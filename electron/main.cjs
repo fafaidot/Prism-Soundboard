@@ -1729,20 +1729,9 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker
 ipcMain.handle('check-app-updates', async () => {
   return new Promise((resolve) => {
-    const currentVersion = app.getVersion() || '1.3.7';
-    let owner = 'Fafa';
-    let repo = 'Soundboard';
-
-    try {
-      if (fs.existsSync(SETTINGS_FILE)) {
-        const s = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
-        if (s.githubRepo && s.githubRepo.includes('/')) {
-          const parts = s.githubRepo.split('/');
-          owner = parts[0].trim();
-          repo = parts[1].trim();
-        }
-      }
-    } catch (e) {}
+    const currentVersion = app.getVersion() || '1.3.8';
+    const owner = 'fafaidot';
+    const repo = 'Prism-Soundboard';
 
     const options = {
       hostname: 'api.github.com',

@@ -262,7 +262,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.3.7',
+        currentVersion: '1.3.8',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -1002,11 +1002,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
                         <span>Prism Soundboard</span>
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">
-                          v1.3.7
+                          v1.3.8
                         </span>
                       </h4>
                       <p className="text-[11.5px] text-[#7e8697]">
-                        Direct GitHub releases update channel
+                        Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
                       </p>
                     </div>
                   </div>
@@ -1125,13 +1125,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="pt-1">
                   <input
                     type="text"
-                    value={localSettings.githubRepo || 'Fafa/Soundboard'}
-                    onChange={(e) => setLocalSettings((prev) => ({ ...prev, githubRepo: e.target.value }))}
-                    placeholder="Owner/Repository (e.g. Fafa/Soundboard)"
-                    className="w-full max-w-md px-3.5 py-2.5 bg-[#111319] border border-[#262a38] rounded-[10px] text-[12.5px] text-white placeholder-[#5d6476] font-mono focus:outline-none focus:border-[var(--accent-color,#38bdf8)] transition-colors"
+                    disabled
+                    value="fafaidot/Prism-Soundboard"
+                    className="w-full max-w-md px-3.5 py-2.5 bg-[#111319]/60 border border-[#262a38] rounded-[10px] text-[12.5px] text-[#00ff88] font-mono focus:outline-none cursor-default"
                   />
                   <p className="text-[10.5px] text-[#606778] mt-1.5">
-                    Format: <code className="text-[#a4abbd]">username/repository</code>. When you publish a new release or tag on GitHub, clicking "Check for Updates" will find it immediately.
+                    Hardcoded repository source: <code className="text-[#a4abbd]">fafaidot/Prism-Soundboard</code>. Clicking "Check for Updates" directly queries this repository's releases.
                   </p>
                 </div>
               </div>
@@ -1142,7 +1141,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Clean Footer */}
         <div className="px-7 py-4.5 border-t border-[var(--theme-border,#222436)] flex items-center justify-between bg-[var(--theme-bg-header,#090a0f)]">
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.3.7</span>
+            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.3.8</span>
             <span className="text-[#3b4152]">•</span>
             <button
               onClick={() => {
