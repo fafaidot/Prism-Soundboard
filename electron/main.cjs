@@ -1729,7 +1729,16 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker
 ipcMain.handle('check-app-updates', async () => {
   return new Promise((resolve) => {
-    const currentVersion = app.getVersion() || '1.3.8';
+    // Read actual version from package.json rather than electron binary version
+    let currentVersion = '1.3.8';
+    try {
+      const pkgPath = path.join(__dirname, '../package.json');
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+        if (pkg.version) currentVersion = pkg.version;
+      }
+    } catch (e) {}
+
     const owner = 'fafaidot';
     const repo = 'Prism-Soundboard';
 
