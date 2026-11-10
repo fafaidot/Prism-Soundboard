@@ -15,7 +15,8 @@ import { audioEngine } from './services/audioEngine';
 import { SoundItem, AudioSettings, YouTubeSearchResult } from './types';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Download, X, ExternalLink } from 'lucide-react';
+import prismLogo from './assets/Prism.png';
 
 const DEFAULT_SETTINGS: AudioSettings = {
   inputDeviceId: '',
@@ -86,6 +87,9 @@ export const App: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
+  // Automatic Startup Update Modal State
+  const [startupUpdate, setStartupUpdate] = useState<any | null>(null);
+
   // Synchronize audio engine with active state and real-time mic meter (MAIN WINDOW ONLY)
   useEffect(() => {
     if (isStandaloneOverlay) return;
@@ -151,6 +155,19 @@ export const App: React.FC = () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [activeSoundIds.length, isStandaloneOverlay]);
+
+  // Listen for automatic startup update notification from main process
+  useEffect(() => {
+    if (isStandaloneOverlay) return;
+    if (window.soundboardAPI?.onStartupUpdateAvailable) {
+      const cleanup = window.soundboardAPI.onStartupUpdateAvailable((updateData) => {
+        if (updateData && updateData.hasUpdate) {
+          setStartupUpdate(updateData);
+        }
+      });
+      return cleanup;
+    }
+  }, [isStandaloneOverlay]);
 
   const currentTheme = useMemo(() => {
     return getTheme(settings.theme, settings.accentColor);
@@ -1493,6 +1510,84 @@ export const App: React.FC = () => {
         }}
         accentColor={settings.accentColor}
       />
+
+      {/* Startup Update Alert Modal */}
+      {startupUpdate && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-[#11131a] border border-[#232736] rounded-[20px] shadow-2xl p-6 text-white space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-[12px] bg-[var(--accent-color,#38bdf8)]/15 border border-[var(--accent-color,#38bdf8)]/30 flex items-center justify-center">
+                  <Sparkles size={20} className="text-[var(--accent-color,#38bdf8)]" />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-white flex items-center gap-2">
+                    <span>New Version Available</span>
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--accent-color,#38bdf8)] text-black font-extrabold">
+                      {startupUpdate.latestVersion || startupUpdate.releaseName}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-[#7e8697]">
+                    An update for Prism Soundboard is ready to download
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setStartupUpdate(null)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[#7e8697] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {startupUpdate.releaseNotes && (
+              <div className="p-3 bg-black/40 rounded-[12px] border border-white/5 text-[11.5px] text-[#c4cad7] max-h-40 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
+                {startupUpdate.releaseNotes}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                onClick={() => {
+                  if (window.soundboardAPI?.openExternal && startupUpdate.releaseUrl) {
+                    window.soundboardAPI.openExternal(startupUpdate.releaseUrl);
+                  }
+                }}
+                className="text-[11.5px] text-[#7e8697] hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <span>View Release Notes</span>
+                <ExternalLink size={12} />
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => setStartupUpdate(null)}
+                  className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-[#8e96a8] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    const targetUrl = startupUpdate.downloadUrl || startupUpdate.releaseUrl;
+                    if (window.soundboardAPI?.openExternal && targetUrl) {
+                      window.soundboardAPI.openExternal(targetUrl);
+                    }
+                    setStartupUpdate(null);
+                  }}
+                  style={{
+                    backgroundColor: 'var(--accent-color, #38bdf8)',
+                    color: '#000000',
+                  }}
+                  className="flex items-center gap-2 px-5 py-2 rounded-[10px] text-[12px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-lg"
+                >
+                  <Download size={14} />
+                  <span>Update Now</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GPU Accelerated Floating Drag Clone Card */}
       {isPointerDragging && pointerDragSound && pointerDragRect && (

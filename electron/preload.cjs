@@ -92,6 +92,11 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   closeOverlay: () => ipcRenderer.invoke('close-overlay'),
   showMainWindow: () => ipcRenderer.invoke('show-main-window'),
   checkAppUpdates: () => ipcRenderer.invoke('check-app-updates'),
+  onStartupUpdateAvailable: (callback) => {
+    const handler = (_event, updateData) => callback(updateData);
+    ipcRenderer.on('startup-update-available', handler);
+    return () => ipcRenderer.removeListener('startup-update-available', handler);
+  },
 
   // Inter-Window IPC Events (Overlay <-> Main sync)
   sendIpcCommand: (channel, data) => ipcRenderer.send(channel, data),

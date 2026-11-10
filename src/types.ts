@@ -158,6 +158,7 @@ export interface SoundboardAPI {
     owner?: string;
     repo?: string;
   }>;
+  onStartupUpdateAvailable?: (callback: (update: any) => void) => () => void;
   sendIpcCommand?: (channel: string, data?: any) => void;
   onIpcCommand?: (channel: string, callback: (data: any) => void) => () => void;
 }

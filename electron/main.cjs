@@ -454,6 +454,16 @@ function createWindow() {
     } else {
       mainWindow.show();
     }
+
+    // Automatic Startup Update Check (checks 3.5s after window shows)
+    setTimeout(async () => {
+      try {
+        const update = await fetchLatestGitHubRelease();
+        if (update && update.hasUpdate && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('startup-update-available', update);
+        }
+      } catch (e) {}
+    }, 3500);
   });
 
   mainWindow.on('close', (e) => {
@@ -1726,11 +1736,10 @@ ipcMain.handle('rename-virtual-mic', async () => {
   });
 });
 
-// GitHub Release Update Checker
-ipcMain.handle('check-app-updates', async () => {
+// GitHub Release Update Checker helper
+function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    // Read actual version from package.json rather than electron binary version
-    let currentVersion = '1.3.8';
+    let currentVersion = '1.4.0';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -1835,6 +1844,11 @@ ipcMain.handle('check-app-updates', async () => {
       });
     });
   });
+}
+
+// GitHub Release Update Checker IPC
+ipcMain.handle('check-app-updates', async () => {
+  return fetchLatestGitHubRelease();
 });
 
 function compareSemver(v1, v2) {
