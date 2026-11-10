@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+:root {
+  --accent-color: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --accent-soft: rgba(56, 189, 248, 0.15);
+
+  --theme-bg-app: #0b0c0f;
+  --theme-bg-surface: #111317;
+  --theme-bg-card: #171920;
+  --theme-bg-card-hover: #1e212b;
+  --theme-bg-card-selected: #252936;
+  --theme-bg-sidebar: #0f1014;
+  --theme-bg-header: #08080b;
+
+  --theme-border: #20232d;
+  --theme-border-hover: #2d3240;
+  --theme-border-highlight: rgba(56, 189, 248, 0.55);
+
+  --theme-text-primary: #ffffff;
+  --theme-text-secondary: #94a3b8;
+  --theme-text-muted: #64748b;
+}
+
+.bg-accent {
+  background-color: var(--accent-color, #38bdf8) !important;
+}
+
+.bg-accent-soft {
+  background-color: var(--accent-soft, rgba(56, 189, 248, 0.15)) !important;
+}
+
+.text-accent {
+  color: var(--accent-color, #38bdf8) !important;
+}
+
+.border-accent {
+  border-color: var(--accent-color, #38bdf8) !important;
+}
+
+.ring-accent {
+  --tw-ring-color: var(--accent-color, #38bdf8) !important;
+}
+
+/* Theme background & border utilities */
+.bg-theme-app {
+  background-color: var(--theme-bg-app, #0b0c0f);
+}
+
+.bg-theme-surface {
+  background-color: var(--theme-bg-surface, #111317);
+}
+
+.bg-theme-card {
+  background-color: var(--theme-bg-card, #171920);
+}
+
+.bg-theme-card-hover:hover {
+  background-color: var(--theme-bg-card-hover, #1e212b);
+}
+
+.bg-theme-sidebar {
+  background-color: var(--theme-bg-sidebar, #0f1014);
+}
+
+.bg-theme-header {
+  background-color: var(--theme-bg-header, #08080b);
+}
+
+.border-theme {
+  border-color: var(--theme-border, #20232d);
+}
+
+.border-theme-hover:hover {
+  border-color: var(--theme-border-hover, #2d3240);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+input, textarea, select {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "Plus Jakarta Sans", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.012em;
+    overflow: hidden;
+    background-color: var(--theme-bg-app, #0b0c0f);
+    color: var(--theme-text-primary, #ffffff);
+  }
+}
+
+/* Hide scrollbars completely where desired (no-scrollbar class) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Windows 11 Fluent Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 140, 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 140, 0.45);
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag-region {
+  -webkit-app-region: no-drag;
+}

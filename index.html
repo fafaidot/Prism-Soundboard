@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prism Soundboard</title>
+    <link rel="icon" type="image/png" href="/Prism.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // Capture phase intercepts before any element can begin native dragging
+      window.addEventListener('dragstart', function(e) {
+        e.preventDefault();
+        return false;
+      }, true);
+    </script>
+  </head>
+  <body class="select-none antialiased text-white overflow-hidden bg-transparent">
+    <div id="root" class="bg-transparent"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
