@@ -1794,14 +1794,18 @@ function fetchLatestGitHubRelease() {
 
           const isNewer = compareSemver(latestTag, cleanCurrent) > 0;
 
-          // Find Windows installer or portable asset if available
+          // Prefer the Setup/Installer asset first so it updates installed shortcuts and files; fallback to any .exe
           let downloadUrl = release.html_url;
           if (Array.isArray(release.assets)) {
-            const exeAsset = release.assets.find(
+            const setupAsset = release.assets.find(
+              (a) => a.name && a.name.toLowerCase().includes('setup') && a.name.endsWith('.exe')
+            );
+            const anyExeAsset = release.assets.find(
               (a) => a.name && (a.name.endsWith('.exe') || a.name.endsWith('.msi'))
             );
-            if (exeAsset && exeAsset.browser_download_url) {
-              downloadUrl = exeAsset.browser_download_url;
+            const targetAsset = setupAsset || anyExeAsset;
+            if (targetAsset && targetAsset.browser_download_url) {
+              downloadUrl = targetAsset.browser_download_url;
             }
           }
 
