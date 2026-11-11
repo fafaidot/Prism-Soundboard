@@ -15,7 +15,7 @@ import { audioEngine } from './services/audioEngine';
 import { SoundItem, AudioSettings, YouTubeSearchResult } from './types';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
-import { Plus, Sparkles, Download, X, ExternalLink } from 'lucide-react';
+import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw } from 'lucide-react';
 import prismLogo from './assets/Prism.png';
 
 const DEFAULT_SETTINGS: AudioSettings = {
@@ -89,6 +89,9 @@ export const App: React.FC = () => {
 
   // Automatic Startup Update Modal State
   const [startupUpdate, setStartupUpdate] = useState<any | null>(null);
+  const [isUpdatingApp, setIsUpdatingApp] = useState(false);
+  const [updateProgressPercent, setUpdateProgressPercent] = useState<number>(0);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   // Synchronize audio engine with active state and real-time mic meter (MAIN WINDOW ONLY)
   useEffect(() => {
@@ -159,14 +162,28 @@ export const App: React.FC = () => {
   // Listen for automatic startup update notification from main process
   useEffect(() => {
     if (isStandaloneOverlay) return;
+
+    let cleanupProgress: (() => void) | undefined;
+    if (window.soundboardAPI?.onUpdateDownloadProgress) {
+      cleanupProgress = window.soundboardAPI.onUpdateDownloadProgress((progress) => {
+        setIsUpdatingApp(true);
+        setUpdateProgressPercent(progress.percent);
+      });
+    }
+
+    let cleanupStartup: (() => void) | undefined;
     if (window.soundboardAPI?.onStartupUpdateAvailable) {
-      const cleanup = window.soundboardAPI.onStartupUpdateAvailable((updateData) => {
+      cleanupStartup = window.soundboardAPI.onStartupUpdateAvailable((updateData) => {
         if (updateData && updateData.hasUpdate) {
           setStartupUpdate(updateData);
         }
       });
-      return cleanup;
     }
+
+    return () => {
+      if (cleanupProgress) cleanupProgress();
+      if (cleanupStartup) cleanupStartup();
+    };
   }, [isStandaloneOverlay]);
 
   const currentTheme = useMemo(() => {
@@ -1546,45 +1563,94 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2">
-              <button
-                onClick={() => {
-                  if (window.soundboardAPI?.openExternal && startupUpdate.releaseUrl) {
-                    window.soundboardAPI.openExternal(startupUpdate.releaseUrl);
-                  }
-                }}
-                className="text-[11.5px] text-[#7e8697] hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <span>View Release Notes</span>
-                <ExternalLink size={12} />
-              </button>
+            {updateError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-[10px] text-[11.5px]">
+                {updateError}
+              </div>
+            )}
 
-              <div className="flex items-center gap-2.5">
-                <button
-                  onClick={() => setStartupUpdate(null)}
-                  className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-[#8e96a8] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  Later
-                </button>
+            {isUpdatingApp ? (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-white font-semibold flex items-center gap-2">
+                    <RefreshCw size={13} className="animate-spin text-[var(--accent-color,#38bdf8)]" />
+                    <span>Downloading update installer...</span>
+                  </span>
+                  <span className="text-[var(--accent-color,#38bdf8)] font-mono font-bold">
+                    {updateProgressPercent}%
+                  </span>
+                </div>
+                <div className="w-full h-2.5 bg-black/50 rounded-full overflow-hidden border border-white/10">
+                  <div
+                    className="h-full bg-[var(--accent-color,#38bdf8)] rounded-full transition-all duration-150"
+                    style={{ width: `${updateProgressPercent}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-[#7e8697]">
+                  {updateProgressPercent >= 100
+                    ? 'Launching setup and restarting Prism Soundboard...'
+                    : 'The app will close and update automatically when finished.'}
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pt-2">
                 <button
                   onClick={() => {
-                    const targetUrl = startupUpdate.downloadUrl || startupUpdate.releaseUrl;
-                    if (window.soundboardAPI?.openExternal && targetUrl) {
-                      window.soundboardAPI.openExternal(targetUrl);
+                    if (window.soundboardAPI?.openExternal && startupUpdate.releaseUrl) {
+                      window.soundboardAPI.openExternal(startupUpdate.releaseUrl);
                     }
-                    setStartupUpdate(null);
                   }}
-                  style={{
-                    backgroundColor: 'var(--accent-color, #38bdf8)',
-                    color: '#000000',
-                  }}
-                  className="flex items-center gap-2 px-5 py-2 rounded-[10px] text-[12px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-lg"
+                  className="text-[11.5px] text-[#7e8697] hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <Download size={14} />
-                  <span>Update Now</span>
+                  <span>View Release Notes</span>
+                  <ExternalLink size={12} />
                 </button>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => setStartupUpdate(null)}
+                    className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-[#8e96a8] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    Later
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const downloadUrl = startupUpdate.downloadUrl;
+                      if (!downloadUrl) {
+                        if (window.soundboardAPI?.openExternal && startupUpdate.releaseUrl) {
+                          window.soundboardAPI.openExternal(startupUpdate.releaseUrl);
+                        }
+                        setStartupUpdate(null);
+                        return;
+                      }
+
+                      setIsUpdatingApp(true);
+                      setUpdateError(null);
+                      setUpdateProgressPercent(0);
+
+                      if (window.soundboardAPI?.downloadAndInstallUpdate) {
+                        const res = await window.soundboardAPI.downloadAndInstallUpdate(downloadUrl);
+                        if (!res.success) {
+                          setIsUpdatingApp(false);
+                          setUpdateError(res.error || 'Failed to download or install update.');
+                        }
+                      } else if (window.soundboardAPI?.openExternal) {
+                        window.soundboardAPI.openExternal(downloadUrl);
+                        setStartupUpdate(null);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: 'var(--accent-color, #38bdf8)',
+                      color: '#000000',
+                    }}
+                    className="flex items-center gap-2 px-5 py-2 rounded-[10px] text-[12px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-lg"
+                  >
+                    <Download size={14} />
+                    <span>Update Now</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

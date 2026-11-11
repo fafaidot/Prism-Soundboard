@@ -97,6 +97,12 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
     ipcRenderer.on('startup-update-available', handler);
     return () => ipcRenderer.removeListener('startup-update-available', handler);
   },
+  downloadAndInstallUpdate: (downloadUrl) => ipcRenderer.invoke('download-and-install-update', downloadUrl),
+  onUpdateDownloadProgress: (callback) => {
+    const handler = (_event, progress) => callback(progress);
+    ipcRenderer.on('update-download-progress', handler);
+    return () => ipcRenderer.removeListener('update-download-progress', handler);
+  },
 
   // Inter-Window IPC Events (Overlay <-> Main sync)
   sendIpcCommand: (channel, data) => ipcRenderer.send(channel, data),

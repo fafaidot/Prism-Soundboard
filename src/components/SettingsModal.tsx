@@ -76,6 +76,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     owner?: string;
     repo?: string;
   } | null>(null);
+  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
+  const [downloadProgressPercent, setDownloadProgressPercent] = useState<number>(0);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (window.soundboardAPI?.onUpdateDownloadProgress) {
+      return window.soundboardAPI.onUpdateDownloadProgress((progress) => {
+        setIsDownloadingUpdate(true);
+        setDownloadProgressPercent(progress.percent);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -1039,18 +1051,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                           {updateResult.downloadUrl && (
                             <button
-                              onClick={() => {
-                                if (window.soundboardAPI?.openExternal && updateResult.downloadUrl) {
-                                  window.soundboardAPI.openExternal(updateResult.downloadUrl);
+                              disabled={isDownloadingUpdate}
+                              onClick={async () => {
+                                const downloadUrl = updateResult.downloadUrl;
+                                if (!downloadUrl) return;
+
+                                setIsDownloadingUpdate(true);
+                                setDownloadError(null);
+                                setDownloadProgressPercent(0);
+
+                                if (window.soundboardAPI?.downloadAndInstallUpdate) {
+                                  const res = await window.soundboardAPI.downloadAndInstallUpdate(downloadUrl);
+                                  if (!res.success) {
+                                    setIsDownloadingUpdate(false);
+                                    setDownloadError(res.error || 'Failed to download or install update.');
+                                  }
+                                } else if (window.soundboardAPI?.openExternal) {
+                                  window.soundboardAPI.openExternal(downloadUrl);
+                                  setIsDownloadingUpdate(false);
                                 }
                               }}
-                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[8px] bg-[#00ff88] text-black text-[11.5px] font-bold hover:brightness-110 transition-all cursor-pointer"
+                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[8px] bg-[#00ff88] text-black text-[11.5px] font-bold hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
                             >
                               <Download size={13} />
-                              <span>Download Update</span>
+                              <span>{isDownloadingUpdate ? 'Downloading...' : 'Update & Restart'}</span>
                             </button>
                           )}
                         </div>
+
+                        {/* In-app download progress bar */}
+                        {isDownloadingUpdate && (
+                          <div className="p-3 bg-black/40 rounded-[10px] border border-white/10 space-y-2">
+                            <div className="flex items-center justify-between text-[11.5px]">
+                              <span className="text-white font-medium flex items-center gap-1.5">
+                                <RefreshCw size={12} className="animate-spin text-[#00ff88]" />
+                                <span>Downloading update...</span>
+                              </span>
+                              <span className="text-[#00ff88] font-mono font-bold">
+                                {downloadProgressPercent}%
+                              </span>
+                            </div>
+                            <div className="w-full h-2 bg-black/60 rounded-full overflow-hidden border border-white/10">
+                              <div
+                                className="h-full bg-[#00ff88] rounded-full transition-all duration-150"
+                                style={{ width: `${downloadProgressPercent}%` }}
+                              />
+                            </div>
+                            <p className="text-[11px] text-[#7e8697]">
+                              {downloadProgressPercent >= 100
+                                ? 'Launching installer and updating Prism Soundboard...'
+                                : 'Downloading directly in background — the installer will launch automatically.'}
+                            </p>
+                          </div>
+                        )}
+
+                        {downloadError && (
+                          <div className="p-2.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-[8px] text-[11.5px]">
+                            {downloadError}
+                          </div>
+                        )}
 
                         {updateResult.releaseNotes && (
                           <div className="p-3 bg-black/30 rounded-[10px] text-[11.5px] text-[#c4cad7] max-h-36 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed border border-white/5">

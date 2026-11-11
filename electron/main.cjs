@@ -1851,6 +1851,130 @@ ipcMain.handle('check-app-updates', async () => {
   return fetchLatestGitHubRelease();
 });
 
+// Direct in-app update downloader and installer (No browser needed)
+ipcMain.handle('download-and-install-update', async (event, downloadUrl) => {
+  if (!downloadUrl) {
+    return { success: false, error: 'No download URL provided.' };
+  }
+
+  const senderWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+
+  return new Promise((resolve) => {
+    try {
+      const tempDir = app.getPath('temp');
+      const installerFileName = `Prism_Soundboard_Setup_Update_${Date.now()}.exe`;
+      const installerPath = path.join(tempDir, installerFileName);
+      const fileStream = fs.createWriteStream(installerPath);
+
+      function downloadStream(url, redirectCount = 0) {
+        if (redirectCount > 10) {
+          fileStream.close();
+          try { fs.unlinkSync(installerPath); } catch (e) {}
+          return resolve({ success: false, error: 'Too many download redirects.' });
+        }
+
+        const client = url.startsWith('https') ? https : http;
+        const options = {
+          headers: {
+            'User-Agent': 'Prism-Soundboard-Updater',
+            Accept: 'application/octet-stream, */*',
+          },
+        };
+
+        const req = client.get(url, options, (res) => {
+          // Follow HTTP redirects (GitHub asset releases redirect to AWS S3 CDN)
+          if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+            return downloadStream(res.headers.location, redirectCount + 1);
+          }
+
+          if (res.statusCode !== 200) {
+            fileStream.close();
+            try { fs.unlinkSync(installerPath); } catch (e) {}
+            return resolve({
+              success: false,
+              error: `Server responded with HTTP status ${res.statusCode}`,
+            });
+          }
+
+          const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+          let transferredBytes = 0;
+          let lastReportPercent = -1;
+
+          res.on('data', (chunk) => {
+            transferredBytes += chunk.length;
+            fileStream.write(chunk);
+
+            if (totalBytes > 0 && senderWindow && !senderWindow.isDestroyed()) {
+              const percent = Math.min(100, Math.round((transferredBytes / totalBytes) * 100));
+              if (percent !== lastReportPercent) {
+                lastReportPercent = percent;
+                senderWindow.webContents.send('update-download-progress', {
+                  percent,
+                  transferred: transferredBytes,
+                  total: totalBytes,
+                });
+              }
+            }
+          });
+
+          res.on('end', () => {
+            fileStream.end(() => {
+              if (senderWindow && !senderWindow.isDestroyed()) {
+                senderWindow.webContents.send('update-download-progress', {
+                  percent: 100,
+                  transferred: transferredBytes,
+                  total: totalBytes || transferredBytes,
+                });
+              }
+
+              // Give Windows filesystem a brief moment to release handles, then launch installer
+              setTimeout(() => {
+                try {
+                  console.log('[Updater] Launching downloaded installer:', installerPath);
+                  const child = spawn(installerPath, [], {
+                    detached: true,
+                    stdio: 'ignore',
+                  });
+                  child.unref();
+
+                  // Safely quit running instance so the NSIS installer can update files smoothly
+                  setTimeout(() => {
+                    app.quit();
+                  }, 600);
+
+                  resolve({ success: true });
+                } catch (spawnErr) {
+                  console.error('[Updater] Failed to execute installer:', spawnErr);
+                  resolve({
+                    success: false,
+                    error: `Failed to launch installer: ${spawnErr.message}`,
+                  });
+                }
+              }, 400);
+            });
+          });
+
+          res.on('error', (err) => {
+            fileStream.close();
+            try { fs.unlinkSync(installerPath); } catch (e) {}
+            resolve({ success: false, error: err.message || 'Stream error during download.' });
+          });
+        });
+
+        req.on('error', (err) => {
+          fileStream.close();
+          try { fs.unlinkSync(installerPath); } catch (e) {}
+          resolve({ success: false, error: err.message || 'Network error while connecting.' });
+        });
+      }
+
+      downloadStream(downloadUrl);
+    } catch (err) {
+      resolve({ success: false, error: err.message || 'Unknown updater error.' });
+    }
+  });
+});
+
 function compareSemver(v1, v2) {
   if (!v1 || !v2) return 0;
   const p1 = v1.split('.').map((n) => parseInt(n) || 0);

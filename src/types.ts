@@ -159,6 +159,8 @@ export interface SoundboardAPI {
     repo?: string;
   }>;
   onStartupUpdateAvailable?: (callback: (update: any) => void) => () => void;
+  downloadAndInstallUpdate?: (downloadUrl: string) => Promise<{ success: boolean; error?: string }>;
+  onUpdateDownloadProgress?: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => () => void;
   sendIpcCommand?: (channel: string, data?: any) => void;
   onIpcCommand?: (channel: string, callback: (data: any) => void) => () => void;
 }
