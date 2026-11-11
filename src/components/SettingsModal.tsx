@@ -1013,9 +1013,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
                         <span>Prism Soundboard</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">
-                          v1.4.0
-                        </span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.4.0</span>
                       </h4>
                       <p className="text-[11.5px] text-[#7e8697]">
                         Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
