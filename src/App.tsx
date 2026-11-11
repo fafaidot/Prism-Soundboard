@@ -97,6 +97,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (isStandaloneOverlay) return;
 
+    // Initialize audio engine only once
     audioEngine.init();
 
     const unsubscribeState = audioEngine.subscribe(() => {
@@ -124,7 +125,7 @@ export const App: React.FC = () => {
       unsubscribeMic();
       window.removeEventListener('beforeunload', handleUnload);
     };
-  }, [isStandaloneOverlay]);
+  }, []);
 
   // Live playback progress polling loop (throttled smoothly at ~15fps when sounds are playing to prevent overlay lag)
   useEffect(() => {

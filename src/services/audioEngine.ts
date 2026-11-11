@@ -211,6 +211,11 @@ class AudioEngine {
         this.settings.secondaryDeviceId = cableId;
       }
 
+      const realSpeaker = await this.findPhysicalSpeakerId();
+      if (realSpeaker && (!this.settings.primaryDeviceId || this.settings.primaryDeviceId === 'default')) {
+        this.settings.primaryDeviceId = realSpeaker;
+      }
+
       await this.setupAudioGraph();
       this.startMicMeterLoop();
     } catch (e) {
@@ -222,19 +227,15 @@ class AudioEngine {
     const prevInput = this.settings.inputDeviceId;
     const prevPrimary = this.settings.primaryDeviceId;
     const prevRecordSource = this.settings.recordSource ?? 'screen';
+    const prevHearMyself = this.settings.hearMyself;
+    const prevMicVol = this.settings.micInputVolume;
+    const prevSpkVol = this.settings.masterSpeakerVolume;
 
     this.settings = {
       ...this.settings,
       ...newSettings,
       recordSource: newSettings.recordSource ?? this.settings.recordSource ?? 'screen',
     };
-
-    // Ensure device labels are unlocked and auto-detect dedicated CABLE Input sink ID
-    await this.ensureDeviceLabelsUnlocked();
-    const cableId = await this.findCableInputDeviceId();
-    if (cableId) {
-      this.settings.secondaryDeviceId = cableId;
-    }
 
     const ctx = this.getAudioContext();
     if (ctx.state === 'suspended') {
@@ -247,30 +248,30 @@ class AudioEngine {
     }
 
     // 1. Live Voice Input Volume
-    this.setMicInputVolume(this.settings.micInputVolume ?? 100);
+    if (prevMicVol !== this.settings.micInputVolume) {
+      this.setMicInputVolume(this.settings.micInputVolume ?? 100);
+    }
 
-    // 2. Live Hear Myself Toggle (Plays physical voice to headphones scaled by mic volume ONLY when Hear Myself is ON)
-    if (this.monitorGainNode) {
+    // 2. Live Hear Myself Toggle
+    if (this.monitorGainNode && (prevHearMyself !== this.settings.hearMyself || prevMicVol !== this.settings.micInputVolume)) {
       const isHearMyself = Boolean(this.settings.hearMyself);
       const vol = Math.max(0, Math.min(2.0, (this.settings.micInputVolume ?? 100) / 100));
       this.monitorGainNode.gain.setValueAtTime(isHearMyself ? vol : 0.0, ctx.currentTime);
     }
 
     // 3. Live Master Volumes
-    this.setMasterSpeakerVolume(this.settings.masterSpeakerVolume ?? 100);
-    this.setMasterMicVolume(this.settings.masterMicVolume ?? 100);
-
-    // 4. Update dedicated Virtual Cable AudioContext sink
-    if (this.cableCtx && cableId && 'setSinkId' in this.cableCtx) {
-      try {
-        await (this.cableCtx as any).setSinkId(cableId);
-      } catch (e) {
-        console.warn('[Prism Audio Engine] cableCtx update setSinkId error:', e);
-      }
+    if (prevSpkVol !== this.settings.masterSpeakerVolume) {
+      this.setMasterSpeakerVolume(this.settings.masterSpeakerVolume ?? 100);
+      this.setMasterMicVolume(this.settings.masterMicVolume ?? 100);
     }
 
-    const needsGraphSetup = !this.micStream || prevInput !== newSettings.inputDeviceId || prevPrimary !== newSettings.primaryDeviceId;
+    const needsGraphSetup = !this.micStream || (newSettings.inputDeviceId && prevInput !== newSettings.inputDeviceId) || (newSettings.primaryDeviceId && prevPrimary !== newSettings.primaryDeviceId);
     if (needsGraphSetup) {
+      await this.ensureDeviceLabelsUnlocked();
+      const cableId = await this.findCableInputDeviceId();
+      if (cableId) {
+        this.settings.secondaryDeviceId = cableId;
+      }
       await this.setupAudioGraph();
     } else if (prevRecordSource !== this.settings.recordSource) {
       await this.rebuildClipBuffer(ctx);
@@ -365,7 +366,11 @@ class AudioEngine {
     }
   }
 
+  private isInitializingGraph = false;
+
   public async setupAudioGraph() {
+    if (this.isInitializingGraph) return;
+    this.isInitializingGraph = true;
     try {
       const ctx = this.getAudioContext();
       if (ctx.state === 'suspended') {
@@ -651,6 +656,8 @@ class AudioEngine {
       console.log('[Prism Audio Engine] Physical Mic linked to hardware:', trackLabel || 'Microphone');
     } catch (err) {
       console.error('[Prism Audio Engine] Setup Error:', err);
+    } finally {
+      this.isInitializingGraph = false;
     }
   }
 

@@ -500,8 +500,10 @@ if (!gotTheLock) {
   });
 
 function ensurePhysicalDefaultSpeakers() {
-  const psScript = `
-    $script = @"
+  // Run asynchronously without blocking application initialization or freezing UI input
+  setTimeout(() => {
+    const psScript = `
+      $script = @"
 using System;
 using System.Runtime.InteropServices;
 public class CoreAudioHelper {
@@ -530,20 +532,22 @@ public class CoreAudioHelper {
     }
 }
 "@
-    Add-Type -TypeDefinition $script -ErrorAction SilentlyContinue
-    $render = Get-ChildItem "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render" | ForEach-Object {
-        $p = Get-ItemProperty "$($_.PSPath)\\Properties" -ErrorAction SilentlyContinue
-        if ($p) { [PSCustomObject]@{ Id = $_.PSChildName; Desc = $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' } }
-    }
-    $target = $render | Where-Object { ($_.Desc -like "*Headset Earphone*" -or $_.Desc -like "*HyperX*" -or $_.Desc -like "*Realtek*") -and ($_.Desc -notlike "*CABLE*") } | Select-Object -First 1
-    if ($target) {
-        [CoreAudioHelper]::SetDefault($target.Id)
-    }
-  `.replace(/\r?\n\s*/g, ' ');
+      Add-Type -TypeDefinition $script -ErrorAction SilentlyContinue
+      $render = Get-ChildItem "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render" | ForEach-Object {
+          $p = Get-ItemProperty "$($_.PSPath)\\Properties" -ErrorAction SilentlyContinue
+          if ($p) { [PSCustomObject]@{ Id = $_.PSChildName; Desc = $p.'{a45c254e-df1c-4efd-8020-67d146a850e0},2' } }
+      }
+      $target = $render | Where-Object { ($_.Desc -like "*Headset Earphone*" -or $_.Desc -like "*HyperX*" -or $_.Desc -like "*Realtek*") -and ($_.Desc -notlike "*CABLE*") } | Select-Object -First 1
+      if ($target) {
+          [CoreAudioHelper]::SetDefault($target.Id)
+      }
+    `.replace(/\r?\n\s*/g, ' ');
 
-  try {
-    spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], { windowsHide: true });
-  } catch (e) {}
+    try {
+      const ps = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], { windowsHide: true });
+      ps.unref();
+    } catch (e) {}
+  }, 1000);
 }
 
   app.whenReady().then(() => {
@@ -1739,7 +1743,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.4.1';
+    let currentVersion = '1.4.2';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
