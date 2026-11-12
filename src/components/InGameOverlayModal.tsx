@@ -667,33 +667,15 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         </button>
                       ))}
 
-                      {/* Source header & options */}
-                      <div className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#8e97aa] border-t border-[var(--theme-border,#20232d)] mt-1.5">
-                        Recording Source
+                      {/* Source indicator */}
+                      <div className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#8e97aa] border-t border-[var(--theme-border,#20232d)] mt-1.5 flex items-center justify-between">
+                        <span>Recording Source</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-white font-mono">LOCKED</span>
                       </div>
-                      {[
-                        { id: 'screen', label: 'Computer Audio (Loopback)' },
-                        { id: 'all', label: 'Screen + Mic Combined' },
-                        { id: 'mic', label: 'Microphone Only' },
-                      ].map((src) => (
-                        <button
-                          key={src.id}
-                          type="button"
-                          onClick={() => {
-                            if (onChangeRecordSource) {
-                              onChangeRecordSource(src.id as any);
-                            }
-                            setShowClipMenu(false);
-                          }}
-                          style={recordSource === src.id ? { color: accent } : undefined}
-                          className={`w-full px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer ${
-                            recordSource === src.id ? 'bg-white/5 font-bold' : 'text-white'
-                          }`}
-                        >
-                          <span className="truncate">{src.label}</span>
-                          {recordSource === src.id && <Check size={12} style={{ color: accent }} />}
-                        </button>
-                      ))}
+                      <div className="px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between text-white bg-white/5">
+                        <span className="truncate">Screen + Mic Combined</span>
+                        <Check size={12} style={{ color: accent }} />
+                      </div>
                     </div>
                   )}
                 </div>

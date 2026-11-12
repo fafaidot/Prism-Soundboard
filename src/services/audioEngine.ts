@@ -33,7 +33,7 @@ class AudioEngine {
     overlayHotkey: 'F8',
     recordHotkey: 'F9',
     recordDuration: 5,
-    recordSource: 'screen',
+    recordSource: 'all',
     theme: 'dark',
     accentColor: '#38bdf8',
     minimizeToTray: true,

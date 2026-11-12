@@ -39,6 +39,7 @@ interface SettingsModalProps {
   deletedCount?: number;
   onOpenDeletedArchive?: () => void;
   sounds?: any[];
+  onOpenClearAllModal?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -50,6 +51,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   deletedCount = 0,
   onOpenDeletedArchive,
   sounds,
+  onOpenClearAllModal,
 }) => {
   const [localSettings, setLocalSettings] = useState<AudioSettings>(settings);
   const [backupMsg, setBackupMsg] = useState<{ text: string; error?: boolean } | null>(null);
@@ -786,20 +788,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-[#8e97aa] mb-1.5">
                       Recording Source
                     </label>
-                    <select
-                      value={localSettings.recordSource || 'screen'}
-                      onChange={(e) =>
-                        setLocalSettings((prev) => ({
-                          ...prev,
-                          recordSource: e.target.value as any,
-                        }))
-                      }
-                      className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white focus:outline-none transition-colors"
-                    >
-                      <option value="screen">Computer Audio (Loopback)</option>
-                      <option value="all">Screen + Mic Combined</option>
-                      <option value="mic">Microphone Only</option>
-                    </select>
+                    <div className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white flex items-center justify-between">
+                      <span className="font-semibold text-white">Screen + Mic Combined</span>
+                      <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-[#31C5F4]/15 text-[#31C5F4] font-medium border border-[#31C5F4]/30">Active</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1157,6 +1149,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span>Restore Deleted ({deletedCount})</span>
                     </button>
                   )}
+                </div>
+              </div>
+
+              {/* Soundboard Library Management / Clear Sounds */}
+              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-white">
+                    <Trash2 size={17} className="text-red-400" />
+                    <span className="text-[13.5px] font-bold">Sound Library Management</span>
+                  </div>
+                  {sounds && sounds.length > 0 && (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-[#8e95a5]">
+                      {sounds.length} {sounds.length === 1 ? 'sound' : 'sounds'} loaded
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11.5px] text-[#7e8697] leading-relaxed">
+                  Clear all sounds from your active library. You will have the option to save a full backup before clearing.
+                </p>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenClearAllModal) {
+                        onClose();
+                        onOpenClearAllModal();
+                      }
+                    }}
+                    disabled={!sounds || sounds.length === 0}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 size={14} />
+                    <span>Clear All Sounds ({sounds?.length || 0})</span>
+                  </button>
                 </div>
               </div>
 

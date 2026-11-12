@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS: AudioSettings = {
   overlayHotkey: 'F8',
   recordHotkey: 'F9',
   recordDuration: 5,
-  recordSource: 'screen',
+  recordSource: 'all',
   theme: 'dark',
   accentColor: '#38bdf8',
   minimizeToTray: true,
@@ -1713,19 +1713,6 @@ export const App: React.FC = () => {
                           </div>
                         </div>
                       </div>
-
-                      {/* Clear All Sounds Button */}
-                      {sounds.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setIsClearAllModalOpen(true)}
-                          className="px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-red-500/10 border border-[#1B222E] hover:border-red-500/40 text-[#8e95a5] hover:text-red-400 text-[11.5px] font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                          title="Clear all sounds from library"
-                        >
-                          <Trash2 size={13} />
-                          <span>Clear All</span>
-                        </button>
-                      )}
                     </div>
 
                     {/* 5-Column Grid */}
@@ -1893,6 +1880,7 @@ export const App: React.FC = () => {
         deletedCount={deletedSounds.length}
         onOpenDeletedArchive={() => setIsRestoreModalOpen(true)}
         sounds={sounds}
+        onOpenClearAllModal={() => setIsClearAllModalOpen(true)}
         onReloadSounds={async () => {
           if (window.soundboardAPI?.loadSounds) {
             const reloaded = await window.soundboardAPI.loadSounds();
