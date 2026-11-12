@@ -67,6 +67,22 @@ export interface AudioSettings {
   githubRepo?: string; // Optional custom GitHub repository "owner/repo" for update checks
   sortBy?: 'custom' | 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration';
   activeFilter?: 'all' | 'clips' | 'youtube' | 'favorites';
+  storageLocation?: string; // Unified root folder, e.g. "D:\Prism" -> contains /Sounds and /Videos
+}
+
+export interface VideoClipItem {
+  id: string;
+  title: string;
+  filePath: string;
+  thumbnailPath?: string;
+  duration: number; // in seconds
+  fileSize: number; // in bytes
+  dateAdded: number; // timestamp
+  isFavorite: boolean;
+  game?: string;
+  fps?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface SoundboardAPI {
@@ -163,6 +179,20 @@ export interface SoundboardAPI {
   onUpdateDownloadProgress?: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => () => void;
   sendIpcCommand?: (channel: string, data?: any) => void;
   onIpcCommand?: (channel: string, callback: (data: any) => void) => () => void;
+
+  // Video Clips & Storage APIs
+  loadVideoClips?: () => Promise<VideoClipItem[]>;
+  saveVideoClips?: (clips: VideoClipItem[]) => Promise<boolean>;
+  saveRecordedVideoClip?: (data: { base64: string; duration: number; title?: string; game?: string; width?: number; height?: number }) => Promise<VideoClipItem>;
+  deleteVideoClip?: (clipId: string) => Promise<boolean>;
+  renameVideoClip?: (clipId: string, newTitle: string) => Promise<boolean>;
+  toggleFavoriteVideoClip?: (clipId: string) => Promise<boolean>;
+  showItemInFolder?: (filePath: string) => Promise<boolean>;
+  extractAudioFromVideoClip?: (clip: VideoClipItem) => Promise<SoundItem | null>;
+  trimVideoClip?: (data: { clipId: string; startSec: number; endSec: number; saveAsNew: boolean }) => Promise<VideoClipItem | null>;
+  getStorageDirectories?: () => Promise<{ root: string; sounds: string; videos: string }>;
+  changeStorageLocation?: (newRootPath: string) => Promise<{ success: boolean; root: string; sounds: string; videos: string; error?: string }>;
+  selectStorageFolderDialog?: () => Promise<string | null>;
 }
 
 declare global {

@@ -12,7 +12,9 @@ import { RestoreDeletedModal } from './components/RestoreDeletedModal';
 import { EditSoundModal } from './components/EditSoundModal';
 import { InGameOverlayModal } from './components/InGameOverlayModal';
 import { audioEngine } from './services/audioEngine';
-import { SoundItem, AudioSettings, YouTubeSearchResult } from './types';
+import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem } from './types';
+import { ClipCard } from './components/ClipCard';
+import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
 import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw } from 'lucide-react';
@@ -86,6 +88,11 @@ export const App: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+
+  // Video Clips State & Viewer
+  const [activeView, setActiveView] = useState<'sounds' | 'clips'>('sounds');
+  const [videoClips, setVideoClips] = useState<VideoClipItem[]>([]);
+  const [activePlayingVideo, setActivePlayingVideo] = useState<VideoClipItem | null>(null);
 
   // Automatic Startup Update Modal State
   const [startupUpdate, setStartupUpdate] = useState<any | null>(null);
@@ -297,6 +304,14 @@ export const App: React.FC = () => {
             setDeletedSounds(savedDeleted);
           }
         }
+
+        // Load Video Clips
+        if (window.soundboardAPI?.loadVideoClips) {
+          const savedClips = await window.soundboardAPI.loadVideoClips();
+          if (savedClips && Array.isArray(savedClips)) {
+            setVideoClips(savedClips);
+          }
+        }
       }
     };
 
@@ -477,7 +492,14 @@ export const App: React.FC = () => {
         })
       : () => {};
 
+    const cleanupVideoClipsSync = window.soundboardAPI.onIpcCommand
+      ? window.soundboardAPI.onIpcCommand('video-clips-updated', (clips: VideoClipItem[]) => {
+          setVideoClips(clips);
+        })
+      : () => {};
+
     return () => {
+      cleanupVideoClipsSync();
       cleanupHotkeys();
       cleanupPanic();
       cleanupRepeatLast();
@@ -1186,6 +1208,9 @@ export const App: React.FC = () => {
 
       {/* Top Command Shelf */}
       <CommandBar
+        activeView={activeView}
+        onChangeView={setActiveView}
+        clipsCount={videoClips.length}
         totalSounds={sounds.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -1274,72 +1299,144 @@ export const App: React.FC = () => {
           className="relative flex-1 flex flex-col overflow-hidden"
         >
           <main className="flex-1 overflow-y-auto px-5 pt-5 pb-28 select-none">
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3">
-              {filteredSounds.map((sound) => (
-                <SoundCard
-                  key={sound.id}
-                  sound={sound}
-                  isSelected={selectedSoundId === sound.id}
-                  isPlaying={activeSoundIds.includes(sound.id)}
-                  playbackProgress={playbackProgressMap[sound.id] || 0}
-                  accentColor={settings.accentColor}
-                  isListeningHotkey={listeningSoundId === sound.id}
-                  isDragging={draggedSoundId === sound.id}
-                  onCardPointerDown={handleCardPointerDown}
-                  onSelect={() => {
-                    if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
-                    setSelectedSoundId(sound.id);
-                  }}
-                  onPlay={() => {
-                    if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
-                    handlePlaySound(sound);
-                  }}
-                  onToggleFavorite={(e) => {
-                    e.stopPropagation();
-                    handleUpdateSound({
-                      ...sound,
-                      isFavorite: !sound.isFavorite,
-                    });
-                  }}
-                  onDelete={(e) => {
-                    e.stopPropagation();
-                    setSelectedSoundId(sound.id);
-                    setIsDeleteModalOpen(true);
-                  }}
-                  onStartListeningHotkey={() => {
-                    setSelectedSoundId(sound.id);
-                    setListeningSoundId(sound.id);
-                  }}
-                  onClearHotkey={() => {
-                    handleUpdateSound({
-                      ...sound,
-                      hotkey: '',
-                    });
-                  }}
-                />
-              ))}
-
-              {/* "+ Add" Square Tile (Matches Voicemod Reference Grid) */}
-              <div
-                onClick={() => setIsYouTubeModalOpen(true)}
-                style={{
-                  backgroundColor: 'var(--theme-bg-card, #171826)',
-                  borderColor: 'var(--theme-border, #222436)',
-                }}
-                className="group aspect-square rounded-[14px] border-2 border-dashed hover:border-[var(--theme-border-highlight)] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.02] shadow-sm"
-                title="Add new sound from YouTube"
-              >
-                <div
-                  style={{ backgroundColor: `${currentTheme.accent}20`, color: currentTheme.accent }}
-                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <Plus size={20} className="stroke-[2.5]" />
-                </div>
-                <span className="text-[12px] font-bold text-[#656c7d] group-hover:text-white transition-colors">
-                  Add
-                </span>
+            {activeView === 'clips' ? (
+              /* Video Clips Grid (Medal Experience) */
+              <div>
+                {videoClips.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+                    <div
+                      style={{ backgroundColor: `${currentTheme.accent}15`, color: currentTheme.accent }}
+                      className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+                    >
+                      <Plus size={28} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-[16px]">No Game Clips Yet</h3>
+                      <p className="text-[12px] text-[#7e8697] max-w-sm mt-1">
+                        Press [{settings.recordHotkey || 'F9'}] anytime in-game to instantly capture and save the last {settings.recordDuration || 15} seconds!
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
+                    {videoClips.map((clip) => (
+                      <ClipCard
+                        key={clip.id}
+                        clip={clip}
+                        accentColor={settings.accentColor}
+                        onClick={() => setActivePlayingVideo(clip)}
+                        onToggleFavorite={async () => {
+                          if (window.soundboardAPI?.toggleFavoriteVideoClip) {
+                            await window.soundboardAPI.toggleFavoriteVideoClip(clip.id);
+                          }
+                          setVideoClips((prev) =>
+                            prev.map((c) => (c.id === clip.id ? { ...c, isFavorite: !c.isFavorite } : c))
+                          );
+                        }}
+                        onOpenFolder={() => {
+                          if (window.soundboardAPI?.showItemInFolder) {
+                            window.soundboardAPI.showItemInFolder(clip.filePath);
+                          }
+                        }}
+                        onRename={async (newTitle) => {
+                          if (window.soundboardAPI?.renameVideoClip) {
+                            await window.soundboardAPI.renameVideoClip(clip.id, newTitle);
+                          }
+                          setVideoClips((prev) =>
+                            prev.map((c) => (c.id === clip.id ? { ...c, title: newTitle } : c))
+                          );
+                        }}
+                        onExtractToSoundboard={async () => {
+                          if (window.soundboardAPI?.extractAudioFromVideoClip) {
+                            const newSound = await window.soundboardAPI.extractAudioFromVideoClip(clip);
+                            if (newSound) {
+                              setSounds((prev) => [newSound, ...prev]);
+                              setActiveView('sounds');
+                              setSelectedSoundId(newSound.id);
+                            }
+                          }
+                        }}
+                        onTrim={() => setActivePlayingVideo(clip)}
+                        onDelete={async () => {
+                          if (window.soundboardAPI?.deleteVideoClip) {
+                            await window.soundboardAPI.deleteVideoClip(clip.id);
+                          }
+                          setVideoClips((prev) => prev.filter((c) => c.id !== clip.id));
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              /* Existing Sounds Grid */
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3">
+                {filteredSounds.map((sound) => (
+                  <SoundCard
+                    key={sound.id}
+                    sound={sound}
+                    isSelected={selectedSoundId === sound.id}
+                    isPlaying={activeSoundIds.includes(sound.id)}
+                    playbackProgress={playbackProgressMap[sound.id] || 0}
+                    accentColor={settings.accentColor}
+                    isListeningHotkey={listeningSoundId === sound.id}
+                    isDragging={draggedSoundId === sound.id}
+                    onCardPointerDown={handleCardPointerDown}
+                    onSelect={() => {
+                      if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
+                      setSelectedSoundId(sound.id);
+                    }}
+                    onPlay={() => {
+                      if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
+                      handlePlaySound(sound);
+                    }}
+                    onToggleFavorite={(e) => {
+                      e.stopPropagation();
+                      handleUpdateSound({
+                        ...sound,
+                        isFavorite: !sound.isFavorite,
+                      });
+                    }}
+                    onDelete={(e) => {
+                      e.stopPropagation();
+                      setSelectedSoundId(sound.id);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    onStartListeningHotkey={() => {
+                      setSelectedSoundId(sound.id);
+                      setListeningSoundId(sound.id);
+                    }}
+                    onClearHotkey={() => {
+                      handleUpdateSound({
+                        ...sound,
+                        hotkey: '',
+                      });
+                    }}
+                  />
+                ))}
+
+                {/* "+ Add" Square Tile (Matches Voicemod Reference Grid) */}
+                <div
+                  onClick={() => setIsYouTubeModalOpen(true)}
+                  style={{
+                    backgroundColor: 'var(--theme-bg-card, #171826)',
+                    borderColor: 'var(--theme-border, #222436)',
+                  }}
+                  className="group aspect-square rounded-[14px] border-2 border-dashed hover:border-[var(--theme-border-highlight)] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.02] shadow-sm"
+                  title="Add new sound from YouTube"
+                >
+                  <div
+                    style={{ backgroundColor: `${currentTheme.accent}20`, color: currentTheme.accent }}
+                    className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <Plus size={20} className="stroke-[2.5]" />
+                  </div>
+                  <span className="text-[12px] font-bold text-[#656c7d] group-hover:text-white transition-colors">
+                    Add
+                  </span>
+                </div>
+              </div>
+            )}
           </main>
 
           {/* Bottom Dock Control Pod (Floating padded pod matching HUD bottom dock design) */}
@@ -1654,6 +1751,51 @@ export const App: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Fullscreen Interactive Video Player Modal */}
+      {activePlayingVideo && (
+        <VideoPlayerModal
+          clip={activePlayingVideo}
+          accentColor={settings.accentColor}
+          onClose={() => setActivePlayingVideo(null)}
+          onOpenFolder={() => {
+            if (window.soundboardAPI?.showItemInFolder) {
+              window.soundboardAPI.showItemInFolder(activePlayingVideo.filePath);
+            }
+          }}
+          onExtractToSoundboard={async () => {
+            if (window.soundboardAPI?.extractAudioFromVideoClip) {
+              const newSound = await window.soundboardAPI.extractAudioFromVideoClip(activePlayingVideo);
+              if (newSound) {
+                setSounds((prev) => [newSound, ...prev]);
+                setActiveView('sounds');
+                setSelectedSoundId(newSound.id);
+                setActivePlayingVideo(null);
+              }
+            }
+          }}
+          onSaveTrimmedClip={async (startSec, endSec, saveAsNew) => {
+            // Trim and update clip duration / boundaries
+            if (saveAsNew) {
+              const newClipItem: VideoClipItem = {
+                ...activePlayingVideo,
+                id: `clip_${Date.now()}`,
+                title: `${activePlayingVideo.title} (Trimmed)`,
+                duration: endSec - startSec,
+                dateAdded: Date.now(),
+              };
+              setVideoClips((prev) => [newClipItem, ...prev]);
+              setActivePlayingVideo(newClipItem);
+            } else {
+              setVideoClips((prev) =>
+                prev.map((c) =>
+                  c.id === activePlayingVideo.id ? { ...c, duration: endSec - startSec } : c
+                )
+              );
+            }
+          }}
+        />
       )}
 
       {/* GPU Accelerated Floating Drag Clone Card */}

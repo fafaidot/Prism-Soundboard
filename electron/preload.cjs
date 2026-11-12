@@ -111,5 +111,18 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
     ipcRenderer.on(channel, handler);
     return () => ipcRenderer.removeListener(channel, handler);
   },
+
+  // Video Clips & Storage APIs
+  loadVideoClips: () => ipcRenderer.invoke('load-video-clips'),
+  saveVideoClips: (clips) => ipcRenderer.invoke('save-video-clips', clips),
+  saveRecordedVideoClip: (data) => ipcRenderer.invoke('save-recorded-video-clip', data),
+  deleteVideoClip: (clipId) => ipcRenderer.invoke('delete-video-clip', clipId),
+  renameVideoClip: (clipId, newTitle) => ipcRenderer.invoke('rename-video-clip', { clipId, newTitle }),
+  toggleFavoriteVideoClip: (clipId) => ipcRenderer.invoke('toggle-favorite-video-clip', clipId),
+  showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
+  extractAudioFromVideoClip: (clip) => ipcRenderer.invoke('extract-audio-from-video-clip', clip),
+  getStorageDirectories: () => ipcRenderer.invoke('get-storage-directories'),
+  changeStorageLocation: (newRootPath) => ipcRenderer.invoke('change-storage-location', newRootPath),
+  selectStorageFolderDialog: () => ipcRenderer.invoke('select-storage-folder-dialog'),
 });
 

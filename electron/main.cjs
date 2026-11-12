@@ -254,14 +254,59 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.prism.soundboard');
 }
 
-// Storage directories: Always use "Prism Soundboard" folder for unified storage across dev and prod
+// Storage directories: Default to "Prism Soundboard" folder in appData or custom unified folder
 const APP_DATA_ROOT = app.getPath('appData');
 const USER_DATA_DIR = path.join(APP_DATA_ROOT, 'Prism Soundboard');
 const SOUNDS_FILE = path.join(USER_DATA_DIR, 'soundboard_sounds.json');
 const DELETED_SOUNDS_FILE = path.join(USER_DATA_DIR, 'deleted_sounds.json');
+const CLIPS_FILE = path.join(USER_DATA_DIR, 'video_clips.json');
 const SETTINGS_FILE = path.join(USER_DATA_DIR, 'soundboard_settings.json');
-const AUDIO_DIR = path.join(USER_DATA_DIR, 'audio_library');
-const DELETED_DIR = path.join(USER_DATA_DIR, 'deleted');
+
+// Read saved settings on startup to see if user configured custom merged storage folder
+let activeStorageRoot = USER_DATA_DIR;
+try {
+  if (fs.existsSync(SETTINGS_FILE)) {
+    const s = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+    if (s.storageLocation && typeof s.storageLocation === 'string' && s.storageLocation.trim()) {
+      activeStorageRoot = s.storageLocation.trim();
+    }
+  }
+} catch (e) {}
+
+let AUDIO_DIR = path.join(activeStorageRoot, 'Sounds');
+let VIDEOS_DIR = path.join(activeStorageRoot, 'Videos');
+let DELETED_DIR = path.join(activeStorageRoot, 'Deleted');
+
+function ensureStorageDirectories() {
+  try {
+    if (!fs.existsSync(USER_DATA_DIR)) fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+    if (!fs.existsSync(activeStorageRoot)) fs.mkdirSync(activeStorageRoot, { recursive: true });
+    if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+    if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
+    if (!fs.existsSync(DELETED_DIR)) fs.mkdirSync(DELETED_DIR, { recursive: true });
+
+    // Migrate old audio_library to new Sounds folder if legacy exists
+    const legacyAudioDir = path.join(USER_DATA_DIR, 'audio_library');
+    if (fs.existsSync(legacyAudioDir) && legacyAudioDir !== AUDIO_DIR) {
+      try {
+        const files = fs.readdirSync(legacyAudioDir);
+        files.forEach((f) => {
+          const oldP = path.join(legacyAudioDir, f);
+          const newP = path.join(AUDIO_DIR, f);
+          if (!fs.existsSync(newP)) {
+            fs.copyFileSync(oldP, newP);
+          }
+        });
+      } catch (migErr) {
+        console.warn('Error migrating legacy audio_library:', migErr);
+      }
+    }
+  } catch (err) {
+    console.error('ensureStorageDirectories error:', err);
+  }
+}
+
+ensureStorageDirectories();
 
 // Read saved panicHotkey on startup
 try {
@@ -1981,6 +2026,371 @@ ipcMain.handle('download-and-install-update', async (event, downloadUrl) => {
       resolve({ success: false, error: err.message || 'Unknown updater error.' });
     }
   });
+});
+
+// Video Clips & Merged Storage IPC Handlers
+ipcMain.handle('load-video-clips', async () => {
+  try {
+    if (fs.existsSync(CLIPS_FILE)) {
+      const data = fs.readFileSync(CLIPS_FILE, 'utf-8');
+      const clips = JSON.parse(data);
+      // Ensure local file paths exist
+      return Array.isArray(clips) ? clips.filter((c) => c && c.filePath && fs.existsSync(c.filePath)) : [];
+    }
+  } catch (err) {
+    console.error('Failed to load video clips:', err);
+  }
+  return [];
+});
+
+ipcMain.handle('save-video-clips', async (_event, clips) => {
+  try {
+    fs.writeFileSync(CLIPS_FILE, JSON.stringify(clips, null, 2), 'utf-8');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video-clips-updated', clips);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('video-clips-updated', clips);
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to save video clips:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('save-recorded-video-clip', async (_event, { base64, duration, title, game, width, height }) => {
+  try {
+    ensureStorageDirectories();
+    const clipId = `clip_${Date.now()}`;
+    const cleanBase64 = base64.replace(/^data:video\/[a-zA-Z0-9_-]+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    const fileName = `${clipId}.mp4`;
+    const filePath = path.join(VIDEOS_DIR, fileName);
+    fs.writeFileSync(filePath, buffer);
+
+    const stats = fs.statSync(filePath);
+    const newClip = {
+      id: clipId,
+      title: title || 'Untitled',
+      filePath,
+      duration: duration || 15,
+      fileSize: stats.size,
+      dateAdded: Date.now(),
+      isFavorite: false,
+      game: game || 'Game',
+      width: width || 1920,
+      height: height || 1080,
+    };
+
+    let existingClips = [];
+    if (fs.existsSync(CLIPS_FILE)) {
+      try {
+        existingClips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+      } catch (e) {}
+    }
+    const updated = [newClip, ...existingClips];
+    fs.writeFileSync(CLIPS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video-clips-updated', updated);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('video-clips-updated', updated);
+    }
+
+    return newClip;
+  } catch (err) {
+    console.error('Error saving recorded video clip:', err);
+    throw err;
+  }
+});
+
+ipcMain.handle('delete-video-clip', async (_event, clipId) => {
+  try {
+    if (!fs.existsSync(CLIPS_FILE)) return false;
+    const clips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+    const target = clips.find((c) => c.id === clipId);
+    if (target && target.filePath && fs.existsSync(target.filePath)) {
+      try {
+        fs.unlinkSync(target.filePath);
+      } catch (e) {}
+    }
+    const updated = clips.filter((c) => c.id !== clipId);
+    fs.writeFileSync(CLIPS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video-clips-updated', updated);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('video-clips-updated', updated);
+    }
+    return true;
+  } catch (err) {
+    console.error('Error deleting video clip:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('rename-video-clip', async (_event, { clipId, newTitle }) => {
+  try {
+    if (!fs.existsSync(CLIPS_FILE)) return false;
+    const clips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+    const updated = clips.map((c) => (c.id === clipId ? { ...c, title: newTitle } : c));
+    fs.writeFileSync(CLIPS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video-clips-updated', updated);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('video-clips-updated', updated);
+    }
+    return true;
+  } catch (err) {
+    console.error('Error renaming video clip:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('toggle-favorite-video-clip', async (_event, clipId) => {
+  try {
+    if (!fs.existsSync(CLIPS_FILE)) return false;
+    const clips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+    const updated = clips.map((c) => (c.id === clipId ? { ...c, isFavorite: !c.isFavorite } : c));
+    fs.writeFileSync(CLIPS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video-clips-updated', updated);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('video-clips-updated', updated);
+    }
+    return true;
+  } catch (err) {
+    console.error('Error toggling favorite video clip:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('show-item-in-folder', async (_event, filePath) => {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      shell.showItemInFolder(filePath);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+});
+
+// Extract audio from video clip into a Soundboard button item
+ipcMain.handle('extract-audio-from-video-clip', async (_event, clip) => {
+  try {
+    if (!clip || !clip.filePath || !fs.existsSync(clip.filePath)) return null;
+
+    ensureStorageDirectories();
+    const soundId = `snd_${Date.now()}`;
+    const audioFileName = `${soundId}.wav`;
+    const destAudioPath = path.join(AUDIO_DIR, audioFileName);
+
+    // Read video file buffer
+    const videoBuffer = fs.readFileSync(clip.filePath);
+    // Copy into sounds directory as accessible media file
+    fs.writeFileSync(destAudioPath, videoBuffer);
+
+    const soundItem = {
+      id: soundId,
+      title: clip.title || 'Extracted Audio Clip',
+      author: clip.game || 'Gameplay Clip',
+      audioPath: destAudioPath,
+      thumbnail: '',
+      duration: clip.duration || 5,
+      hotkey: '',
+      volume: 100,
+      reproductionMode: 'overlap',
+      reproductionOptions: {
+        stopOtherSounds: false,
+        muteOtherSounds: false,
+        muteVoice: false,
+        loop: false,
+      },
+      playCount: 0,
+      isFavorite: false,
+      category: 'Clips',
+      source: 'clip',
+      dateAdded: Date.now(),
+    };
+
+    // Append to sounds library
+    let sounds = [];
+    if (fs.existsSync(SOUNDS_FILE)) {
+      try { sounds = JSON.parse(fs.readFileSync(SOUNDS_FILE, 'utf-8')); } catch (e) {}
+    }
+    const updatedSounds = [soundItem, ...sounds];
+    fs.writeFileSync(SOUNDS_FILE, JSON.stringify(updatedSounds, null, 2), 'utf-8');
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sounds-updated', updatedSounds);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('sounds-updated', updatedSounds);
+    }
+
+    return soundItem;
+  } catch (err) {
+    console.error('Failed to extract audio from video clip:', err);
+    return null;
+  }
+});
+
+// Storage folder management & Automatic Migration
+ipcMain.handle('get-storage-directories', async () => {
+  return {
+    root: activeStorageRoot,
+    sounds: AUDIO_DIR,
+    videos: VIDEOS_DIR,
+  };
+});
+
+ipcMain.handle('select-storage-folder-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Unified Storage Folder (Contains /Sounds and /Videos)',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return null;
+  }
+  return result.filePaths[0];
+});
+
+ipcMain.handle('change-storage-location', async (_event, newRootPath) => {
+  try {
+    if (!newRootPath || typeof newRootPath !== 'string') {
+      return { success: false, error: 'Invalid folder path.' };
+    }
+
+    const targetRoot = path.resolve(newRootPath.trim());
+    if (targetRoot === activeStorageRoot) {
+      return { success: true, root: activeStorageRoot, sounds: AUDIO_DIR, videos: VIDEOS_DIR };
+    }
+
+    const newSoundsDir = path.join(targetRoot, 'Sounds');
+    const newVideosDir = path.join(targetRoot, 'Videos');
+    const newDeletedDir = path.join(targetRoot, 'Deleted');
+
+    if (!fs.existsSync(targetRoot)) fs.mkdirSync(targetRoot, { recursive: true });
+    if (!fs.existsSync(newSoundsDir)) fs.mkdirSync(newSoundsDir, { recursive: true });
+    if (!fs.existsSync(newVideosDir)) fs.mkdirSync(newVideosDir, { recursive: true });
+    if (!fs.existsSync(newDeletedDir)) fs.mkdirSync(newDeletedDir, { recursive: true });
+
+    // 1. Move all audio files from old AUDIO_DIR to newSoundsDir
+    if (fs.existsSync(AUDIO_DIR)) {
+      const audioFiles = fs.readdirSync(AUDIO_DIR);
+      for (const file of audioFiles) {
+        const oldFile = path.join(AUDIO_DIR, file);
+        const newFile = path.join(newSoundsDir, file);
+        try {
+          if (!fs.existsSync(newFile)) {
+            fs.copyFileSync(oldFile, newFile);
+            fs.unlinkSync(oldFile);
+          }
+        } catch (e) {
+          console.warn('Error moving audio file:', e);
+        }
+      }
+    }
+
+    // 2. Move all video files from old VIDEOS_DIR to newVideosDir
+    if (fs.existsSync(VIDEOS_DIR)) {
+      const videoFiles = fs.readdirSync(VIDEOS_DIR);
+      for (const file of videoFiles) {
+        const oldFile = path.join(VIDEOS_DIR, file);
+        const newFile = path.join(newVideosDir, file);
+        try {
+          if (!fs.existsSync(newFile)) {
+            fs.copyFileSync(oldFile, newFile);
+            fs.unlinkSync(oldFile);
+          }
+        } catch (e) {
+          console.warn('Error moving video file:', e);
+        }
+      }
+    }
+
+    // 3. Move deleted sounds
+    if (fs.existsSync(DELETED_DIR)) {
+      const deletedFiles = fs.readdirSync(DELETED_DIR);
+      for (const file of deletedFiles) {
+        const oldFile = path.join(DELETED_DIR, file);
+        const newFile = path.join(newDeletedDir, file);
+        try {
+          if (!fs.existsSync(newFile)) {
+            fs.copyFileSync(oldFile, newFile);
+            fs.unlinkSync(oldFile);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Update active in-memory paths
+    activeStorageRoot = targetRoot;
+    AUDIO_DIR = newSoundsDir;
+    VIDEOS_DIR = newVideosDir;
+    DELETED_DIR = newDeletedDir;
+
+    // 4. Update file pointers in soundboard_sounds.json
+    if (fs.existsSync(SOUNDS_FILE)) {
+      try {
+        const sounds = JSON.parse(fs.readFileSync(SOUNDS_FILE, 'utf-8'));
+        const updatedSounds = sounds.map((s) => {
+          if (s.audioPath) {
+            const fileName = path.basename(s.audioPath);
+            s.audioPath = path.join(AUDIO_DIR, fileName);
+          }
+          return s;
+        });
+        fs.writeFileSync(SOUNDS_FILE, JSON.stringify(updatedSounds, null, 2), 'utf-8');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('sounds-updated', updatedSounds);
+        }
+      } catch (e) {}
+    }
+
+    // 5. Update file pointers in video_clips.json
+    if (fs.existsSync(CLIPS_FILE)) {
+      try {
+        const clips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+        const updatedClips = clips.map((c) => {
+          if (c.filePath) {
+            const fileName = path.basename(c.filePath);
+            c.filePath = path.join(VIDEOS_DIR, fileName);
+          }
+          return c;
+        });
+        fs.writeFileSync(CLIPS_FILE, JSON.stringify(updatedClips, null, 2), 'utf-8');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('video-clips-updated', updatedClips);
+        }
+      } catch (e) {}
+    }
+
+    // 6. Save storageLocation to soundboard_settings.json
+    let settings = {};
+    if (fs.existsSync(SETTINGS_FILE)) {
+      try { settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); } catch (e) {}
+    }
+    settings.storageLocation = targetRoot;
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+
+    return {
+      success: true,
+      root: activeStorageRoot,
+      sounds: AUDIO_DIR,
+      videos: VIDEOS_DIR,
+    };
+  } catch (err) {
+    console.error('Error changing storage location:', err);
+    return { success: false, error: err.message || 'Failed to move storage files.' };
+  }
 });
 
 function compareSemver(v1, v2) {

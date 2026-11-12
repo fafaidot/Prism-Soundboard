@@ -58,6 +58,10 @@ interface CommandBarProps {
   onStartRecord?: () => void;
   onChangeRecordDuration?: (duration: number) => void;
   onChangeRecordSource?: (source: 'all' | 'screen' | 'mic') => void;
+  // View mode: Sounds vs Game Clips
+  activeView?: 'sounds' | 'clips';
+  onChangeView?: (view: 'sounds' | 'clips') => void;
+  clipsCount?: number;
 }
 
 export const CommandBar: React.FC<CommandBarProps> = ({
@@ -88,6 +92,9 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   onStartRecord,
   onChangeRecordDuration,
   onChangeRecordSource,
+  activeView = 'sounds',
+  onChangeView,
+  clipsCount = 0,
 }) => {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -107,6 +114,56 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 
   return (
     <div className="h-11 px-4 bg-[var(--theme-bg-header,#090a0f)] border-b border-[var(--theme-border,#222436)] flex items-center justify-between gap-3 select-none relative z-30 transition-colors duration-150">
+      {/* View Switcher: Sounds vs Clips */}
+      {onChangeView && (
+        <div className="h-[30px] flex items-center gap-0.5 bg-[var(--theme-bg-surface,#12131d)] p-0.5 rounded-[8px] border border-[var(--theme-border,#222436)] shrink-0">
+          <button
+            onClick={() => onChangeView('sounds')}
+            style={
+              activeView === 'sounds'
+                ? {
+                    backgroundColor: `${accent}25`,
+                    borderColor: `${accent}50`,
+                    color: '#ffffff',
+                  }
+                : undefined
+            }
+            className={`h-full px-2.5 flex items-center gap-1.5 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${
+              activeView === 'sounds'
+                ? 'shadow-sm border'
+                : 'text-[#9da5b7] hover:text-white'
+            }`}
+          >
+            <span>Sounds</span>
+            <span className="text-[10px] opacity-70 font-mono">({totalSounds})</span>
+          </button>
+
+          <button
+            onClick={() => onChangeView('clips')}
+            style={
+              activeView === 'clips'
+                ? {
+                    backgroundColor: `${accent}25`,
+                    borderColor: `${accent}50`,
+                    color: '#ffffff',
+                  }
+                : undefined
+            }
+            className={`h-full px-2.5 flex items-center gap-1.5 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${
+              activeView === 'clips'
+                ? 'shadow-sm border'
+                : 'text-[#9da5b7] hover:text-white'
+            }`}
+          >
+            <Clapperboard size={12} style={activeView === 'clips' ? { color: accent } : undefined} />
+            <span>Clips</span>
+            {clipsCount > 0 && (
+              <span className="text-[10px] opacity-70 font-mono">({clipsCount})</span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Left: Compact Icon-Only Search, Filters & Sort */}
       <div className="flex items-center gap-2 flex-1">
         {/* Compact Expandable Icon-Only Search */}

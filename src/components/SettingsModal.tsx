@@ -76,9 +76,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     owner?: string;
     repo?: string;
   } | null>(null);
+  const [storagePaths, setStoragePaths] = useState<{ root: string; sounds: string; videos: string } | null>(null);
+  const [isRelocatingStorage, setIsRelocatingStorage] = useState(false);
+  const [storageRelocateMsg, setStorageRelocateMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [downloadProgressPercent, setDownloadProgressPercent] = useState<number>(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (window.soundboardAPI?.getStorageDirectories) {
+      window.soundboardAPI.getStorageDirectories().then(setStoragePaths).catch(() => {});
+    }
+  }, [isOpen]);
+
+  const handleChangeStorageFolder = async () => {
+    if (!window.soundboardAPI?.selectStorageFolderDialog || !window.soundboardAPI?.changeStorageLocation) return;
+    try {
+      const selected = await window.soundboardAPI.selectStorageFolderDialog();
+      if (!selected) return;
+
+      setIsRelocatingStorage(true);
+      setStorageRelocateMsg({ text: 'Moving existing sounds and video files to new folder...' });
+
+      const res = await window.soundboardAPI.changeStorageLocation(selected);
+      if (res.success) {
+        setStoragePaths({ root: res.root, sounds: res.sounds, videos: res.videos });
+        setLocalSettings((prev) => ({ ...prev, storageLocation: res.root }));
+        setStorageRelocateMsg({ text: `Successfully migrated all files to: ${res.root}` });
+        if (onReloadSounds) onReloadSounds();
+      } else {
+        setStorageRelocateMsg({ text: res.error || 'Failed to move storage folder.', error: true });
+      }
+    } catch (e: any) {
+      setStorageRelocateMsg({ text: e.message || 'Error changing storage location.', error: true });
+    } finally {
+      setIsRelocatingStorage(false);
+    }
+  };
 
   useEffect(() => {
     if (window.soundboardAPI?.onUpdateDownloadProgress) {
@@ -918,6 +952,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* TAB 4: BACKUP & STORAGE */}
           {activeTab === 'backup' && (
             <div className="space-y-5">
+              {/* Unified Media Storage Location (Sounds & Videos) */}
+              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-white">
+                    <FolderOpen size={17} style={{ color: accent }} />
+                    <span className="text-[13.5px] font-bold">Unified Media & Clips Storage Location</span>
+                  </div>
+                  <button
+                    disabled={isRelocatingStorage}
+                    onClick={handleChangeStorageFolder}
+                    style={{ backgroundColor: `${accent}20`, color: accent, borderColor: `${accent}40` }}
+                    className="px-3.5 py-1.5 rounded-[8px] border text-[11.5px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isRelocatingStorage ? 'Relocating...' : 'Change Location'}
+                  </button>
+                </div>
+
+                <p className="text-[11.5px] text-[#7e8697] leading-relaxed">
+                  Choose a root folder on your PC. Prism will automatically manage <span className="font-mono text-white font-semibold">/Sounds</span> and <span className="font-mono text-white font-semibold">/Videos</span> inside it. Changing this location automatically moves all your existing audio and video files!
+                </p>
+
+                {storagePaths && (
+                  <div className="p-3 bg-[#111319] rounded-[10px] border border-[#2a2f3f] space-y-1.5 font-mono text-[11.5px]">
+                    <div className="text-white truncate">
+                      <span className="text-[#7e8697]">Root: </span>{storagePaths.root}
+                    </div>
+                    <div className="text-[#8e97aa] text-[10.5px] flex items-center gap-4">
+                      <span>• {storagePaths.sounds}</span>
+                      <span>• {storagePaths.videos}</span>
+                    </div>
+                  </div>
+                )}
+
+                {storageRelocateMsg && (
+                  <div
+                    className={`p-3 rounded-[10px] text-[12px] font-semibold border ${
+                      storageRelocateMsg.error
+                        ? 'bg-[#e81123]/15 border-[#e81123]/30 text-[#ff4d5e]'
+                        : 'bg-[#00ff88]/15 border-[#00ff88]/30 text-[#00ff88]'
+                    }`}
+                  >
+                    {storageRelocateMsg.text}
+                  </div>
+                )}
+              </div>
+
+              {/* Soundboard Backup */}
               <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
                 <div className="flex items-center gap-2.5 text-white">
                   <DownloadCloud size={17} style={{ color: accent }} />
