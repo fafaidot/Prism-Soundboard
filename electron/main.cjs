@@ -794,18 +794,40 @@ ipcMain.on('sync-paused-sounds', (_event, pausedIds) => {
   }
 });
 
-ipcMain.on('sync-sounds-updated', (_event, sounds) => {
-  // Save updated sounds to disk directly from main process to ensure persistence
-  try {
-    fs.writeFileSync(SOUNDS_FILE, JSON.stringify(sounds, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('[Persistence] Error saving sounds:', err);
-  }
+let soundsWriteTimer = null;
+let pendingSoundsData = null;
 
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
+function debouncedSaveSounds(sounds) {
+  pendingSoundsData = sounds;
+  if (soundsWriteTimer) clearTimeout(soundsWriteTimer);
+  soundsWriteTimer = setTimeout(() => {
+    soundsWriteTimer = null;
+    const toWrite = pendingSoundsData;
+    pendingSoundsData = null;
+    if (!toWrite) return;
+    try {
+      fs.promises.writeFile(SOUNDS_FILE, JSON.stringify(toWrite, null, 2), 'utf-8').catch((err) => {
+        console.error('[Persistence] Error saving sounds:', err);
+      });
+      const electronSoundsFile = path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json');
+      if (fs.existsSync(path.dirname(electronSoundsFile))) {
+        fs.promises.writeFile(electronSoundsFile, JSON.stringify(toWrite, null, 2), 'utf-8').catch(() => {});
+      }
+    } catch (err) {
+      console.error('[Persistence] Error saving sounds:', err);
+    }
+  }, 300);
+}
+
+ipcMain.on('sync-sounds-updated', (event, sounds) => {
+  // Asynchronously debounced save to disk - zero UI / main loop stutter
+  debouncedSaveSounds(sounds);
+
+  // Broadcast to other windows only, avoiding echo loops back to the sender
+  if (overlayWindow && !overlayWindow.isDestroyed() && event.sender !== overlayWindow.webContents) {
     overlayWindow.webContents.send('sounds-updated', sounds);
   }
-  if (mainWindow && !mainWindow.isDestroyed()) {
+  if (mainWindow && !mainWindow.isDestroyed() && event.sender !== mainWindow.webContents) {
     mainWindow.webContents.send('sounds-updated', sounds);
   }
 });
@@ -846,11 +868,12 @@ ipcMain.on('sync-toggle-pause-sound', (_event, soundId) => {
   }
 });
 
-ipcMain.on('sync-settings-changed', (_event, newSettings) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
+ipcMain.on('sync-settings-changed', (event, newSettings) => {
+  debouncedSaveSettingsFile(newSettings);
+  if (mainWindow && !mainWindow.isDestroyed() && event.sender !== mainWindow.webContents) {
     mainWindow.webContents.send('settings-sync', newSettings);
   }
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
+  if (overlayWindow && !overlayWindow.isDestroyed() && event.sender !== overlayWindow.webContents) {
     overlayWindow.webContents.send('settings-sync', newSettings);
   }
 });
@@ -942,14 +965,7 @@ ipcMain.handle('load-sounds', async () => {
 
 ipcMain.handle('save-sounds', async (_event, sounds) => {
   try {
-    fs.writeFileSync(SOUNDS_FILE, JSON.stringify(sounds, null, 2), 'utf-8');
-    // Mirror to Electron directory to keep dev and prod in sync
-    const electronSoundsFile = path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json');
-    try {
-      if (fs.existsSync(path.dirname(electronSoundsFile))) {
-        fs.writeFileSync(electronSoundsFile, JSON.stringify(sounds, null, 2), 'utf-8');
-      }
-    } catch (e) {}
+    debouncedSaveSounds(sounds);
     return true;
   } catch (err) {
     console.error('Failed to save sounds:', err);
@@ -1335,10 +1351,30 @@ ipcMain.handle('load-settings', async () => {
   };
 });
 
+let settingsWriteTimer = null;
+let pendingSettingsData = null;
+
+function debouncedSaveSettingsFile(settings) {
+  pendingSettingsData = settings;
+  if (settingsWriteTimer) clearTimeout(settingsWriteTimer);
+  settingsWriteTimer = setTimeout(() => {
+    settingsWriteTimer = null;
+    const toWrite = pendingSettingsData;
+    pendingSettingsData = null;
+    if (!toWrite) return;
+    try {
+      fs.promises.writeFile(SETTINGS_FILE, JSON.stringify(toWrite, null, 2), 'utf-8').catch((err) => {
+        console.error('[Persistence] Error saving settings:', err);
+      });
+    } catch (err) {
+      console.error('[Persistence] Error saving settings:', err);
+    }
+  }, 300);
+}
+
 ipcMain.handle('save-settings', async (_event, settings) => {
   try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
-    ensurePhysicalDefaultSpeakers();
+    debouncedSaveSettingsFile(settings);
     if (settings.panicHotkey) {
       panicHotkey = settings.panicHotkey;
     }

@@ -555,13 +555,18 @@ export const App: React.FC = () => {
   }, [isStandaloneOverlay]);
 
   // Fluid Real-Time Drag-To-Rearrange Pointer Listeners
+  const dragRafIdRef = useRef<number | null>(null);
+
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
       if (!pointerStartRef.current || !activePointerSoundRef.current) return;
 
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+
       const dist = Math.hypot(
-        e.clientX - pointerStartRef.current.x,
-        e.clientY - pointerStartRef.current.y
+        clientX - pointerStartRef.current.x,
+        clientY - pointerStartRef.current.y
       );
 
       // Distance Threshold: 4px
@@ -578,42 +583,54 @@ export const App: React.FC = () => {
       }
 
       if (isPointerDraggingRef.current) {
-        setPointerCurrentPos({ x: e.clientX, y: e.clientY });
-
-        // Piercing Hit-Testing
-        const elements = document.elementsFromPoint(e.clientX, e.clientY);
-        let targetId: string | null = null;
-        for (const el of elements) {
-          const card = el.closest('[data-sound-id]');
-          if (card) {
-            targetId = card.getAttribute('data-sound-id');
-            break;
-          }
+        if (dragRafIdRef.current) {
+          cancelAnimationFrame(dragRafIdRef.current);
         }
 
-        // Live Array Splice
-        if (targetId && activePointerSoundRef.current) {
-          const currentDraggedId = activePointerSoundRef.current.id;
+        dragRafIdRef.current = requestAnimationFrame(() => {
+          dragRafIdRef.current = null;
+          setPointerCurrentPos({ x: clientX, y: clientY });
 
-          if (targetId !== currentDraggedId && lastTargetSwapRef.current !== targetId) {
-            lastTargetSwapRef.current = targetId;
-
-            setSounds((prevSounds) => {
-              const srcIdx = prevSounds.findIndex((s) => s.id === currentDraggedId);
-              const tgtIdx = prevSounds.findIndex((s) => s.id === targetId);
-              if (srcIdx === -1 || tgtIdx === -1 || srcIdx === tgtIdx) return prevSounds;
-
-              const next = [...prevSounds];
-              const [movedItem] = next.splice(srcIdx, 1);
-              next.splice(tgtIdx, 0, movedItem);
-              return next;
-            });
+          // Piercing Hit-Testing
+          const elements = document.elementsFromPoint(clientX, clientY);
+          let targetId: string | null = null;
+          for (const el of elements) {
+            const card = el.closest('[data-sound-id]');
+            if (card) {
+              targetId = card.getAttribute('data-sound-id');
+              break;
+            }
           }
-        }
+
+          // Live Array Splice
+          if (targetId && activePointerSoundRef.current) {
+            const currentDraggedId = activePointerSoundRef.current.id;
+
+            if (targetId !== currentDraggedId && lastTargetSwapRef.current !== targetId) {
+              lastTargetSwapRef.current = targetId;
+
+              setSounds((prevSounds) => {
+                const srcIdx = prevSounds.findIndex((s) => s.id === currentDraggedId);
+                const tgtIdx = prevSounds.findIndex((s) => s.id === targetId);
+                if (srcIdx === -1 || tgtIdx === -1 || srcIdx === tgtIdx) return prevSounds;
+
+                const next = [...prevSounds];
+                const [movedItem] = next.splice(srcIdx, 1);
+                next.splice(tgtIdx, 0, movedItem);
+                return next;
+              });
+            }
+          }
+        });
       }
     };
 
     const handlePointerUp = () => {
+      if (dragRafIdRef.current) {
+        cancelAnimationFrame(dragRafIdRef.current);
+        dragRafIdRef.current = null;
+      }
+
       if (isPointerDraggingRef.current && activePointerSoundRef.current) {
         justFinishedDragRef.current = true;
         setTimeout(() => {
@@ -654,6 +671,10 @@ export const App: React.FC = () => {
     window.addEventListener('pointercancel', handlePointerUp, { capture: true });
     window.addEventListener('mouseup', handlePointerUp, { capture: true });
     return () => {
+      if (dragRafIdRef.current) {
+        cancelAnimationFrame(dragRafIdRef.current);
+        dragRafIdRef.current = null;
+      }
       window.removeEventListener('pointermove', handlePointerMove, { capture: true });
       window.removeEventListener('pointerup', handlePointerUp, { capture: true });
       window.removeEventListener('pointercancel', handlePointerUp, { capture: true });
@@ -751,15 +772,41 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleWindowKeyDown, true);
   }, [settings.panicHotkey, listeningSoundId]);
 
-  // Sync sounds state with persistence
-  const updateAndSaveSounds = (updated: SoundItem[]) => {
+  // Sync sounds state with debounced persistence to eliminate UI stutter
+  const soundsDebounceTimerRef = useRef<any>(null);
+  const pendingSoundsToPersistRef = useRef<SoundItem[] | null>(null);
+
+  const updateAndSaveSounds = (updated: SoundItem[], immediate = false) => {
     setSounds(updated);
-    if (window.soundboardAPI) {
-      window.soundboardAPI.saveSounds(updated);
-      if (window.soundboardAPI.sendIpcCommand) {
-        window.soundboardAPI.sendIpcCommand('sync-sounds-updated', updated);
+    pendingSoundsToPersistRef.current = updated;
+
+    if (immediate) {
+      if (soundsDebounceTimerRef.current) {
+        clearTimeout(soundsDebounceTimerRef.current);
+        soundsDebounceTimerRef.current = null;
       }
+      if (window.soundboardAPI) {
+        window.soundboardAPI.saveSounds(updated);
+        if (window.soundboardAPI.sendIpcCommand) {
+          window.soundboardAPI.sendIpcCommand('sync-sounds-updated', updated);
+        }
+      }
+      return;
     }
+
+    if (soundsDebounceTimerRef.current) {
+      clearTimeout(soundsDebounceTimerRef.current);
+    }
+    soundsDebounceTimerRef.current = setTimeout(() => {
+      soundsDebounceTimerRef.current = null;
+      const toSave = pendingSoundsToPersistRef.current;
+      if (toSave && window.soundboardAPI) {
+        window.soundboardAPI.saveSounds(toSave);
+        if (window.soundboardAPI.sendIpcCommand) {
+          window.soundboardAPI.sendIpcCommand('sync-sounds-updated', toSave);
+        }
+      }
+    }, 250);
   };
 
   const selectedSound = useMemo(() => {
@@ -1051,15 +1098,42 @@ export const App: React.FC = () => {
   };
 
   // Settings Save
-  const handleSaveSettings = (newSettings: AudioSettings) => {
+  // Settings Save with debounced persistence to avoid slider lag
+  const settingsDebounceTimerRef = useRef<any>(null);
+  const pendingSettingsToPersistRef = useRef<AudioSettings | null>(null);
+
+  const handleSaveSettings = (newSettings: AudioSettings, immediate = false) => {
     setSettings(newSettings);
     audioEngine.updateSettings(newSettings);
-    if (window.soundboardAPI) {
-      window.soundboardAPI.saveSettings(newSettings);
-      if (window.soundboardAPI.sendIpcCommand) {
-        window.soundboardAPI.sendIpcCommand('sync-settings-changed', newSettings);
+    pendingSettingsToPersistRef.current = newSettings;
+
+    if (immediate) {
+      if (settingsDebounceTimerRef.current) {
+        clearTimeout(settingsDebounceTimerRef.current);
+        settingsDebounceTimerRef.current = null;
       }
+      if (window.soundboardAPI) {
+        window.soundboardAPI.saveSettings(newSettings);
+        if (window.soundboardAPI.sendIpcCommand) {
+          window.soundboardAPI.sendIpcCommand('sync-settings-changed', newSettings);
+        }
+      }
+      return;
     }
+
+    if (settingsDebounceTimerRef.current) {
+      clearTimeout(settingsDebounceTimerRef.current);
+    }
+    settingsDebounceTimerRef.current = setTimeout(() => {
+      settingsDebounceTimerRef.current = null;
+      const toSave = pendingSettingsToPersistRef.current;
+      if (toSave && window.soundboardAPI) {
+        window.soundboardAPI.saveSettings(toSave);
+        if (window.soundboardAPI.sendIpcCommand) {
+          window.soundboardAPI.sendIpcCommand('sync-settings-changed', toSave);
+        }
+      }
+    }, 200);
   };
 
   // Toggle Hear Myself
