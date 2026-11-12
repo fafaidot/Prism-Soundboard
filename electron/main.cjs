@@ -2075,9 +2075,12 @@ ipcMain.handle('save-recorded-video-clip', async (_event, { base64, duration, ti
   try {
     ensureStorageDirectories();
     const clipId = `clip_${Date.now()}`;
-    // Support any video mime type (e.g. data:video/webm;codecs=vp9,opus;base64, or data:video/mp4;base64,)
-    const commaIndex = base64.indexOf(',');
-    const cleanBase64 = commaIndex !== -1 ? base64.substring(commaIndex + 1) : base64;
+    // Find the exact base64 payload after ';base64,' (supporting any codec parameters like ;codecs=vp9,opus;base64,)
+    const base64Marker = ';base64,';
+    const markerIndex = base64.indexOf(base64Marker);
+    const cleanBase64 = markerIndex !== -1 
+      ? base64.substring(markerIndex + base64Marker.length) 
+      : (base64.includes(',') ? base64.substring(base64.lastIndexOf(',') + 1) : base64);
     const buffer = Buffer.from(cleanBase64, 'base64');
     const fileName = `${clipId}.mp4`;
     const filePath = path.join(VIDEOS_DIR, fileName);
