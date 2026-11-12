@@ -1321,9 +1321,42 @@ ipcMain.handle('import-soundboard-backup', async () => {
   }
 });
 
+ipcMain.handle('check-virtual-driver-installed', async () => {
+  return new Promise((resolve) => {
+    // Check multiple indicators: Registry uninstall entry, active audio devices, or driver inf presence
+    const psCheck = `
+      $reg1 = Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\VB:VBCABLE {87459874-1236-4469}'
+      $reg2 = (Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like '*VB-Audio*' -or $_.DisplayName -like '*CABLE*' }).Count -gt 0
+      $dev = (Get-CimInstance Win32_SoundDevice -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*VB-Audio*' -or $_.Name -like '*CABLE*' }).Count -gt 0
+      if ($reg1 -or $reg2 -or $dev) { Write-Output 'INSTALLED' } else { Write-Output 'NOT_INSTALLED' }
+    `.replace(/\r?\n\s*/g, ' ');
+
+    try {
+      const ps = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCheck], { windowsHide: true });
+      let output = '';
+      ps.stdout.on('data', (d) => {
+        output += d.toString();
+      });
+      ps.on('close', (code) => {
+        resolve(output.includes('INSTALLED'));
+      });
+      ps.on('error', () => {
+        resolve(false);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+});
+
 ipcMain.handle('install-virtual-driver', async () => {
-  const setupPath = path.join(__dirname, '../driver/vbcable/VBCABLE_Setup_x64.exe');
-  if (fs.existsSync(setupPath)) {
+  const candidatePaths = [
+    path.join(__dirname, '../driver/vbcable/VBCABLE_Setup_x64.exe'),
+    path.join(process.resourcesPath || '', 'driver/vbcable/VBCABLE_Setup_x64.exe'),
+    path.join(app.getAppPath(), 'driver/vbcable/VBCABLE_Setup_x64.exe'),
+  ];
+  const setupPath = candidatePaths.find((p) => fs.existsSync(p));
+  if (setupPath) {
     const psCommand = `Start-Process -FilePath "${setupPath}" -Verb RunAs`;
     spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand]);
     return true;

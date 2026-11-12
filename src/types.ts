@@ -160,6 +160,7 @@ export interface SoundboardAPI {
     duration: number;
     title: string;
   }>;
+  checkVirtualDriverInstalled?: () => Promise<boolean>;
   installVirtualDriver: () => Promise<boolean>;
   renameVirtualMic: () => Promise<boolean>;
   closeOverlay?: () => Promise<boolean>;

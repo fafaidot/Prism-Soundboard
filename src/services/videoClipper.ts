@@ -444,53 +444,52 @@ class VideoClipper {
       this.isExporting = true;
       const targetMs = this.bufferDurationSeconds * 1000;
 
-      // Find active slot closest to the target duration
-      let bestSlot: RecorderSlot | null = null;
-      let bestDiff = Infinity;
-      let bestElapsed = 0;
+    // Choose the slot with the longest elapsed recording time (up to target duration + 10%)
+    let bestSlot: RecorderSlot | null = null;
+    let longestElapsed = 0;
 
-      for (const slot of this.slots) {
-        if (slot.stopped) continue;
-        const elapsed = performance.now() - slot.startTime;
-        const diff = Math.abs(elapsed - targetMs);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          bestSlot = slot;
-          bestElapsed = elapsed;
-        }
+    for (const slot of this.slots) {
+      if (slot.stopped) continue;
+      const elapsed = performance.now() - slot.startTime;
+      if (elapsed > longestElapsed) {
+        longestElapsed = elapsed;
+        bestSlot = slot;
       }
+    }
 
-      // If active slots are very young (< 3s) but we have an already completed buffer of the target length, use it
-      if ((!bestSlot || bestElapsed < 3000) && this.lastCompletedBlob && this.lastCompletedBlob.size > 0) {
-        const blob = this.lastCompletedBlob;
-        const durationMs = this.lastCompletedDurationMs || targetMs;
-        return await this.exportBlob(blob, durationMs, title);
-      }
-
-      if (!bestSlot) {
-        return {
-          success: false,
-          error: 'Buffer is still filling up. Wait a few more seconds and try again.',
-        };
-      }
-
-      // Stop the chosen slot and get its complete blob
+    // If the longest active slot is already near the target duration (>= 75% of targetMs)
+    // or if we don't have a completed blob, use the longest slot!
+    if (bestSlot && longestElapsed >= targetMs * 0.75) {
       const { blob, durationMs } = await this.stopSlot(bestSlot);
-
-      // Remove stopped slots
       this.slots = this.slots.filter((s) => !s.stopped);
-
-      // Start replacement slot immediately
       if (this.isBuffering && this.combinedStream) {
         const newSlot = this.createSlot();
         this.slots.push(newSlot);
       }
-
-      if (blob.size === 0) {
-        return { success: false, error: 'Recorded blob is empty.' };
-      }
-
       return await this.exportBlob(blob, durationMs, title);
+    }
+
+    // Otherwise, if we have an already completed buffer of the target length, use it
+    if (this.lastCompletedBlob && this.lastCompletedBlob.size > 0) {
+      const blob = this.lastCompletedBlob;
+      const durationMs = this.lastCompletedDurationMs || targetMs;
+      return await this.exportBlob(blob, durationMs, title);
+    }
+
+    if (bestSlot) {
+      const { blob, durationMs } = await this.stopSlot(bestSlot);
+      this.slots = this.slots.filter((s) => !s.stopped);
+      if (this.isBuffering && this.combinedStream) {
+        const newSlot = this.createSlot();
+        this.slots.push(newSlot);
+      }
+      return await this.exportBlob(blob, durationMs, title);
+    }
+
+    return {
+      success: false,
+      error: 'Buffer is still filling up. Wait a few more seconds and try again.',
+    };
     } catch (err: any) {
       console.error('[VideoClipper] Export failed:', err);
       return { success: false, error: err.message || 'Unknown export error.' };
@@ -507,9 +506,9 @@ class VideoClipper {
     durationMs: number,
     title?: string
   ): Promise<{ success: boolean; clip?: any; error?: string }> {
-    // Clamp the target duration to the configured seconds so metadata matches the user setting
+    // Lock duration to configured target seconds if the slot captured at least 70% of the buffer
     const targetMs = this.bufferDurationSeconds * 1000;
-    const effectiveDurationMs = durationMs >= targetMs * 0.8 ? targetMs : durationMs;
+    const effectiveDurationMs = durationMs >= targetMs * 0.7 ? targetMs : durationMs;
 
     // Fix WebM duration metadata with the exact duration
     let fixedBlob: Blob;
@@ -632,7 +631,7 @@ class VideoClipper {
     }
 
     this.combinedStream = null;
-  }
+}
 }
 
 export const videoClipper = new VideoClipper();

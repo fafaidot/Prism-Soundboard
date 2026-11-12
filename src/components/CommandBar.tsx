@@ -7,6 +7,9 @@ import {
   Scissors,
   ChevronDown,
   Check,
+  Plus,
+  Video,
+  FolderOpen,
 } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
@@ -70,8 +73,11 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   recordHotkey = 'F9',
   onStartRecord,
   onChangeRecordDuration,
+  onOpenYouTubeSearch,
+  onImportLocalFiles,
 }) => {
   const [showDurationMenu, setShowDurationMenu] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   return (
     <div className="h-14 px-6 bg-[#090B10] border-b border-[#1B222E] flex items-center justify-between gap-4 select-none relative z-30 transition-colors duration-150">
@@ -195,6 +201,22 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               ))}
             </div>
           )}
+        </div>
+        {/* Primary Light Blue "+ Add Sound" Button with Plus Sign */}
+        <div className="relative">
+          <Tooltip content="Add Sound (YouTube / Local File)" position="bottom">
+            <button
+              onClick={() => {
+                if (onOpenYouTubeSearch) {
+                  onOpenYouTubeSearch();
+                }
+              }}
+              className="h-9 w-9 rounded-lg bg-[#31C5F4] hover:bg-[#31C5F4]/90 text-[#090B10] flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-md"
+              title="Add Sound"
+            >
+              <Plus size={18} className="stroke-[2.75]" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

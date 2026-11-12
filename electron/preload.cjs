@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   exportSoundboardBackup: () => ipcRenderer.invoke('export-soundboard-backup'),
   importSoundboardBackup: () => ipcRenderer.invoke('import-soundboard-backup'),
   saveRecordedAudio: (data) => ipcRenderer.invoke('save-recorded-audio', data),
+  checkVirtualDriverInstalled: () => ipcRenderer.invoke('check-virtual-driver-installed'),
   installVirtualDriver: () => ipcRenderer.invoke('install-virtual-driver'),
   renameVirtualMic: () => ipcRenderer.invoke('rename-virtual-mic'),
   closeOverlay: () => ipcRenderer.invoke('close-overlay'),

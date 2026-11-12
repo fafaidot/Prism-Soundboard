@@ -12,6 +12,7 @@ import { ClearAllSoundsModal } from './components/ClearAllSoundsModal';
 import { RestoreDeletedModal } from './components/RestoreDeletedModal';
 import { EditSoundModal } from './components/EditSoundModal';
 import { InGameOverlayModal } from './components/InGameOverlayModal';
+import { VBCableSetupModal } from './components/VBCableSetupModal';
 import { audioEngine } from './services/audioEngine';
 import { videoClipper } from './services/videoClipper';
 import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem } from './types';
@@ -101,6 +102,7 @@ export const App: React.FC = () => {
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [isVBCableModalOpen, setIsVBCableModalOpen] = useState(false);
 
   // Video Clips State & Viewer
   const [activeView, setActiveView] = useState<'sounds' | 'clips'>('sounds');
@@ -324,6 +326,15 @@ export const App: React.FC = () => {
           const savedClips = await window.soundboardAPI.loadVideoClips();
           if (savedClips && Array.isArray(savedClips)) {
             setVideoClips(savedClips);
+          }
+        }
+
+        // Mandatory First-Time / Startup Check for VB-CABLE Driver
+        if (window.soundboardAPI?.checkVirtualDriverInstalled) {
+          const isInstalled = await window.soundboardAPI.checkVirtualDriverInstalled();
+          const cableSink = await audioEngine.findCableInputDeviceId();
+          if (!isInstalled && !cableSink) {
+            setIsVBCableModalOpen(true);
           }
         }
 
@@ -1747,13 +1758,13 @@ export const App: React.FC = () => {
                       {/* "+ Add" Square Tile */}
                       <div
                         onClick={() => setIsYouTubeModalOpen(true)}
-                        className="group aspect-[4/3] rounded-xl border border-dashed border-[#1d2b3c] hover:border-[#22d3ee]/60 bg-[#0d141d]/50 hover:bg-[#111a24] flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                        className="group aspect-[4/3] rounded-xl border border-dashed border-[#1B222E] hover:border-[#31C5F4]/60 bg-[#151B25]/40 hover:bg-[#151B25] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
                         title="Add new sound"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-[#0e3b52] text-[#22d3ee] flex items-center justify-center transition-colors">
-                          <Plus size={16} className="stroke-[2.5]" />
+                        <div className="w-10 h-10 rounded-xl bg-[#31C5F4] text-[#090B10] flex items-center justify-center transition-all group-hover:scale-110 shadow-md">
+                          <Plus size={20} className="stroke-[2.75]" />
                         </div>
-                        <span className="text-[11px] font-medium text-[#5a687c] group-hover:text-white transition-colors">
+                        <span className="text-[12px] font-semibold text-[#8e95a5] group-hover:text-white transition-colors">
                           Add Sound
                         </span>
                       </div>
@@ -2141,6 +2152,16 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Mandatory VB-CABLE Driver Setup Modal */}
+      <VBCableSetupModal
+        isOpen={isVBCableModalOpen}
+        onComplete={() => {
+          setIsVBCableModalOpen(false);
+          audioEngine.setupAudioGraph();
+        }}
+        accentColor={settings.accentColor}
+      />
 
       {/* GPU Accelerated Floating Drag Clone Card */}
       {isPointerDragging && pointerDragSound && pointerDragRect && (

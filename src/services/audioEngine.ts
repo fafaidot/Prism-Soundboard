@@ -66,7 +66,7 @@ class AudioEngine {
 
   // Continuous Rolling Circular Buffer for Clipping the Last N Seconds (Microphone & Computer Sounds)
   private bufferSampleRate: number = 48000;
-  private maxRollingSeconds: number = 15;
+  private maxRollingSeconds: number = 65;
   private clipWorkletNode: AudioWorkletNode | null = null;
   private clipProcessorNode: ScriptProcessorNode | null = null;
   private clipMixGainNode: GainNode | null = null;
@@ -1396,7 +1396,7 @@ class RollingClipWorkletProcessor extends AudioWorkletProcessor {
       if (!data) return;
       if (data.type === 'init') {
         this.sampleRate = data.sampleRate || 48000;
-        this.maxSeconds = data.maxSeconds || 15;
+        this.maxSeconds = data.maxSeconds || 65;
         this.numChannels = 2;
         this.bufferSize = Math.floor(this.sampleRate * this.maxSeconds * 2);
         this.buffer = new Float32Array(this.bufferSize);

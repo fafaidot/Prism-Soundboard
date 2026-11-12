@@ -5,6 +5,7 @@ import {
   Star,
   Trash2,
   Music,
+  Clapperboard,
   Plus,
   Play,
   Pause,
@@ -188,8 +189,18 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
       {/* Selected Sound Info Card */}
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-[#123244] border border-[#31C5F4]/30 flex items-center justify-center text-[#31C5F4] flex-shrink-0">
-          <Music size={22} />
+        <div className="w-12 h-12 rounded-xl bg-[#0E131A] border border-[#1B222E] overflow-hidden flex items-center justify-center text-[#31C5F4] flex-shrink-0 shadow-sm">
+          {sound.thumbnail ? (
+            <img
+              src={sound.thumbnail}
+              alt={sound.title}
+              className="w-full h-full object-cover"
+            />
+          ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
+            <Clapperboard size={22} className="text-[#31C5F4]" />
+          ) : (
+            <Music size={22} className="text-[#31C5F4]" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-bold text-white truncate">{sound.title}</h3>
@@ -367,6 +378,8 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 export const ControlPanel = React.memo(ControlPanelComponent, (prev, next) => {
   return (
     prev.sound?.id === next.sound?.id &&
+    prev.sound?.title === next.sound?.title &&
+    prev.sound?.thumbnail === next.sound?.thumbnail &&
     prev.sound?.volume === next.sound?.volume &&
     prev.sound?.speed === next.sound?.speed &&
     prev.sound?.reproductionMode === next.sound?.reproductionMode &&

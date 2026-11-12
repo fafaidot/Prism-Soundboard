@@ -38,6 +38,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "driver",
+        "to": "driver",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
