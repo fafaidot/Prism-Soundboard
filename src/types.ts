@@ -152,7 +152,7 @@ export interface SoundboardAPI {
   moveToDeleted?: (sound: SoundItem) => Promise<SoundItem | false>;
   restoreDeletedSound?: (soundId: string) => Promise<SoundItem | null>;
   permanentlyDeleteSound?: (soundId: string) => Promise<boolean>;
-  exportSoundboardBackup?: () => Promise<boolean>;
+  exportSoundboardBackup?: (sounds?: SoundItem[]) => Promise<boolean>;
   importSoundboardBackup?: () => Promise<{ sounds: SoundItem[]; settings?: AudioSettings } | null>;
   resetAllAppData?: () => Promise<boolean>;
   saveRecordedAudio?: (data: { base64: string; duration: number; title: string }) => Promise<{

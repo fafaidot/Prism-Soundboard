@@ -1164,7 +1164,7 @@ ipcMain.handle('permanently-delete-sound', async (_event, soundId) => {
 });
 
 // Export Backup (Packages all audio files + sounds.json + settings.json into a .prism zip archive)
-ipcMain.handle('export-soundboard-backup', async () => {
+ipcMain.handle('export-soundboard-backup', async (_event, liveSounds) => {
   try {
     const defaultName = `prism-soundboard-backup-${new Date().toISOString().slice(0, 10)}.prism`;
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -1179,11 +1179,35 @@ ipcMain.handle('export-soundboard-backup', async () => {
 
     let sounds = [];
     let settings = {};
-    if (fs.existsSync(SOUNDS_FILE)) {
-      sounds = JSON.parse(fs.readFileSync(SOUNDS_FILE, 'utf-8'));
+
+    // 1. Prioritize live sounds passed directly from the client UI
+    if (Array.isArray(liveSounds) && liveSounds.length > 0) {
+      sounds = liveSounds;
+    } else {
+      // 2. Read from disk files, falling back to backup file if empty
+      const candidateFiles = [
+        SOUNDS_FILE,
+        path.join(USER_DATA_DIR, 'sounds_backup_57.json'),
+        path.join(USER_DATA_DIR, 'sounds.json'),
+        path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json'),
+      ];
+      for (const cf of candidateFiles) {
+        if (fs.existsSync(cf)) {
+          try {
+            const parsed = JSON.parse(fs.readFileSync(cf, 'utf-8'));
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              sounds = parsed;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
     }
+
     if (fs.existsSync(SETTINGS_FILE)) {
-      settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+      try {
+        settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+      } catch (e) {}
     }
 
     // Embed all physical audio files referenced by sounds

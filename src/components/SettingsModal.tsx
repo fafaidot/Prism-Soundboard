@@ -38,6 +38,7 @@ interface SettingsModalProps {
   onReloadSounds?: () => void;
   deletedCount?: number;
   onOpenDeletedArchive?: () => void;
+  sounds?: any[];
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -48,6 +49,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onReloadSounds,
   deletedCount = 0,
   onOpenDeletedArchive,
+  sounds,
 }) => {
   const [localSettings, setLocalSettings] = useState<AudioSettings>(settings);
   const [backupMsg, setBackupMsg] = useState<{ text: string; error?: boolean } | null>(null);
@@ -299,7 +301,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleBackupExport = async () => {
     if (window.soundboardAPI?.exportSoundboardBackup) {
-      const res = await window.soundboardAPI.exportSoundboardBackup();
+      const res = await window.soundboardAPI.exportSoundboardBackup(sounds);
       if (res) {
         setBackupMsg({ text: 'Backup exported successfully!' });
       } else {

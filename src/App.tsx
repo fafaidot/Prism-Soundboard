@@ -1892,6 +1892,7 @@ export const App: React.FC = () => {
         onSaveSettings={handleSaveSettings}
         deletedCount={deletedSounds.length}
         onOpenDeletedArchive={() => setIsRestoreModalOpen(true)}
+        sounds={sounds}
         onReloadSounds={async () => {
           if (window.soundboardAPI?.loadSounds) {
             const reloaded = await window.soundboardAPI.loadSounds();
@@ -1931,7 +1932,7 @@ export const App: React.FC = () => {
         onConfirmClear={handleClearAllSounds}
         onExportBackup={async () => {
           if (window.soundboardAPI?.exportSoundboardBackup) {
-            return await window.soundboardAPI.exportSoundboardBackup();
+            return await window.soundboardAPI.exportSoundboardBackup(sounds);
           }
         }}
       />
