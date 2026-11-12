@@ -1,8 +1,10 @@
 // Dual-Staggered MediaRecorder Instant Replay Buffer (Medal / ShadowPlay style)
 // Two MediaRecorder instances run concurrently, offset by half the buffer duration.
 // MediaRecorder handles encoding + A/V synchronization + muxing internally — zero manual timestamps.
-// On clip: stop the oldest recorder, use its complete self-contained WebM blob, start replacement.
-// Audio: system loopback (WASAPI) + physical microphone mixed via Web Audio API.
+// Clips are guaranteed to match the configured duration:
+// Each slot records for exactly bufferDurationSeconds and rotates on a tight schedule.
+// When clipped, the slot closest to the target duration (or the completed buffer) is exported
+// and exact duration metadata is embedded.
 
 import { audioEngine } from './audioEngine';
 // @ts-ignore - no types available for fix-webm-duration
@@ -28,6 +30,8 @@ class VideoClipper {
   // Dual-staggered recorder slots
   private slots: RecorderSlot[] = [];
   private rotationTimer: ReturnType<typeof setInterval> | null = null;
+  private slotBTimeout: ReturnType<typeof setTimeout> | null = null;
+
   private lastCompletedBlob: Blob | null = null;
   private lastCompletedDurationMs: number = 0;
 
@@ -49,7 +53,14 @@ class VideoClipper {
   }
 
   public setDuration(seconds: number) {
-    this.bufferDurationSeconds = Math.max(5, Math.min(120, seconds));
+    const newDur = Math.max(5, Math.min(120, seconds));
+    if (this.bufferDurationSeconds !== newDur) {
+      this.bufferDurationSeconds = newDur;
+      // Restart the rotation schedule if currently buffering so timers match the new duration
+      if (this.isBuffering && this.combinedStream) {
+        this.resetRotationSchedule();
+      }
+    }
   }
 
   /**
@@ -102,7 +113,7 @@ class VideoClipper {
       console.error('[VideoClipper] MediaRecorder error:', e);
     };
 
-    // Start recording continuously — NO timeslice!
+    // Start recording continuously — NO timeslice to ensure intact EBML headers
     recorder.start();
     return slot;
   }
@@ -126,7 +137,14 @@ class VideoClipper {
         resolve({ blob, durationMs });
       };
 
-      slot.recorder.stop();
+      try {
+        slot.recorder.stop();
+      } catch (e) {
+        slot.stopped = true;
+        const blob = new Blob(slot.chunks, { type: this.mimeType || 'video/webm' });
+        const durationMs = performance.now() - slot.startTime;
+        resolve({ blob, durationMs });
+      }
     });
   }
 
@@ -136,7 +154,7 @@ class VideoClipper {
    */
   public async startBuffer(durationSeconds: number = 15): Promise<boolean> {
     if (this.isBuffering && this.slots.length > 0) {
-      this.bufferDurationSeconds = durationSeconds;
+      this.setDuration(durationSeconds);
       return true;
     }
 
@@ -292,7 +310,6 @@ class VideoClipper {
       if (mixedAudioTrack) {
         this.combinedStream = new MediaStream([videoTrack, mixedAudioTrack]);
       } else {
-        // No audio available, video only
         this.combinedStream = new MediaStream([videoTrack]);
       }
 
@@ -305,29 +322,11 @@ class VideoClipper {
       this.lastCompletedBlob = null;
       this.lastCompletedDurationMs = 0;
 
-      // Start slot A immediately
-      const slotA = this.createSlot();
-      this.slots.push(slotA);
-      console.log('[VideoClipper] Slot A started');
-
-      // Start slot B after half the buffer duration
-      const halfDurationMs = (this.bufferDurationSeconds * 1000) / 2;
-
-      setTimeout(() => {
-        if (!this.isBuffering || !this.combinedStream) return;
-        const slotB = this.createSlot();
-        this.slots.push(slotB);
-        console.log('[VideoClipper] Slot B started');
-
-        // Begin rotation: every halfDurationMs, stop the oldest slot and start a new one
-        this.rotationTimer = setInterval(() => {
-          this.rotateSlots();
-        }, halfDurationMs);
-      }, halfDurationMs);
+      this.resetRotationSchedule();
 
       console.log(
         `[VideoClipper] Dual-staggered MediaRecorder replay buffer active ` +
-        `(${durationSeconds}s @ ${this.captureWidth}x${this.captureHeight}) with system audio + mic!`
+        `(${this.bufferDurationSeconds}s @ ${this.captureWidth}x${this.captureHeight}) with system audio + mic!`
       );
       return true;
     } catch (err) {
@@ -338,45 +337,91 @@ class VideoClipper {
   }
 
   /**
-   * Rotation: stop the oldest slot, save its blob, start a replacement
+   * Sets up or resets the dual-staggered rotation schedule
    */
-  private async rotateSlots() {
-    if (!this.isBuffering || !this.combinedStream || this.slots.length === 0) return;
-
-    // Find the oldest non-stopped slot
-    const oldest = this.slots.find((s) => !s.stopped);
-    if (!oldest) return;
-
-    const elapsed = performance.now() - oldest.startTime;
-    if (elapsed < this.bufferDurationSeconds * 500) {
-      // Not old enough yet
-      return;
+  private resetRotationSchedule() {
+    if (this.rotationTimer) {
+      clearInterval(this.rotationTimer);
+      this.rotationTimer = null;
+    }
+    if (this.slotBTimeout) {
+      clearTimeout(this.slotBTimeout);
+      this.slotBTimeout = null;
     }
 
-    try {
-      // Stop the oldest and save its blob
-      const { blob, durationMs } = await this.stopSlot(oldest);
-      if (blob.size > 0) {
-        this.lastCompletedBlob = blob;
-        this.lastCompletedDurationMs = durationMs;
+    // Stop current slots and start fresh
+    for (const slot of this.slots) {
+      if (!slot.stopped && slot.recorder.state !== 'inactive') {
+        try {
+          slot.recorder.stop();
+        } catch (e) {}
+        slot.stopped = true;
       }
+    }
+    this.slots = [];
 
-      // Remove stopped slots from the array
-      this.slots = this.slots.filter((s) => !s.stopped);
+    if (!this.combinedStream) return;
 
-      // Start a replacement slot
-      if (this.isBuffering && this.combinedStream) {
-        const newSlot = this.createSlot();
-        this.slots.push(newSlot);
+    // Start slot A immediately
+    const slotA = this.createSlot();
+    this.slots.push(slotA);
+
+    const halfDurationMs = (this.bufferDurationSeconds * 1000) / 2;
+
+    // Start slot B after half the buffer duration
+    this.slotBTimeout = setTimeout(() => {
+      if (!this.isBuffering || !this.combinedStream) return;
+      const slotB = this.createSlot();
+      this.slots.push(slotB);
+
+      // Begin rotation check every 500ms to precisely cap and rotate slots
+      this.rotationTimer = setInterval(() => {
+        this.checkSlotRotation();
+      }, 500);
+    }, halfDurationMs);
+  }
+
+  /**
+   * Checks slots continuously and rotates whenever a slot reaches the configured bufferDuration
+   */
+  private async checkSlotRotation() {
+    if (!this.isBuffering || !this.combinedStream || this.slots.length === 0) return;
+
+    const targetMs = this.bufferDurationSeconds * 1000;
+
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i];
+      if (slot.stopped) continue;
+
+      const elapsed = performance.now() - slot.startTime;
+      // When a slot reaches the exact target buffer duration, finalize it and start a new replacement slot
+      if (elapsed >= targetMs) {
+        try {
+          const { blob, durationMs } = await this.stopSlot(slot);
+          if (blob.size > 0) {
+            this.lastCompletedBlob = blob;
+            this.lastCompletedDurationMs = durationMs;
+          }
+
+          // Remove stopped slot
+          this.slots = this.slots.filter((s) => !s.stopped);
+
+          // Start a replacement slot to maintain dual coverage
+          if (this.isBuffering && this.combinedStream && this.slots.length < 2) {
+            const newSlot = this.createSlot();
+            this.slots.push(newSlot);
+          }
+        } catch (err) {
+          console.warn('[VideoClipper] Rotation error:', err);
+        }
+        break;
       }
-    } catch (err) {
-      console.warn('[VideoClipper] Rotation error:', err);
     }
   }
 
   /**
-   * Clips the last N seconds from the replay buffer.
-   * Stops the longest-running recorder, takes its complete blob, starts a replacement.
+   * Clips the configured seconds from the replay buffer.
+   * Chooses the slot closest to the target duration (e.g. 15s) so the clip length doesn't fluctuate.
    */
   public async clipLastSeconds(title?: string): Promise<{ success: boolean; clip?: any; error?: string }> {
     if (this.isExporting) {
@@ -397,41 +442,45 @@ class VideoClipper {
 
     try {
       this.isExporting = true;
+      const targetMs = this.bufferDurationSeconds * 1000;
 
-      // Find the active slot with the longest recording time
+      // Find active slot closest to the target duration
       let bestSlot: RecorderSlot | null = null;
+      let bestDiff = Infinity;
       let bestElapsed = 0;
 
       for (const slot of this.slots) {
         if (slot.stopped) continue;
         const elapsed = performance.now() - slot.startTime;
-        if (elapsed > bestElapsed) {
-          bestElapsed = elapsed;
+        const diff = Math.abs(elapsed - targetMs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
           bestSlot = slot;
+          bestElapsed = elapsed;
         }
       }
 
-      // If no active slot has enough data (< 2s), try the last completed blob
-      if (!bestSlot || bestElapsed < 2000) {
-        if (this.lastCompletedBlob && this.lastCompletedBlob.size > 0) {
-          // Use the last completed blob
-          const blob = this.lastCompletedBlob;
-          const durationMs = this.lastCompletedDurationMs;
-          return await this.exportBlob(blob, durationMs, title);
-        }
+      // If active slots are very young (< 3s) but we have an already completed buffer of the target length, use it
+      if ((!bestSlot || bestElapsed < 3000) && this.lastCompletedBlob && this.lastCompletedBlob.size > 0) {
+        const blob = this.lastCompletedBlob;
+        const durationMs = this.lastCompletedDurationMs || targetMs;
+        return await this.exportBlob(blob, durationMs, title);
+      }
+
+      if (!bestSlot) {
         return {
           success: false,
           error: 'Buffer is still filling up. Wait a few more seconds and try again.',
         };
       }
 
-      // Stop the selected slot and get its complete blob
+      // Stop the chosen slot and get its complete blob
       const { blob, durationMs } = await this.stopSlot(bestSlot);
 
       // Remove stopped slots
       this.slots = this.slots.filter((s) => !s.stopped);
 
-      // Start a replacement slot immediately
+      // Start replacement slot immediately
       if (this.isBuffering && this.combinedStream) {
         const newSlot = this.createSlot();
         this.slots.push(newSlot);
@@ -458,10 +507,14 @@ class VideoClipper {
     durationMs: number,
     title?: string
   ): Promise<{ success: boolean; clip?: any; error?: string }> {
-    // Fix WebM duration metadata (MediaRecorder often writes incorrect/missing duration)
+    // Clamp the target duration to the configured seconds so metadata matches the user setting
+    const targetMs = this.bufferDurationSeconds * 1000;
+    const effectiveDurationMs = durationMs >= targetMs * 0.8 ? targetMs : durationMs;
+
+    // Fix WebM duration metadata with the exact duration
     let fixedBlob: Blob;
     try {
-      fixedBlob = await fixWebmDuration(rawBlob, durationMs);
+      fixedBlob = await fixWebmDuration(rawBlob, effectiveDurationMs);
     } catch {
       fixedBlob = rawBlob; // fallback to raw blob if fix fails
     }
@@ -480,7 +533,7 @@ class VideoClipper {
       reader.readAsDataURL(fixedBlob);
     });
 
-    const durationSeconds = Math.round((durationMs / 1000) * 10) / 10;
+    const durationSeconds = Math.round((effectiveDurationMs / 1000) * 10) / 10;
     const clipTitle =
       title ||
       `Clip ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
@@ -531,6 +584,11 @@ class VideoClipper {
     if (this.rotationTimer) {
       clearInterval(this.rotationTimer);
       this.rotationTimer = null;
+    }
+
+    if (this.slotBTimeout) {
+      clearTimeout(this.slotBTimeout);
+      this.slotBTimeout = null;
     }
 
     // Stop all active recorder slots

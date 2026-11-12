@@ -1384,7 +1384,8 @@ export const App: React.FC = () => {
             recordHotkey={settings.recordHotkey || 'F9'}
             onStartRecord={handleStartRecordClip}
             onChangeRecordDuration={(dur) => {
-              handleSaveSettings({ ...settings, recordDuration: dur });
+              videoClipper.setDuration(dur);
+              handleSaveSettings({ ...settings, recordDuration: dur, videoClipDuration: dur });
             }}
             onChangeRecordSource={(src) => {
               handleSaveSettings({ ...settings, recordSource: src });
