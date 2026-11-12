@@ -1491,13 +1491,27 @@ export const App: React.FC = () => {
             onToggleHearMyself={handleToggleHearMyself}
             isRecording={isRecordingClip}
             recordingSecondsLeft={recordSecondsLeft}
-            recordDuration={settings.recordDuration || 5}
+            recordDuration={
+              activeView === 'clips'
+                ? settings.videoClipDuration || 15
+                : settings.recordDuration || 5
+            }
             recordSource={settings.recordSource || 'screen'}
-            recordHotkey={settings.recordHotkey || 'F9'}
-            onStartRecord={handleStartRecordClip}
+            recordHotkey={
+              activeView === 'clips'
+                ? settings.videoClipHotkey || 'F10'
+                : settings.recordHotkey || 'F9'
+            }
+            onStartRecord={
+              activeView === 'clips' ? handleTriggerVideoClip : handleStartRecordClip
+            }
             onChangeRecordDuration={(dur) => {
-              videoClipper.setDuration(dur);
-              handleSaveSettings({ ...settings, recordDuration: dur, videoClipDuration: dur });
+              if (activeView === 'clips') {
+                videoClipper.setDuration(dur);
+                handleSaveSettings({ ...settings, videoClipDuration: dur });
+              } else {
+                handleSaveSettings({ ...settings, recordDuration: dur });
+              }
             }}
             onChangeRecordSource={(src) => {
               handleSaveSettings({ ...settings, recordSource: src });
@@ -1549,7 +1563,12 @@ export const App: React.FC = () => {
                   <div className="max-w-[1400px] mx-auto w-full">
                     {/* Header: Title + Subtitle with Sort Dropdown */}
                     <div className="flex flex-col gap-1 mb-6">
-                      <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
+                      <div className="flex items-center gap-2.5">
+                        <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#31C5F4]/15 border border-[#31C5F4]/30 text-[#31C5F4]">
+                          Experimental
+                        </span>
+                      </div>
                       <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
                         <span>{filteredClips.length} Videos</span>
                         <span className="text-[#3b4758]">SORT BY</span>
@@ -1589,13 +1608,13 @@ export const App: React.FC = () => {
 
                     {filteredClips.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
-                        <div className="w-16 h-16 rounded-2xl bg-[#0e3b52] text-[#22d3ee] flex items-center justify-center shadow-lg">
+                        <div className="w-16 h-16 rounded-2xl bg-[#123244] border border-[#31C5F4]/30 text-[#31C5F4] flex items-center justify-center shadow-lg">
                           <Video size={28} />
                         </div>
                         <div>
                           <h3 className="text-white font-bold text-[16px]">No Game Clips Yet</h3>
-                          <p className="text-[12px] text-[#5a687c] max-w-sm mt-1">
-                            Press [{settings.recordHotkey || 'F9'}] or [F10] anytime in-game to instantly capture and save gameplay clips!
+                          <p className="text-[12px] text-[#8e95a5] max-w-sm mt-1 leading-relaxed">
+                            Press <span className="font-mono font-bold text-[#31C5F4]">[{settings.videoClipHotkey || 'F10'}]</span> anytime in-game or click the <span className="text-[#31C5F4] font-semibold">Video Clip</span> button above to capture gameplay moments!
                           </p>
                         </div>
                       </div>

@@ -75,9 +75,11 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   onChangeRecordDuration,
   onOpenYouTubeSearch,
   onImportLocalFiles,
+  activeView = 'sounds',
 }) => {
   const [showDurationMenu, setShowDurationMenu] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const isVideoTab = activeView === 'clips';
 
   return (
     <div className="h-14 px-6 bg-[#090B10] border-b border-[#1B222E] flex items-center justify-between gap-4 select-none relative z-30 transition-colors duration-150">
@@ -158,16 +160,24 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           </button>
         </Tooltip>
 
-        {/* Quick Clip Dropdown Button */}
+        {/* Quick Clip Dropdown Button: adapts dynamically to Sounds vs Videos tab */}
         <div className="relative">
           <div className="flex items-center h-9 rounded-lg bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 text-[#8e95a5] hover:text-white transition-all overflow-hidden">
             <button
               onClick={() => onStartRecord && onStartRecord()}
               className="flex items-center gap-2 px-3 h-full hover:bg-white/5 cursor-pointer text-[12px] font-medium"
-              title={`Capture Instant Clip [${recordHotkey}]`}
+              title={
+                isVideoTab
+                  ? `Capture Instant Game Replay Video Clip [${recordHotkey}]`
+                  : `Capture Instant Sound Clip [${recordHotkey}]`
+              }
             >
-              <Scissors size={13} className="text-[#31C5F4]" />
-              <span>Clip · {recordDuration}s</span>
+              {isVideoTab ? (
+                <Video size={13} className="text-[#31C5F4]" />
+              ) : (
+                <Scissors size={13} className="text-[#31C5F4]" />
+              )}
+              <span>{isVideoTab ? 'Video Clip' : 'Clip'} · {recordDuration}s</span>
             </button>
             <button
               onClick={() => setShowDurationMenu(!showDurationMenu)}
@@ -180,9 +190,9 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           {showDurationMenu && (
             <div className="absolute right-0 top-11 w-44 rounded-xl bg-[#151B25] border border-[#1B222E] p-1.5 shadow-2xl z-50 flex flex-col gap-1">
               <span className="px-2.5 py-1 text-[10px] font-bold text-[#5a687c] uppercase tracking-wider">
-                Replay Duration
+                {isVideoTab ? 'Video Replay Buffer' : 'Audio Replay Buffer'}
               </span>
-              {[5, 15, 30, 60].map((dur) => (
+              {(isVideoTab ? [15, 30, 45, 60] : [5, 15, 30, 60]).map((dur) => (
                 <button
                   key={dur}
                   onClick={() => {
