@@ -52,6 +52,11 @@ class AudioEngine {
   // Headphone Monitor (Hear Myself directly into ctx.destination)
   private monitorGainNode: GainNode | null = null;
 
+  // Public accessor for real physical mic MediaStream for mixed video clipping
+  public getMicrophoneStream(): MediaStream | null {
+    return this.micStream;
+  }
+
   // Master Gain for all Soundboard clips (Affects sounds only, real-time live volume scaling)
   private soundsMasterGainNode: GainNode | null = null;
 
