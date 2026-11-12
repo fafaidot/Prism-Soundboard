@@ -1892,3 +1892,6 @@ registerProcessor('rolling-clip-worklet', RollingClipWorkletProcessor);
 }
 
 export const audioEngine = new AudioEngine();
+if (typeof window !== 'undefined') {
+  (window as any).audioEngine = audioEngine;
+}

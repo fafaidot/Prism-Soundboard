@@ -521,7 +521,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      devTools: false,
+      devTools: true,
       webSecurity: false, // Allows playing local audio smoothly
       backgroundThrottling: false, // Prevents background sleeping / input freeze when gaming
     },
@@ -547,6 +547,16 @@ function createWindow() {
 
   mainWindow.webContents.on('console-message', (_event, _level, message) => {
     console.log('[Renderer]', message);
+  });
+
+  // Allow F12 or Ctrl+Shift+I to open DevTools
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown') {
+      if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
+        mainWindow.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    }
   });
 
   mainWindow.once('ready-to-show', () => {
