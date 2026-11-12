@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 
 interface SliderProps {
   value: number;
@@ -25,44 +25,82 @@ export const Slider: React.FC<SliderProps> = ({
 }) => {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+  const trackRectRef = useRef<{ left: number; width: number } | null>(null);
+  const latestClientXRef = useRef<number>(0);
+  const rafIdRef = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const minRef = useRef(min);
+  minRef.current = min;
+  const maxRef = useRef(max);
+  maxRef.current = max;
+  const stepRef = useRef(step);
+  stepRef.current = step;
 
   // Compute percentage clamped between 0 and 100
   const range = max - min;
   const percentage = range > 0 ? Math.max(0, Math.min(100, ((value - min) / range) * 100)) : 0;
 
-  const calculateValueFromPointer = useCallback(
-    (clientX: number) => {
-      if (!trackRef.current) return value;
-      const rect = trackRef.current.getBoundingClientRect();
-      if (rect.width <= 0) return value;
-      const offsetX = Math.max(0, Math.min(rect.width, clientX - rect.left));
-      const ratio = offsetX / rect.width;
-      const rawVal = min + ratio * (max - min);
+  const computeValueFromClientX = useCallback((clientX: number) => {
+    const rect = trackRectRef.current;
+    const curMin = minRef.current;
+    const curMax = maxRef.current;
+    const curStep = stepRef.current;
 
-      if (step > 0) {
-        const steppedVal = Math.round((rawVal - min) / step) * step + min;
-        // Fix float precision issues (e.g. 1.00000000002)
-        const decimals = (step.toString().split('.')[1] || '').length;
-        const clamped = Math.max(min, Math.min(max, Number(steppedVal.toFixed(decimals))));
-        return clamped;
+    if (!rect || rect.width <= 0) return curMin;
+
+    const offsetX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const ratio = offsetX / rect.width;
+    const rawVal = curMin + ratio * (curMax - curMin);
+
+    if (curStep > 0) {
+      const steppedVal = Math.round((rawVal - curMin) / curStep) * curStep + curMin;
+      const decimals = (curStep.toString().split('.')[1] || '').length;
+      return Math.max(curMin, Math.min(curMax, Number(steppedVal.toFixed(decimals))));
+    }
+    return Math.max(curMin, Math.min(curMax, rawVal));
+  }, []);
+
+  const scheduleUpdate = useCallback(() => {
+    if (rafIdRef.current !== null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      if (!isDraggingRef.current) return;
+      const newVal = computeValueFromClientX(latestClientXRef.current);
+      onChangeRef.current(newVal);
+    });
+  }, [computeValueFromClientX]);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
       }
-      return Math.max(min, Math.min(max, rawVal));
-    },
-    [min, max, step, value]
-  );
+    };
+  }, []);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (disabled || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    isDraggingRef.current = true;
 
-    // Capture pointer on target if available
+    if (trackRef.current) {
+      const r = trackRef.current.getBoundingClientRect();
+      trackRectRef.current = { left: r.left, width: r.width };
+    }
+
+    isDraggingRef.current = true;
+    setIsDraggingState(true);
+    latestClientXRef.current = e.clientX;
+
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch (_) {}
 
-    const newVal = calculateValueFromPointer(e.clientX);
+    const newVal = computeValueFromClientX(e.clientX);
     onChange(newVal);
   };
 
@@ -70,16 +108,30 @@ export const Slider: React.FC<SliderProps> = ({
     if (!isDraggingRef.current || disabled) return;
     e.preventDefault();
     e.stopPropagation();
-    const newVal = calculateValueFromPointer(e.clientX);
-    onChange(newVal);
+    latestClientXRef.current = e.clientX;
+    scheduleUpdate();
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    setIsDraggingState(false);
+
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch (_) {}
+
+    // Final accurate dispatch
+    if (trackRectRef.current) {
+      const finalVal = computeValueFromClientX(e.clientX);
+      onChange(finalVal);
+    }
+    trackRectRef.current = null;
   };
 
   return (
@@ -105,8 +157,9 @@ export const Slider: React.FC<SliderProps> = ({
           style={{
             width: `${percentage}%`,
             backgroundColor: fillColor,
+            transition: isDraggingState ? 'none' : 'width 75ms ease-out',
           }}
-          className="h-full rounded-full transition-[width] duration-75 ease-out"
+          className="h-full rounded-full"
         />
       </div>
 
@@ -115,8 +168,9 @@ export const Slider: React.FC<SliderProps> = ({
         style={{
           left: `${percentage}%`,
           borderColor: fillColor,
+          transition: isDraggingState ? 'none' : 'transform 75ms ease-out',
         }}
-        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#090B10] border-2 shadow-md transition-transform duration-75 group-hover:scale-110 active:scale-125 pointer-events-none"
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#090B10] border-2 shadow-md group-hover:scale-110 active:scale-125 pointer-events-none"
       />
     </div>
   );
