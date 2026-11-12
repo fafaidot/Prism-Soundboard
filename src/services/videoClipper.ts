@@ -1,47 +1,35 @@
-/// <reference types="dom-webcodecs" />
-/// <reference types="dom-mediacapture-transform" />
-
-// High-performance Keyframe-Aligned In-Memory Ring Buffer Video Clipper (Medal / ShadowPlay Replay Buffer)
-// Records 60fps screen video + system game audio loopback + physical microphone using WebCodecs (VideoEncoder, AudioEncoder)
-// Muxes with webm-muxer into pristine, seekable, non-corrupt WebM files starting strictly on an IDR Keyframe.
-// Zero macroblocking, zero green/gray artifacts, zero audio repeating, synchronized stereo game sound + mic.
+// Dual-Staggered MediaRecorder Instant Replay Buffer (Medal / ShadowPlay style)
+// Two MediaRecorder instances run concurrently, offset by half the buffer duration.
+// MediaRecorder handles encoding + A/V synchronization + muxing internally — zero manual timestamps.
+// On clip: stop the oldest recorder, use its complete self-contained WebM blob, start replacement.
+// Audio: system loopback (WASAPI) + physical microphone mixed via Web Audio API.
 
 import { audioEngine } from './audioEngine';
-import { Muxer, ArrayBufferTarget } from 'webm-muxer';
+// @ts-ignore - no types available for fix-webm-duration
+import fixWebmDuration from 'fix-webm-duration';
 
 export interface VideoClipperConfig {
-  durationSeconds: number; // e.g. 15, 30, 45, 60
+  durationSeconds: number;
 }
 
-interface StoredVideoChunk {
-  chunk: EncodedVideoChunk;
-  metadata?: EncodedVideoChunkMetadata;
-  timestamp: number; // raw chunk timestamp in microseconds
-  timeMs: number; // monotonic wall-clock time in ms (performance.now)
-  type: 'key' | 'delta';
-}
-
-interface StoredAudioChunk {
-  chunk: EncodedAudioChunk;
-  metadata?: EncodedAudioChunkMetadata;
-  timestamp: number; // in microseconds
-  timeMs: number; // monotonic wall-clock time in ms (performance.now)
+interface RecorderSlot {
+  recorder: MediaRecorder;
+  chunks: Blob[];
+  startTime: number; // performance.now() when started
+  stopped: boolean;
 }
 
 class VideoClipper {
   private screenStream: MediaStream | null = null;
   private micStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
-  private scriptProcessor: ScriptProcessorNode | null = null;
+  private combinedStream: MediaStream | null = null;
 
-  // WebCodecs Encoders & Track Processors
-  private videoEncoder: VideoEncoder | null = null;
-  private audioEncoder: AudioEncoder | null = null;
-  private videoReader: ReadableStreamDefaultReader<VideoFrame> | null = null;
-
-  // Keyframe-aligned circular in-memory buffer
-  private videoChunks: StoredVideoChunk[] = [];
-  private audioChunks: StoredAudioChunk[] = [];
+  // Dual-staggered recorder slots
+  private slots: RecorderSlot[] = [];
+  private rotationTimer: ReturnType<typeof setInterval> | null = null;
+  private lastCompletedBlob: Blob | null = null;
+  private lastCompletedDurationMs: number = 0;
 
   private isBuffering: boolean = false;
   private isExporting: boolean = false;
@@ -49,7 +37,8 @@ class VideoClipper {
 
   private captureWidth: number = 1920;
   private captureHeight: number = 1080;
-  private captureFps: number = 60;
+
+  private mimeType: string = '';
 
   public isRecordingActive(): boolean {
     return this.isBuffering;
@@ -64,27 +53,103 @@ class VideoClipper {
   }
 
   /**
-   * Initializes hardware-accelerated screen capture, mixes system sound + microphone,
-   * and begins rolling circular memory buffer with WebCodecs
+   * Select the best supported mimeType for MediaRecorder
+   */
+  private selectMimeType(): string {
+    const candidates = [
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8',
+      'video/webm;codecs=vp9',
+      'video/webm',
+    ];
+    for (const mime of candidates) {
+      if (MediaRecorder.isTypeSupported(mime)) {
+        console.log(`[VideoClipper] Selected mimeType: ${mime}`);
+        return mime;
+      }
+    }
+    console.warn('[VideoClipper] No preferred mimeType supported, using default');
+    return '';
+  }
+
+  /**
+   * Create a new MediaRecorder for the combined stream and start it
+   */
+  private createSlot(): RecorderSlot {
+    const options: MediaRecorderOptions = {
+      videoBitsPerSecond: 8_000_000,
+    };
+    if (this.mimeType) {
+      options.mimeType = this.mimeType;
+    }
+
+    const recorder = new MediaRecorder(this.combinedStream!, options);
+    const slot: RecorderSlot = {
+      recorder,
+      chunks: [],
+      startTime: performance.now(),
+      stopped: false,
+    };
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        slot.chunks.push(e.data);
+      }
+    };
+
+    recorder.onerror = (e) => {
+      console.error('[VideoClipper] MediaRecorder error:', e);
+    };
+
+    // Start recording continuously — NO timeslice!
+    recorder.start();
+    return slot;
+  }
+
+  /**
+   * Stop a recorder slot and return a promise that resolves with the complete blob
+   */
+  private stopSlot(slot: RecorderSlot): Promise<{ blob: Blob; durationMs: number }> {
+    return new Promise((resolve) => {
+      if (slot.stopped || slot.recorder.state === 'inactive') {
+        const blob = new Blob(slot.chunks, { type: this.mimeType || 'video/webm' });
+        const durationMs = performance.now() - slot.startTime;
+        resolve({ blob, durationMs });
+        return;
+      }
+
+      slot.recorder.onstop = () => {
+        slot.stopped = true;
+        const blob = new Blob(slot.chunks, { type: this.mimeType || 'video/webm' });
+        const durationMs = performance.now() - slot.startTime;
+        resolve({ blob, durationMs });
+      };
+
+      slot.recorder.stop();
+    });
+  }
+
+  /**
+   * Initializes screen capture, mixes system sound + microphone,
+   * and begins dual-staggered MediaRecorder replay buffer
    */
   public async startBuffer(durationSeconds: number = 15): Promise<boolean> {
-    if (this.isBuffering && this.videoEncoder && this.videoEncoder.state === 'configured') {
+    if (this.isBuffering && this.slots.length > 0) {
       this.bufferDurationSeconds = durationSeconds;
       return true;
     }
 
-    // Clean previous session if any
+    // Clean previous session
     this.stopBuffer();
 
     try {
       this.bufferDurationSeconds = durationSeconds;
-      this.videoChunks = [];
-      this.audioChunks = [];
 
       let stream: MediaStream | null = null;
 
-      // 1. Primary: Use getDisplayMedia (intercepted by Electron's setDisplayMediaRequestHandler)
-      // This grants BOTH primary display video track AND Windows WASAPI system audio loopback!
+      // 1. Primary: getDisplayMedia (intercepted by Electron's setDisplayMediaRequestHandler)
+      // Provides BOTH screen video AND Windows WASAPI system audio loopback
       if (navigator.mediaDevices?.getDisplayMedia) {
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({
@@ -100,11 +165,11 @@ class VideoClipper {
             } as any,
           });
         } catch (gdmErr) {
-          console.warn('[VideoClipper] getDisplayMedia failed, trying desktopCapturer fallback:', gdmErr);
+          console.warn('[VideoClipper] getDisplayMedia failed, trying fallback:', gdmErr);
         }
       }
 
-      // 2. Fallback: desktopCapturer source via getUserMedia
+      // 2. Fallback: desktopCapturer via getUserMedia
       if (!stream && window.soundboardAPI?.getDesktopScreenSources) {
         try {
           const sources = await window.soundboardAPI.getDesktopScreenSources();
@@ -155,53 +220,8 @@ class VideoClipper {
       const settings = videoTrack.getSettings();
       this.captureWidth = settings.width || 1920;
       this.captureHeight = settings.height || 1080;
-      this.captureFps = Math.min(settings.frameRate || 60, 60);
 
-      this.isBuffering = true;
-
-      // 3. Configure Hardware-Accelerated VideoEncoder
-      this.videoEncoder = new VideoEncoder({
-        output: (chunk, metadata) => {
-          this.onVideoChunk(chunk, metadata);
-        },
-        error: (err) => {
-          console.error('[VideoClipper] VideoEncoder error:', err);
-        },
-      });
-
-      this.videoEncoder.configure({
-        codec: 'vp8',
-        width: this.captureWidth,
-        height: this.captureHeight,
-        bitrate: 8_000_000, // 8 Mbps high-definition 60fps
-        framerate: this.captureFps,
-        latencyMode: 'realtime',
-      });
-
-      // 4. Start Video Frame Reader Pump
-      const videoProcessor = new MediaStreamTrackProcessor({ track: videoTrack });
-      this.videoReader = videoProcessor.readable.getReader();
-      let frameIndex = 0;
-      const keyInterval = Math.max(30, Math.round(this.captureFps * 2)); // Keyframe every 2 seconds
-
-      (async () => {
-        while (this.isBuffering && this.videoReader) {
-          try {
-            const { done, value: videoFrame } = await this.videoReader.read();
-            if (done || !videoFrame) break;
-            if (this.videoEncoder && this.videoEncoder.state === 'configured') {
-              const isKey = frameIndex % keyInterval === 0;
-              this.videoEncoder.encode(videoFrame, { keyFrame: isKey });
-              frameIndex++;
-            }
-            videoFrame.close();
-          } catch (err) {
-            break;
-          }
-        }
-      })();
-
-      // 5. Initialize Web Audio Graph mixing System Game Audio + Physical Microphone
+      // 3. Initialize Web Audio graph to mix system audio + microphone
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtxClass({ sampleRate: 48000 });
       this.audioContext = audioCtx;
@@ -209,10 +229,9 @@ class VideoClipper {
         await audioCtx.resume();
       }
 
-      const mixGain = audioCtx.createGain();
-      mixGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+      const mixDest = audioCtx.createMediaStreamDestination();
 
-      // A. Connect system desktop loopback audio (game sound, music, Discord, windows audio)
+      // A. Connect system audio loopback
       const sysTracks = stream.getAudioTracks();
       if (sysTracks.length > 0) {
         try {
@@ -220,16 +239,16 @@ class VideoClipper {
           const sysGain = audioCtx.createGain();
           sysGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
           sysSource.connect(sysGain);
-          sysGain.connect(mixGain);
-          console.log('[VideoClipper] System audio loopback connected to video mixer:', sysTracks[0].label);
+          sysGain.connect(mixDest);
+          console.log('[VideoClipper] System audio connected:', sysTracks[0].label);
         } catch (sysErr) {
           console.warn('[VideoClipper] System audio route error:', sysErr);
         }
       } else {
-        console.warn('[VideoClipper] No system audio track present on screen stream');
+        console.warn('[VideoClipper] No system audio track on screen stream');
       }
 
-      // B. Connect physical microphone (user's voice)
+      // B. Connect physical microphone
       let micStream = audioEngine.getMicrophoneStream();
       if (!micStream || micStream.getAudioTracks().length === 0 || !micStream.active) {
         try {
@@ -242,7 +261,7 @@ class VideoClipper {
             video: false,
           });
         } catch (e) {
-          console.warn('[VideoClipper] Could not acquire microphone stream:', e);
+          console.warn('[VideoClipper] Could not acquire microphone:', e);
         }
       }
       this.micStream = micStream;
@@ -253,134 +272,111 @@ class VideoClipper {
           const micGain = audioCtx.createGain();
           micGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
           micSource.connect(micGain);
-          micGain.connect(mixGain);
-          console.log('[VideoClipper] Microphone connected to video mixer:', micStream.getAudioTracks()[0].label);
+          micGain.connect(mixDest);
+          console.log('[VideoClipper] Microphone connected:', micStream.getAudioTracks()[0].label);
         } catch (micErr) {
           console.warn('[VideoClipper] Mic audio route error:', micErr);
         }
       }
 
-      // 6. Configure AudioEncoder (Opus 48kHz Stereo @ 160 kbps)
-      this.audioEncoder = new AudioEncoder({
-        output: (chunk, metadata) => {
-          this.onAudioChunk(chunk, metadata);
-        },
-        error: (err) => console.error('[VideoClipper] AudioEncoder error:', err),
-      });
-
-      this.audioEncoder.configure({
-        codec: 'opus',
-        sampleRate: 48000,
-        numberOfChannels: 2,
-        bitrate: 160000, // 160 kbps high-fidelity Opus
-      });
-
-      // 7. Continuous ScriptProcessor Audio Pump (100% reliable, zero stall, zero disconnect)
-      const proc = audioCtx.createScriptProcessor(2048, 2, 2);
-      this.scriptProcessor = proc;
-      mixGain.connect(proc);
-
-      // Keep Web Audio graph clock running with silent destination node
+      // C. Keep the audio rendering thread alive with a silent signal to destination
+      const silentOsc = audioCtx.createOscillator();
       const silentGain = audioCtx.createGain();
       silentGain.gain.setValueAtTime(0, audioCtx.currentTime);
-      proc.connect(silentGain);
+      silentOsc.connect(silentGain);
       silentGain.connect(audioCtx.destination);
+      silentOsc.start();
 
-      proc.onaudioprocess = (e) => {
-        if (!this.isBuffering || !this.audioEncoder || this.audioEncoder.state !== 'configured') return;
+      // 4. Create the combined MediaStream: screen video + mixed audio
+      const mixedAudioTrack = mixDest.stream.getAudioTracks()[0];
+      if (mixedAudioTrack) {
+        this.combinedStream = new MediaStream([videoTrack, mixedAudioTrack]);
+      } else {
+        // No audio available, video only
+        this.combinedStream = new MediaStream([videoTrack]);
+      }
 
-        const ch0 = e.inputBuffer.getChannelData(0);
-        const ch1 = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : ch0;
-        const numFrames = ch0.length;
+      // 5. Select codec
+      this.mimeType = this.selectMimeType();
 
-        const planarData = new Float32Array(numFrames * 2);
-        planarData.set(ch0, 0);
-        planarData.set(ch1, numFrames);
+      // 6. Start dual-staggered MediaRecorder rotation
+      this.isBuffering = true;
+      this.slots = [];
+      this.lastCompletedBlob = null;
+      this.lastCompletedDurationMs = 0;
 
-        // Microsecond timestamp anchored to performance.now()
-        const nowMs = performance.now();
-        const audioTimestampUs = Math.round(nowMs * 1000);
+      // Start slot A immediately
+      const slotA = this.createSlot();
+      this.slots.push(slotA);
+      console.log('[VideoClipper] Slot A started');
 
-        try {
-          const audioData = new AudioData({
-            format: 'f32-planar',
-            sampleRate: 48000,
-            numberOfChannels: 2,
-            numberOfFrames: numFrames,
-            timestamp: audioTimestampUs,
-            data: planarData,
-          });
+      // Start slot B after half the buffer duration
+      const halfDurationMs = (this.bufferDurationSeconds * 1000) / 2;
 
-          this.audioEncoder.encode(audioData);
-          audioData.close();
-        } catch (encErr) {
-          console.warn('[VideoClipper] AudioData encode error:', encErr);
-        }
-      };
+      setTimeout(() => {
+        if (!this.isBuffering || !this.combinedStream) return;
+        const slotB = this.createSlot();
+        this.slots.push(slotB);
+        console.log('[VideoClipper] Slot B started');
 
-      console.log(`[VideoClipper] WebCodecs instant replay buffer active (${durationSeconds}s @ ${this.captureWidth}x${this.captureHeight} ${this.captureFps}fps) with system audio + mic!`);
+        // Begin rotation: every halfDurationMs, stop the oldest slot and start a new one
+        this.rotationTimer = setInterval(() => {
+          this.rotateSlots();
+        }, halfDurationMs);
+      }, halfDurationMs);
+
+      console.log(
+        `[VideoClipper] Dual-staggered MediaRecorder replay buffer active ` +
+        `(${durationSeconds}s @ ${this.captureWidth}x${this.captureHeight}) with system audio + mic!`
+      );
       return true;
     } catch (err) {
-      console.warn('[VideoClipper] Failed to start screen video buffer:', err);
+      console.warn('[VideoClipper] Failed to start buffer:', err);
       this.stopBuffer();
       return false;
     }
   }
 
-  private onVideoChunk(chunk: EncodedVideoChunk, metadata?: EncodedVideoChunkMetadata) {
-    this.videoChunks.push({
-      chunk,
-      metadata,
-      timestamp: chunk.timestamp,
-      timeMs: performance.now(),
-      type: chunk.type,
-    });
-    this.pruneBuffer();
-  }
-
-  private onAudioChunk(chunk: EncodedAudioChunk, metadata?: EncodedAudioChunkMetadata) {
-    this.audioChunks.push({
-      chunk,
-      metadata,
-      timestamp: chunk.timestamp,
-      timeMs: chunk.timestamp / 1000, // timestamp was constructed from performance.now() * 1000
-    });
-  }
-
   /**
-   * Prunes chunks older than buffer duration + 3s margin, strictly ensuring the buffer starts on an IDR Keyframe
+   * Rotation: stop the oldest slot, save its blob, start a replacement
    */
-  private pruneBuffer() {
-    if (this.videoChunks.length === 0) return;
-    const nowMs = performance.now();
-    const cutoffMs = nowMs - (this.bufferDurationSeconds + 3) * 1000;
+  private async rotateSlots() {
+    if (!this.isBuffering || !this.combinedStream || this.slots.length === 0) return;
 
-    let pruneIndex = -1;
-    for (let i = 0; i < this.videoChunks.length; i++) {
-      if (this.videoChunks[i].timeMs < cutoffMs && this.videoChunks[i].type === 'key') {
-        pruneIndex = i;
-      }
-      if (this.videoChunks[i].timeMs >= cutoffMs) {
-        break;
-      }
+    // Find the oldest non-stopped slot
+    const oldest = this.slots.find((s) => !s.stopped);
+    if (!oldest) return;
+
+    const elapsed = performance.now() - oldest.startTime;
+    if (elapsed < this.bufferDurationSeconds * 500) {
+      // Not old enough yet
+      return;
     }
 
-    if (pruneIndex > 0) {
-      this.videoChunks.splice(0, pruneIndex);
-      // Prune audio chunks older than the earliest kept video keyframe
-      const oldestVideoTimeMs = this.videoChunks[0].timeMs;
-      let audioCut = 0;
-      while (audioCut < this.audioChunks.length && this.audioChunks[audioCut].timeMs < oldestVideoTimeMs - 100) {
-        audioCut++;
+    try {
+      // Stop the oldest and save its blob
+      const { blob, durationMs } = await this.stopSlot(oldest);
+      if (blob.size > 0) {
+        this.lastCompletedBlob = blob;
+        this.lastCompletedDurationMs = durationMs;
       }
-      if (audioCut > 0) {
-        this.audioChunks.splice(0, audioCut);
+
+      // Remove stopped slots from the array
+      this.slots = this.slots.filter((s) => !s.stopped);
+
+      // Start a replacement slot
+      if (this.isBuffering && this.combinedStream) {
+        const newSlot = this.createSlot();
+        this.slots.push(newSlot);
       }
+    } catch (err) {
+      console.warn('[VideoClipper] Rotation error:', err);
     }
   }
 
   /**
-   * Clips the last N seconds, muxing strictly from an IDR Keyframe so there are zero macroblocks or audio skips
+   * Clips the last N seconds from the replay buffer.
+   * Stops the longest-running recorder, takes its complete blob, starts a replacement.
    */
   public async clipLastSeconds(title?: string): Promise<{ success: boolean; clip?: any; error?: string }> {
     if (this.isExporting) {
@@ -388,146 +384,122 @@ class VideoClipper {
     }
 
     // If buffer wasn't started, attempt to start it now
-    if (!this.isBuffering || this.videoChunks.length === 0) {
+    if (!this.isBuffering || this.slots.length === 0) {
       const started = await this.startBuffer(this.bufferDurationSeconds);
       if (!started) {
         return { success: false, error: 'Screen capture permission not granted or cancelled.' };
       }
-      return { success: false, error: 'Screen recorder initialized. Buffer is filling now, press again in a few seconds!' };
+      return {
+        success: false,
+        error: 'Screen recorder initialized. Buffer is filling now, press again in a few seconds!',
+      };
     }
 
     try {
       this.isExporting = true;
-      const nowMs = performance.now();
-      const targetStartMs = nowMs - this.bufferDurationSeconds * 1000;
 
-      // Find the keyframe closest to or before targetStartMs
-      let keyframeIndex = -1;
-      for (let i = this.videoChunks.length - 1; i >= 0; i--) {
-        if (this.videoChunks[i].type === 'key') {
-          keyframeIndex = i;
-          if (this.videoChunks[i].timeMs <= targetStartMs) {
-            break;
-          }
+      // Find the active slot with the longest recording time
+      let bestSlot: RecorderSlot | null = null;
+      let bestElapsed = 0;
+
+      for (const slot of this.slots) {
+        if (slot.stopped) continue;
+        const elapsed = performance.now() - slot.startTime;
+        if (elapsed > bestElapsed) {
+          bestElapsed = elapsed;
+          bestSlot = slot;
         }
       }
 
-      if (keyframeIndex === -1) {
-        keyframeIndex = this.videoChunks.findIndex((v) => v.type === 'key');
-      }
-
-      if (keyframeIndex === -1) {
-        return { success: false, error: 'No video keyframes buffered yet. Wait 2 seconds and try again.' };
-      }
-
-      // Slice strictly from the IDR Keyframe!
-      const videoToMux = this.videoChunks.slice(keyframeIndex);
-      const videoStartChunkTs = videoToMux[0].chunk.timestamp;
-      const videoStartTimeMs = videoToMux[0].timeMs;
-
-      // Align audio with the video starting keyframe
-      const audioToMux = this.audioChunks.filter((a) => a.timeMs >= videoStartTimeMs - 50);
-
-      const target = new ArrayBufferTarget();
-      const hasAudio = audioToMux.length > 0;
-
-      const muxer = new Muxer({
-        target,
-        video: {
-          codec: 'V_VP8',
-          width: this.captureWidth,
-          height: this.captureHeight,
-          frameRate: this.captureFps,
-        },
-        ...(hasAudio
-          ? {
-              audio: {
-                codec: 'A_OPUS',
-                sampleRate: 48000,
-                numberOfChannels: 2,
-              },
-            }
-          : {}),
-        firstTimestampBehavior: 'strict',
-      });
-
-      // Interleave video and audio packets strictly in monotonic timestamp order starting at 0
-      type MuxItem =
-        | { kind: 'video'; chunk: EncodedVideoChunk; metadata?: EncodedVideoChunkMetadata; timestamp: number }
-        | { kind: 'audio'; chunk: EncodedAudioChunk; metadata?: EncodedAudioChunkMetadata; timestamp: number };
-
-      const items: MuxItem[] = [
-        ...videoToMux.map((v) => ({
-          kind: 'video' as const,
-          chunk: v.chunk,
-          metadata: v.metadata,
-          timestamp: Math.max(0, v.chunk.timestamp - videoStartChunkTs),
-        })),
-        ...audioToMux.map((a) => ({
-          kind: 'audio' as const,
-          chunk: a.chunk,
-          metadata: a.metadata,
-          timestamp: Math.max(0, Math.round((a.timeMs - videoStartTimeMs) * 1000)),
-        })),
-      ];
-
-      items.sort((a, b) => a.timestamp - b.timestamp);
-
-      for (const item of items) {
-        if (item.kind === 'video') {
-          muxer.addVideoChunk(item.chunk, item.metadata, item.timestamp);
-        } else {
-          muxer.addAudioChunk(item.chunk, item.metadata, item.timestamp);
+      // If no active slot has enough data (< 2s), try the last completed blob
+      if (!bestSlot || bestElapsed < 2000) {
+        if (this.lastCompletedBlob && this.lastCompletedBlob.size > 0) {
+          // Use the last completed blob
+          const blob = this.lastCompletedBlob;
+          const durationMs = this.lastCompletedDurationMs;
+          return await this.exportBlob(blob, durationMs, title);
         }
-      }
-
-      muxer.finalize();
-      const finalBuffer = target.buffer;
-
-      if (!finalBuffer || finalBuffer.byteLength === 0) {
-        return { success: false, error: 'Failed to generate video file.' };
-      }
-
-      // Convert ArrayBuffer to Base64 Data URL
-      const blob = new Blob([finalBuffer], { type: 'video/webm' });
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result);
-          } else {
-            reject(new Error('FileReader result is not a string'));
-          }
+        return {
+          success: false,
+          error: 'Buffer is still filling up. Wait a few more seconds and try again.',
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-
-      const actualDuration = (videoToMux[videoToMux.length - 1].chunk.timestamp - videoStartChunkTs) / 1_000_000;
-      const clipTitle = title || `Clip ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-
-      if (window.soundboardAPI?.saveRecordedVideoClip) {
-        const savedClip = await window.soundboardAPI.saveRecordedVideoClip({
-          base64: dataUrl,
-          duration: Math.round(actualDuration * 10) / 10,
-          title: clipTitle,
-          width: this.captureWidth,
-          height: this.captureHeight,
-        });
-
-        // Play feedback cue sound
-        this.playClipCueSound();
-
-        return { success: true, clip: savedClip };
       }
 
-      return { success: false, error: 'soundboardAPI not available.' };
+      // Stop the selected slot and get its complete blob
+      const { blob, durationMs } = await this.stopSlot(bestSlot);
+
+      // Remove stopped slots
+      this.slots = this.slots.filter((s) => !s.stopped);
+
+      // Start a replacement slot immediately
+      if (this.isBuffering && this.combinedStream) {
+        const newSlot = this.createSlot();
+        this.slots.push(newSlot);
+      }
+
+      if (blob.size === 0) {
+        return { success: false, error: 'Recorded blob is empty.' };
+      }
+
+      return await this.exportBlob(blob, durationMs, title);
     } catch (err: any) {
       console.error('[VideoClipper] Export failed:', err);
       return { success: false, error: err.message || 'Unknown export error.' };
     } finally {
       this.isExporting = false;
     }
+  }
+
+  /**
+   * Export a recorded blob: fix duration metadata, convert to base64, save via IPC
+   */
+  private async exportBlob(
+    rawBlob: Blob,
+    durationMs: number,
+    title?: string
+  ): Promise<{ success: boolean; clip?: any; error?: string }> {
+    // Fix WebM duration metadata (MediaRecorder often writes incorrect/missing duration)
+    let fixedBlob: Blob;
+    try {
+      fixedBlob = await fixWebmDuration(rawBlob, durationMs);
+    } catch {
+      fixedBlob = rawBlob; // fallback to raw blob if fix fails
+    }
+
+    // Convert to base64 data URL
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('FileReader result is not a string'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(fixedBlob);
+    });
+
+    const durationSeconds = Math.round((durationMs / 1000) * 10) / 10;
+    const clipTitle =
+      title ||
+      `Clip ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+
+    if (window.soundboardAPI?.saveRecordedVideoClip) {
+      const savedClip = await window.soundboardAPI.saveRecordedVideoClip({
+        base64: dataUrl,
+        duration: durationSeconds,
+        title: clipTitle,
+        width: this.captureWidth,
+        height: this.captureHeight,
+      });
+
+      this.playClipCueSound();
+
+      return { success: true, clip: savedClip };
+    }
+
+    return { success: false, error: 'soundboardAPI not available.' };
   }
 
   /**
@@ -551,38 +523,28 @@ class VideoClipper {
   }
 
   /**
-   * Stops recording and releases all display/audio tracks and encoders
+   * Stops all recorders, releases all tracks and resources
    */
   public stopBuffer() {
     this.isBuffering = false;
 
-    if (this.scriptProcessor) {
-      try {
-        this.scriptProcessor.disconnect();
-      } catch (e) {}
-      this.scriptProcessor = null;
+    if (this.rotationTimer) {
+      clearInterval(this.rotationTimer);
+      this.rotationTimer = null;
     }
 
-    if (this.videoReader) {
-      try {
-        this.videoReader.cancel().catch(() => {});
-      } catch (e) {}
-      this.videoReader = null;
+    // Stop all active recorder slots
+    for (const slot of this.slots) {
+      if (!slot.stopped && slot.recorder.state !== 'inactive') {
+        try {
+          slot.recorder.stop();
+        } catch (e) {}
+        slot.stopped = true;
+      }
     }
-
-    if (this.videoEncoder && this.videoEncoder.state !== 'closed') {
-      try {
-        this.videoEncoder.close();
-      } catch (e) {}
-      this.videoEncoder = null;
-    }
-
-    if (this.audioEncoder && this.audioEncoder.state !== 'closed') {
-      try {
-        this.audioEncoder.close();
-      } catch (e) {}
-      this.audioEncoder = null;
-    }
+    this.slots = [];
+    this.lastCompletedBlob = null;
+    this.lastCompletedDurationMs = 0;
 
     if (this.screenStream) {
       this.screenStream.getTracks().forEach((track) => {
@@ -594,7 +556,6 @@ class VideoClipper {
     }
 
     if (this.micStream) {
-      // Only stop if we acquired a local one separate from audioEngine
       if (this.micStream !== audioEngine.getMicrophoneStream()) {
         this.micStream.getTracks().forEach((track) => {
           try {
@@ -612,8 +573,7 @@ class VideoClipper {
       this.audioContext = null;
     }
 
-    this.videoChunks = [];
-    this.audioChunks = [];
+    this.combinedStream = null;
   }
 }
 
