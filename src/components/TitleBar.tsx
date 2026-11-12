@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Minus, Square, Copy, X, Settings, Trash2 } from 'lucide-react';
-import prismLogo from '../assets/Prism.png';
+import { Minus, Square, X, Trash2 } from 'lucide-react';
 
 interface TitleBarProps {
   onOpenSettings: () => void;
@@ -11,14 +10,10 @@ interface TitleBarProps {
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
-  onOpenSettings,
-  accentColor,
-  isMicActive = true,
   deletedCount = 0,
   onOpenDeletedArchive,
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
-  const accent = accentColor || 'var(--accent-color, #8b5cf6)';
 
   useEffect(() => {
     if (window.soundboardAPI) {
@@ -41,20 +36,21 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   };
 
   return (
-    <header className="h-[42px] w-full bg-[var(--theme-bg-header,#090a0f)] text-[#cccccc] flex items-center justify-between border-b border-[var(--theme-border,#222436)] select-none drag-region z-50 px-3 transition-colors duration-150">
+    <header className="h-[44px] w-full bg-[#070a0e] text-[#cccccc] flex items-center justify-between border-b border-[#16222f] select-none drag-region z-50 px-3.5 transition-colors duration-150">
       {/* Left: Brand Icon + Title */}
-      <div className="flex items-center gap-3 px-1 no-drag-region">
-        <div className="flex items-center gap-2">
-          <img
-            src={prismLogo}
-            alt="Prism Logo"
-            className="w-5 h-5 object-contain"
-          />
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-[13px] font-black tracking-wider text-white">
+      <div className="flex items-center gap-3 no-drag-region">
+        <div className="flex items-center gap-2.5">
+          {/* Cyan "P" Badge */}
+          <div className="w-7 h-7 rounded-lg bg-[#22d3ee] flex items-center justify-center shadow-sm">
+            <span className="text-[15px] font-black text-[#070a0e] leading-none select-none">
+              P
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[14px] font-black tracking-wider text-white">
               PRISM
             </span>
-            <span className="text-[11px] font-bold text-[#9da5b7] uppercase tracking-widest">
+            <span className="text-[11px] font-bold text-[#5a687c] uppercase tracking-widest">
               SOUNDBOARD
             </span>
           </div>
@@ -67,45 +63,35 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           <button
             onClick={onOpenDeletedArchive}
             title={`View & Restore Deleted Sounds (${deletedCount})`}
-            className="h-[28px] w-[30px] mr-2 rounded-[7px] flex items-center justify-center text-[#8e95a5] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors relative cursor-pointer"
+            className="h-[28px] px-2.5 mr-2 rounded-lg flex items-center justify-center gap-1.5 text-[#8e95a5] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
           >
-            <Trash2 size={14} className="text-[#ff3b30]" />
-            <span className="absolute -top-1 -right-1 px-1 rounded-full bg-[#ff3b30] text-white font-mono text-[10px] font-bold leading-tight">
-              {deletedCount}
-            </span>
+            <Trash2 size={13} className="text-[#ff3b30]" />
+            <span className="text-[11px] font-bold text-[#ff3b30]">{deletedCount}</span>
           </button>
         )}
 
-        <button
-          onClick={onOpenSettings}
-          title="Audio, Hotkey & Theme Settings"
-          className="h-[28px] w-[30px] mr-2 rounded-[7px] flex items-center justify-center text-[#8e95a5] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer"
-        >
-          <Settings size={14} className="hover:rotate-45 transition-transform" />
-        </button>
-
         {/* Windows Standard Controls */}
-        <div className="flex items-center h-full border-l border-[var(--theme-border,#222436)] pl-1">
+        <div className="flex items-center h-full pl-2">
           <button
             onClick={handleMinimize}
             title="Minimize"
-            className="h-full w-[44px] flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="h-full w-[42px] flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <Minus size={14} />
           </button>
           <button
             onClick={handleMaximize}
             title={isMaximized ? 'Restore' : 'Maximize'}
-            className="h-full w-[44px] flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="h-full w-[42px] flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            {isMaximized ? <Copy size={12} /> : <Square size={12} />}
+            <Square size={12} />
           </button>
           <button
             onClick={handleClose}
-            title="Close to Tray"
-            className="h-full w-[44px] flex items-center justify-center text-[#8e95a5] hover:bg-[#e81123] hover:text-white transition-colors cursor-pointer"
+            title="Close"
+            className="h-full w-[42px] flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
       </div>

@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --accent-color: #38bdf8;
-  --accent-hover: #7dd3fc;
-  --accent-soft: rgba(56, 189, 248, 0.15);
+  --accent-color: #22d3ee;
+  --accent-hover: #38bdf8;
+  --accent-soft: rgba(34, 211, 238, 0.15);
 
-  --theme-bg-app: #0b0c0f;
-  --theme-bg-surface: #111317;
-  --theme-bg-card: #171920;
-  --theme-bg-card-hover: #1e212b;
-  --theme-bg-card-selected: #252936;
-  --theme-bg-sidebar: #0f1014;
-  --theme-bg-header: #08080b;
+  --theme-bg-app: #080c12;
+  --theme-bg-surface: #0d131b;
+  --theme-bg-card: #111a24;
+  --theme-bg-card-hover: #162332;
+  --theme-bg-card-selected: #18283a;
+  --theme-bg-sidebar: #070a0e;
+  --theme-bg-header: #070a0e;
 
-  --theme-border: #20232d;
-  --theme-border-hover: #2d3240;
-  --theme-border-highlight: rgba(56, 189, 248, 0.55);
+  --theme-border: #16222f;
+  --theme-border-hover: #233346;
+  --theme-border-highlight: rgba(34, 211, 238, 0.55);
 
   --theme-text-primary: #ffffff;
   --theme-text-secondary: #94a3b8;
-  --theme-text-muted: #64748b;
+  --theme-text-muted: #5a687c;
 }
 
 .bg-accent {

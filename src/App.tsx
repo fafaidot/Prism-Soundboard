@@ -18,7 +18,7 @@ import { ClipCard } from './components/ClipCard';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
-import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw } from 'lucide-react';
+import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Home, Music, Video, Settings, ChevronDown, Check } from 'lucide-react';
 import prismLogo from './assets/Prism.png';
 
 const DEFAULT_SETTINGS: AudioSettings = {
@@ -72,6 +72,16 @@ export const App: React.FC = () => {
   const flashTimerRef = useRef<any>(null);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
   const [recordSecondsLeft, setRecordSecondsLeft] = useState(0);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+
+  const sortLabels: Record<SortOption, string> = {
+    custom: 'Custom Order',
+    newest: 'Recently added',
+    oldest: 'Oldest Added',
+    alphabetical: 'A to Z',
+    most_played: 'Most Played',
+    duration: 'Duration',
+  };
 
   // Pointer drag refs for fluid real-time drag-to-rearrange
   const isPointerDraggingRef = useRef(false);
@@ -1110,6 +1120,30 @@ export const App: React.FC = () => {
     });
   }, [sounds, searchQuery, activeFilter, sortBy]);
 
+  // Filtered and Sorted game video clips
+  const filteredClips = useMemo(() => {
+    let result = videoClips.filter((c) => {
+      const matchSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchFilter = activeFilter === 'favorites' ? !!c.isFavorite : true;
+      return matchSearch && matchFilter;
+    });
+
+    return [...result].sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return (b.dateAdded || 0) - (a.dateAdded || 0);
+        case 'oldest':
+          return (a.dateAdded || 0) - (b.dateAdded || 0);
+        case 'alphabetical':
+          return a.title.localeCompare(b.title);
+        case 'duration':
+          return (b.duration || 0) - (a.duration || 0);
+        default:
+          return (b.dateAdded || 0) - (a.dateAdded || 0);
+      }
+    });
+  }, [videoClips, searchQuery, activeFilter, sortBy]);
+
   if (isStandaloneOverlay) {
     return (
       <div className="w-screen h-screen overflow-hidden bg-transparent flex items-center justify-center p-0 m-0">
@@ -1244,305 +1278,444 @@ export const App: React.FC = () => {
         onOpenDeletedArchive={() => setIsRestoreModalOpen(true)}
       />
 
-      {/* Top Command Shelf */}
-      <CommandBar
-        activeView={activeView}
-        onChangeView={setActiveView}
-        clipsCount={videoClips.length}
-        totalSounds={sounds.length}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        activeFilter={activeFilter}
-        onFilterChange={(f) => {
-          setActiveFilter(f as any);
-          handleSaveSettings({ ...settings, activeFilter: f as any });
-        }}
-        sortBy={sortBy}
-        onSortChange={(s) => {
-          setSortBy(s);
-          handleSaveSettings({ ...settings, sortBy: s });
-        }}
-        deletedCount={deletedSounds.length}
-        onOpenDeletedModal={() => setIsRestoreModalOpen(true)}
-        onStopAll={handleStopAll}
-        hasActiveSounds={activeSoundIds.length > 0}
-        activeSoundsCount={activeSoundIds.length}
-        isStopAllActive={stopAllFlash}
-        onOpenYouTubeSearch={() => setIsYouTubeModalOpen(true)}
-        onImportLocalFiles={handleImportLocalFiles}
-        accentColor={settings.accentColor}
-        panicHotkey={settings.panicHotkey}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        isVirtualActive={!!(settings.secondaryDeviceId && settings.isSecondaryEnabled)}
-        micLevel={micLevel}
-        micVolume={settings.micInputVolume}
-        onMicVolumeChange={(vol) => {
-          audioEngine.setMicInputVolume(vol);
-          handleSaveSettings({ ...settings, micInputVolume: vol });
-        }}
-        hearMyself={settings.hearMyself}
-        onToggleHearMyself={handleToggleHearMyself}
-        isRecording={isRecordingClip}
-        recordingSecondsLeft={recordSecondsLeft}
-        recordDuration={settings.recordDuration || 5}
-        recordSource={settings.recordSource || 'screen'}
-        recordHotkey={settings.recordHotkey || 'F9'}
-        onStartRecord={handleStartRecordClip}
-        onChangeRecordDuration={(dur) => {
-          handleSaveSettings({ ...settings, recordDuration: dur });
-        }}
-        onChangeRecordSource={(src) => {
-          handleSaveSettings({ ...settings, recordSource: src });
-        }}
-      />
-
-      {/* Main Workspace: Left Soundboard Grid + Bottom Toolbar Dock, Right Control Panel */}
+      {/* Main Container below TitleBar: Left Navigation Rail + Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Column: Responsive Sound Grid + Bottom Dock Toolbar */}
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'copy';
-          }}
-          onDragEnter={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onDrop={async (e) => {
-            // Check if external audio files from Windows explorer were dropped
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-              e.preventDefault();
-              e.stopPropagation();
-              const paths: string[] = [];
-              for (let i = 0; i < e.dataTransfer.files.length; i++) {
-                const f = e.dataTransfer.files[i];
-                let p = '';
-                if (window.soundboardAPI?.getFilePathFromDroppedFile) {
-                  p = window.soundboardAPI.getFilePathFromDroppedFile(f);
-                }
-                if (!p && (f as any).path) {
-                  p = (f as any).path;
-                }
-                if (p) {
-                  paths.push(p);
-                }
-              }
-              if (paths.length > 0 && window.soundboardAPI?.importAudioFilePaths) {
-                const imported = await window.soundboardAPI.importAudioFilePaths(paths);
-                handleImportAudioItems(imported);
-              }
-            }
-          }}
-          className="relative flex-1 flex flex-col overflow-hidden"
-        >
-          <main className="flex-1 overflow-y-auto px-5 pt-5 pb-28 select-none">
-            {activeView === 'clips' ? (
-              /* Video Clips Grid (Medal Experience) */
-              <div>
-                {videoClips.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
-                    <div
-                      style={{ backgroundColor: `${currentTheme.accent}15`, color: currentTheme.accent }}
-                      className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
-                    >
-                      <Plus size={28} />
-                    </div>
-                    <div>
-                      <h3 className="text-white font-bold text-[16px]">No Game Clips Yet</h3>
-                      <p className="text-[12px] text-[#7e8697] max-w-sm mt-1">
-                        Press [{settings.recordHotkey || 'F9'}] anytime in-game to instantly capture and save the last {settings.recordDuration || 15} seconds!
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
-                    {videoClips.map((clip) => (
-                      <ClipCard
-                        key={clip.id}
-                        clip={clip}
-                        accentColor={settings.accentColor}
-                        onClick={() => setActivePlayingVideo(clip)}
-                        onToggleFavorite={async () => {
-                          if (window.soundboardAPI?.toggleFavoriteVideoClip) {
-                            await window.soundboardAPI.toggleFavoriteVideoClip(clip.id);
-                          }
-                          setVideoClips((prev) =>
-                            prev.map((c) => (c.id === clip.id ? { ...c, isFavorite: !c.isFavorite } : c))
-                          );
-                        }}
-                        onOpenFolder={() => {
-                          if (window.soundboardAPI?.showItemInFolder) {
-                            window.soundboardAPI.showItemInFolder(clip.filePath);
-                          }
-                        }}
-                        onRename={async (newTitle) => {
-                          if (window.soundboardAPI?.renameVideoClip) {
-                            await window.soundboardAPI.renameVideoClip(clip.id, newTitle);
-                          }
-                          setVideoClips((prev) =>
-                            prev.map((c) => (c.id === clip.id ? { ...c, title: newTitle } : c))
-                          );
-                        }}
-                        onExtractToSoundboard={async () => {
-                          if (window.soundboardAPI?.extractAudioFromVideoClip) {
-                            const newSound = await window.soundboardAPI.extractAudioFromVideoClip(clip);
-                            if (newSound) {
-                              setSounds((prev) => [newSound, ...prev]);
-                              setActiveView('sounds');
-                              setSelectedSoundId(newSound.id);
-                            }
-                          }
-                        }}
-                        onTrim={() => setActivePlayingVideo(clip)}
-                        onDelete={async () => {
-                          if (window.soundboardAPI?.deleteVideoClip) {
-                            await window.soundboardAPI.deleteVideoClip(clip.id);
-                          }
-                          setVideoClips((prev) => prev.filter((c) => c.id !== clip.id));
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Existing Sounds Grid */
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3">
-                {filteredSounds.map((sound) => (
-                  <SoundCard
-                    key={sound.id}
-                    sound={sound}
-                    isSelected={selectedSoundId === sound.id}
-                    isPlaying={activeSoundIds.includes(sound.id)}
-                    playbackProgress={playbackProgressMap[sound.id] || 0}
-                    accentColor={settings.accentColor}
-                    isListeningHotkey={listeningSoundId === sound.id}
-                    isDragging={draggedSoundId === sound.id}
-                    onCardPointerDown={handleCardPointerDown}
-                    onSelect={() => {
-                      if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
-                      setSelectedSoundId(sound.id);
-                    }}
-                    onPlay={() => {
-                      if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
-                      handlePlaySound(sound);
-                    }}
-                    onToggleFavorite={(e) => {
-                      e.stopPropagation();
-                      handleUpdateSound({
-                        ...sound,
-                        isFavorite: !sound.isFavorite,
-                      });
-                    }}
-                    onDelete={(e) => {
-                      e.stopPropagation();
-                      setSelectedSoundId(sound.id);
-                      setIsDeleteModalOpen(true);
-                    }}
-                    onStartListeningHotkey={() => {
-                      setSelectedSoundId(sound.id);
-                      setListeningSoundId(sound.id);
-                    }}
-                    onClearHotkey={() => {
-                      handleUpdateSound({
-                        ...sound,
-                        hotkey: '',
-                      });
-                    }}
-                  />
-                ))}
+        {/* Left Navigation Rail (Dock) */}
+        <div className="w-[68px] min-w-[68px] h-full bg-[#070a0e] border-r border-[#16222f] flex flex-col items-center justify-between py-4 select-none z-40">
+          <div className="flex flex-col items-center gap-2.5">
+            {/* Home Icon */}
+            <button
+              onClick={() => setActiveView('sounds')}
+              title="Home"
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                activeView === 'sounds'
+                  ? 'bg-[#0c3144] border border-[#1b6b90] text-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
+                  : 'text-[#5a687c] hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Home size={18} />
+            </button>
 
-                {/* "+ Add" Square Tile (Matches Voicemod Reference Grid) */}
-                <div
-                  onClick={() => setIsYouTubeModalOpen(true)}
-                  style={{
-                    backgroundColor: 'var(--theme-bg-card, #171826)',
-                    borderColor: 'var(--theme-border, #222436)',
-                  }}
-                  className="group aspect-square rounded-[14px] border-2 border-dashed hover:border-[var(--theme-border-highlight)] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.02] shadow-sm"
-                  title="Add new sound from YouTube"
-                >
-                  <div
-                    style={{ backgroundColor: `${currentTheme.accent}20`, color: currentTheme.accent }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                  >
-                    <Plus size={20} className="stroke-[2.5]" />
-                  </div>
-                  <span className="text-[12px] font-bold text-[#656c7d] group-hover:text-white transition-colors">
-                    Add
-                  </span>
-                </div>
-              </div>
-            )}
-          </main>
+            {/* Sound Library Icon */}
+            <button
+              onClick={() => setActiveView('sounds')}
+              title="Sound Library"
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                activeView === 'sounds'
+                  ? 'bg-[#0c3144] border border-[#1b6b90] text-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
+                  : 'text-[#5a687c] hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Music size={18} />
+            </button>
 
-          {/* Bottom Dock Control Pod (Floating padded pod matching HUD bottom dock design) */}
-          <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pointer-events-none z-50 [isolation:isolate]">
-            {(() => {
-              const activeSound = activeSoundIds.length > 0
-                ? sounds.find((s) => s.id === activeSoundIds[activeSoundIds.length - 1]) || null
-                : null;
-              const progress = activeSound ? playbackProgressMap[activeSound.id] || 0 : 0;
-              return (
-                <div className="pointer-events-auto relative z-10 [isolation:isolate]">
-                  <BottomToolbar
-                    speakerVolume={settings.masterSpeakerVolume}
-                    onSpeakerVolumeChange={(vol) => {
-                      audioEngine.setMasterSpeakerVolume(vol);
-                      handleSaveSettings({ ...settings, masterSpeakerVolume: vol, masterMicVolume: vol });
-                    }}
-                    micProjectionVolume={settings.micInputVolume}
-                    onMicProjectionVolumeChange={(vol) => {
-                      audioEngine.setMicInputVolume(vol);
-                      handleSaveSettings({ ...settings, micInputVolume: vol });
-                    }}
-                    accentColor={settings.accentColor}
-                    activeSound={activeSound}
-                    playbackProgress={progress}
-                    isPaused={activeSound ? (pausedSoundIds.includes(activeSound.id) || audioEngine.isPaused(activeSound.id)) : false}
-                    onStopSound={() => {
-                      if (activeSound) {
-                        audioEngine.stopSound(activeSound.id);
-                      }
-                    }}
-                    onSeekSound={(prog) => {
-                      if (activeSound) {
-                        audioEngine.seekSound(activeSound.id, prog);
-                      }
-                    }}
-                    onSkipSound={(delta) => {
-                      if (activeSound) {
-                        audioEngine.skipSound(activeSound.id, delta);
-                      }
-                    }}
-                    onTogglePause={() => {
-                      if (activeSound) {
-                        audioEngine.togglePlayPauseSound(activeSound.id);
-                      }
-                    }}
-                  />
-                </div>
-              );
-            })()}
+            {/* Video Library Icon */}
+            <button
+              onClick={() => setActiveView('clips')}
+              title="Video Library"
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                activeView === 'clips'
+                  ? 'bg-[#0c3144] border border-[#1b6b90] text-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
+                  : 'text-[#5a687c] hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Video size={18} />
+            </button>
           </div>
+
+          {/* Bottom: Settings */}
+          <button
+            onClick={() => setIsSettingsModalOpen(true)}
+            title="Settings"
+            className="w-11 h-11 rounded-xl text-[#5a687c] hover:text-white hover:bg-white/5 flex items-center justify-center transition-all cursor-pointer"
+          >
+            <Settings size={18} />
+          </button>
         </div>
 
-        {/* Right: Sound Control Panel (Matching user reference) */}
-        <ControlPanel
-          sound={selectedSound}
-          isPlaying={selectedSound ? activeSoundIds.includes(selectedSound.id) : false}
-          accentColor={settings.accentColor}
-          isListeningHotkey={selectedSound ? listeningSoundId === selectedSound.id : false}
-          onUpdateSound={handleUpdateSound}
-          onPlaySound={() => selectedSound && handlePlaySound(selectedSound)}
-          onStartListeningHotkey={() => selectedSound && setListeningSoundId(selectedSound.id)}
-          onClearHotkey={() => selectedSound && handleUpdateSound({ ...selectedSound, hotkey: '' })}
-          onOpenTrimmer={() => setIsTrimmerModalOpen(true)}
-          onDeleteSound={() => setIsDeleteModalOpen(true)}
-          onEditDetails={() => setIsEditModalOpen(true)}
-          onDuplicateSound={() => selectedSound && handleDuplicateSound(selectedSound)}
-        />
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Command Shelf */}
+          <CommandBar
+            activeView={activeView}
+            onChangeView={setActiveView}
+            clipsCount={videoClips.length}
+            totalSounds={sounds.length}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            activeFilter={activeFilter}
+            onFilterChange={(f) => {
+              setActiveFilter(f as any);
+              handleSaveSettings({ ...settings, activeFilter: f as any });
+            }}
+            sortBy={sortBy}
+            onSortChange={(s) => {
+              setSortBy(s);
+              handleSaveSettings({ ...settings, sortBy: s });
+            }}
+            deletedCount={deletedSounds.length}
+            onOpenDeletedModal={() => setIsRestoreModalOpen(true)}
+            onStopAll={handleStopAll}
+            hasActiveSounds={activeSoundIds.length > 0}
+            activeSoundsCount={activeSoundIds.length}
+            isStopAllActive={stopAllFlash}
+            onOpenYouTubeSearch={() => setIsYouTubeModalOpen(true)}
+            onImportLocalFiles={handleImportLocalFiles}
+            accentColor={settings.accentColor}
+            panicHotkey={settings.panicHotkey}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
+            isVirtualActive={!!(settings.secondaryDeviceId && settings.isSecondaryEnabled)}
+            micLevel={micLevel}
+            micVolume={settings.micInputVolume}
+            onMicVolumeChange={(vol) => {
+              audioEngine.setMicInputVolume(vol);
+              handleSaveSettings({ ...settings, micInputVolume: vol });
+            }}
+            hearMyself={settings.hearMyself}
+            onToggleHearMyself={handleToggleHearMyself}
+            isRecording={isRecordingClip}
+            recordingSecondsLeft={recordSecondsLeft}
+            recordDuration={settings.recordDuration || 5}
+            recordSource={settings.recordSource || 'screen'}
+            recordHotkey={settings.recordHotkey || 'F9'}
+            onStartRecord={handleStartRecordClip}
+            onChangeRecordDuration={(dur) => {
+              handleSaveSettings({ ...settings, recordDuration: dur });
+            }}
+            onChangeRecordSource={(src) => {
+              handleSaveSettings({ ...settings, recordSource: src });
+            }}
+          />
+
+          {/* Main Workspace: Library Grid + Bottom Toolbar Dock, Right Control Panel */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Grid Column */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={async (e) => {
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const paths: string[] = [];
+                  for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                    const f = e.dataTransfer.files[i];
+                    let p = '';
+                    if (window.soundboardAPI?.getFilePathFromDroppedFile) {
+                      p = window.soundboardAPI.getFilePathFromDroppedFile(f);
+                    }
+                    if (!p && (f as any).path) {
+                      p = (f as any).path;
+                    }
+                    if (p) {
+                      paths.push(p);
+                    }
+                  }
+                  if (paths.length > 0 && window.soundboardAPI?.importAudioFilePaths) {
+                    const imported = await window.soundboardAPI.importAudioFilePaths(paths);
+                    handleImportAudioItems(imported);
+                  }
+                }
+              }}
+              className="relative flex-1 flex flex-col overflow-hidden"
+            >
+              <main className="flex-1 overflow-y-auto px-7 pt-6 pb-28 select-none">
+                {activeView === 'clips' ? (
+                  /* Video Clips Grid (Centered 3-column layout matching Image 2) */
+                  <div className="max-w-[1400px] mx-auto w-full">
+                    {/* Header: Title + Subtitle with Sort Dropdown */}
+                    <div className="flex flex-col gap-1 mb-6">
+                      <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
+                      <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
+                        <span>{filteredClips.length} Videos</span>
+                        <span className="text-[#3b4758]">SORT BY</span>
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowSortMenu(!showSortMenu)}
+                            className="flex items-center gap-1.5 text-white/90 hover:text-[#22d3ee] font-medium cursor-pointer transition-colors"
+                          >
+                            <span>{sortLabels[sortBy] || 'Recently added'}</span>
+                            <ChevronDown size={13} />
+                          </button>
+                          {showSortMenu && (
+                            <div className="absolute left-0 top-6 w-44 rounded-xl bg-[#0d141d] border border-[#182432] p-1 shadow-2xl z-50 flex flex-col gap-0.5">
+                              {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
+                                <button
+                                  key={opt}
+                                  onClick={() => {
+                                    setSortBy(opt);
+                                    handleSaveSettings({ ...settings, sortBy: opt });
+                                    setShowSortMenu(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
+                                    sortBy === opt
+                                      ? 'bg-[#0e3b52] text-[#22d3ee] font-medium'
+                                      : 'text-[#8e95a5] hover:bg-white/5 hover:text-white'
+                                  }`}
+                                >
+                                  <span>{sortLabels[opt]}</span>
+                                  {sortBy === opt && <Check size={12} className="text-[#22d3ee]" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {filteredClips.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
+                        <div className="w-16 h-16 rounded-2xl bg-[#0e3b52] text-[#22d3ee] flex items-center justify-center shadow-lg">
+                          <Video size={28} />
+                        </div>
+                        <div>
+                          <h3 className="text-white font-bold text-[16px]">No Game Clips Yet</h3>
+                          <p className="text-[12px] text-[#5a687c] max-w-sm mt-1">
+                            Press [{settings.recordHotkey || 'F9'}] or [F10] anytime in-game to instantly capture and save gameplay clips!
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Centered 3 Columns Grid */
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredClips.map((clip) => (
+                          <ClipCard
+                            key={clip.id}
+                            clip={clip}
+                            accentColor={settings.accentColor}
+                            onClick={() => setActivePlayingVideo(clip)}
+                            onToggleFavorite={async () => {
+                              if (window.soundboardAPI?.toggleFavoriteVideoClip) {
+                                await window.soundboardAPI.toggleFavoriteVideoClip(clip.id);
+                              }
+                              setVideoClips((prev) =>
+                                prev.map((c) => (c.id === clip.id ? { ...c, isFavorite: !c.isFavorite } : c))
+                              );
+                            }}
+                            onOpenFolder={() => {
+                              if (window.soundboardAPI?.showItemInFolder) {
+                                window.soundboardAPI.showItemInFolder(clip.filePath);
+                              }
+                            }}
+                            onRename={async (newTitle) => {
+                              if (window.soundboardAPI?.renameVideoClip) {
+                                await window.soundboardAPI.renameVideoClip(clip.id, newTitle);
+                              }
+                              setVideoClips((prev) =>
+                                prev.map((c) => (c.id === clip.id ? { ...c, title: newTitle } : c))
+                              );
+                            }}
+                            onExtractToSoundboard={async () => {
+                              if (window.soundboardAPI?.extractAudioFromVideoClip) {
+                                const newSound = await window.soundboardAPI.extractAudioFromVideoClip(clip);
+                                if (newSound) {
+                                  setSounds((prev) => [newSound, ...prev]);
+                                  setActiveView('sounds');
+                                  setSelectedSoundId(newSound.id);
+                                }
+                              }
+                            }}
+                            onTrim={() => setActivePlayingVideo(clip)}
+                            onDelete={async () => {
+                              if (window.soundboardAPI?.deleteVideoClip) {
+                                await window.soundboardAPI.deleteVideoClip(clip.id);
+                              }
+                              setVideoClips((prev) => prev.filter((c) => c.id !== clip.id));
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Sounds Grid View matching Image 1 */
+                  <div>
+                    {/* Header: Title + Subtitle with Sort Dropdown */}
+                    <div className="flex flex-col gap-1 mb-5">
+                      <h1 className="text-2xl font-bold text-white tracking-tight">Sound library</h1>
+                      <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
+                        <span>{filteredSounds.length} sounds</span>
+                        <span className="text-[#3b4758]">SORT BY</span>
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowSortMenu(!showSortMenu)}
+                            className="flex items-center gap-1.5 text-white/90 hover:text-[#22d3ee] font-medium cursor-pointer transition-colors"
+                          >
+                            <span>{sortLabels[sortBy] || 'Recently added'}</span>
+                            <ChevronDown size={13} />
+                          </button>
+                          {showSortMenu && (
+                            <div className="absolute left-0 top-6 w-44 rounded-xl bg-[#0d141d] border border-[#182432] p-1 shadow-2xl z-50 flex flex-col gap-0.5">
+                              {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
+                                <button
+                                  key={opt}
+                                  onClick={() => {
+                                    setSortBy(opt);
+                                    handleSaveSettings({ ...settings, sortBy: opt });
+                                    setShowSortMenu(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
+                                    sortBy === opt
+                                      ? 'bg-[#0e3b52] text-[#22d3ee] font-medium'
+                                      : 'text-[#8e95a5] hover:bg-white/5 hover:text-white'
+                                  }`}
+                                >
+                                  <span>{sortLabels[opt]}</span>
+                                  {sortBy === opt && <Check size={12} className="text-[#22d3ee]" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 5-Column Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                      {filteredSounds.map((sound) => (
+                        <SoundCard
+                          key={sound.id}
+                          sound={sound}
+                          isSelected={selectedSoundId === sound.id}
+                          isPlaying={activeSoundIds.includes(sound.id)}
+                          playbackProgress={playbackProgressMap[sound.id] || 0}
+                          accentColor={settings.accentColor}
+                          isListeningHotkey={listeningSoundId === sound.id}
+                          isDragging={draggedSoundId === sound.id}
+                          onCardPointerDown={handleCardPointerDown}
+                          onSelect={() => {
+                            if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
+                            setSelectedSoundId(sound.id);
+                          }}
+                          onPlay={() => {
+                            if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
+                            handlePlaySound(sound);
+                          }}
+                          onToggleFavorite={(e) => {
+                            e.stopPropagation();
+                            handleUpdateSound({
+                              ...sound,
+                              isFavorite: !sound.isFavorite,
+                            });
+                          }}
+                          onDelete={(e) => {
+                            e.stopPropagation();
+                            setSelectedSoundId(sound.id);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          onStartListeningHotkey={() => {
+                            setSelectedSoundId(sound.id);
+                            setListeningSoundId(sound.id);
+                          }}
+                          onClearHotkey={() => {
+                            handleUpdateSound({
+                              ...sound,
+                              hotkey: '',
+                            });
+                          }}
+                        />
+                      ))}
+
+                      {/* "+ Add" Square Tile */}
+                      <div
+                        onClick={() => setIsYouTubeModalOpen(true)}
+                        className="group aspect-[4/3] rounded-xl border border-dashed border-[#1d2b3c] hover:border-[#22d3ee]/60 bg-[#0d141d]/50 hover:bg-[#111a24] flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                        title="Add new sound"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-[#0e3b52] text-[#22d3ee] flex items-center justify-center transition-colors">
+                          <Plus size={16} className="stroke-[2.5]" />
+                        </div>
+                        <span className="text-[11px] font-medium text-[#5a687c] group-hover:text-white transition-colors">
+                          Add Sound
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </main>
+
+              {/* Bottom Dock Control Pod */}
+              <div className="absolute bottom-0 left-0 right-0 pointer-events-none z-50 [isolation:isolate]">
+                {(() => {
+                  const activeSound =
+                    activeSoundIds.length > 0
+                      ? sounds.find((s) => s.id === activeSoundIds[activeSoundIds.length - 1]) || null
+                      : null;
+                  const progress = activeSound ? playbackProgressMap[activeSound.id] || 0 : 0;
+                  return (
+                    <div className="pointer-events-auto relative z-10 [isolation:isolate]">
+                      <BottomToolbar
+                        speakerVolume={settings.masterSpeakerVolume}
+                        onSpeakerVolumeChange={(vol) => {
+                          audioEngine.setMasterSpeakerVolume(vol);
+                          handleSaveSettings({ ...settings, masterSpeakerVolume: vol, masterMicVolume: vol });
+                        }}
+                        micProjectionVolume={settings.micInputVolume}
+                        onMicProjectionVolumeChange={(vol) => {
+                          audioEngine.setMicInputVolume(vol);
+                          handleSaveSettings({ ...settings, micInputVolume: vol });
+                        }}
+                        accentColor={settings.accentColor}
+                        activeSound={activeSound}
+                        playbackProgress={progress}
+                        isPaused={
+                          activeSound
+                            ? pausedSoundIds.includes(activeSound.id) || audioEngine.isPaused(activeSound.id)
+                            : false
+                        }
+                        onStopSound={() => {
+                          if (activeSound) {
+                            audioEngine.stopSound(activeSound.id);
+                          }
+                        }}
+                        onSeekSound={(prog) => {
+                          if (activeSound) {
+                            audioEngine.seekSound(activeSound.id, prog);
+                          }
+                        }}
+                        onSkipSound={(delta) => {
+                          if (activeSound) {
+                            audioEngine.skipSound(activeSound.id, delta);
+                          }
+                        }}
+                        onTogglePause={() => {
+                          if (activeSound) {
+                            audioEngine.togglePlayPauseSound(activeSound.id);
+                          }
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Right: Sound Control Panel (Only in sounds view) */}
+            {activeView === 'sounds' && (
+              <ControlPanel
+                sound={selectedSound}
+                isPlaying={selectedSound ? activeSoundIds.includes(selectedSound.id) : false}
+                accentColor={settings.accentColor}
+                isListeningHotkey={selectedSound ? listeningSoundId === selectedSound.id : false}
+                onUpdateSound={handleUpdateSound}
+                onPlaySound={() => selectedSound && handlePlaySound(selectedSound)}
+                onStartListeningHotkey={() => selectedSound && setListeningSoundId(selectedSound.id)}
+                onClearHotkey={() => selectedSound && handleUpdateSound({ ...selectedSound, hotkey: '' })}
+                onOpenTrimmer={() => setIsTrimmerModalOpen(true)}
+                onDeleteSound={() => setIsDeleteModalOpen(true)}
+                onEditDetails={() => setIsEditModalOpen(true)}
+                onDuplicateSound={() => selectedSound && handleDuplicateSound(selectedSound)}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Modals */}
