@@ -1565,7 +1565,7 @@ export const App: React.FC = () => {
                     <div className="flex flex-col gap-1 mb-6">
                       <div className="flex items-center gap-2.5">
                         <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#31C5F4]/15 border border-[#31C5F4]/30 text-[#31C5F4]">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ff0000]/15 border border-[#ff0000]/30 text-[#ff0000]">
                           Experimental
                         </span>
                       </div>

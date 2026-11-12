@@ -1322,6 +1322,60 @@ ipcMain.handle('import-soundboard-backup', async () => {
   }
 });
 
+ipcMain.handle('reset-all-app-data', async () => {
+  try {
+    // 1. Clear files in USER_DATA_DIR
+    const filesToDelete = [
+      SOUNDS_FILE,
+      SETTINGS_FILE,
+      DELETED_SOUNDS_FILE,
+      CLIPS_FILE,
+      path.join(USER_DATA_DIR, 'sounds.json'),
+      path.join(USER_DATA_DIR, 'sounds_backup_57.json'),
+    ];
+
+    for (const f of filesToDelete) {
+      if (fs.existsSync(f)) {
+        try {
+          fs.unlinkSync(f);
+        } catch (e) {}
+      }
+    }
+
+    // 2. Clear out audio, video, deleted directories
+    const dirsToClear = [AUDIO_DIR, VIDEOS_DIR, DELETED_DIR];
+    for (const d of dirsToClear) {
+      if (fs.existsSync(d)) {
+        try {
+          fs.rmSync(d, { recursive: true, force: true });
+        } catch (e) {}
+      }
+    }
+
+    // 3. Clear Electron app data copies if present
+    const electronFiles = [
+      path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json'),
+      path.join(APP_DATA_ROOT, 'Electron', 'sounds.json'),
+      path.join(APP_DATA_ROOT, 'Electron', 'soundboard_settings.json'),
+    ];
+    for (const ef of electronFiles) {
+      if (fs.existsSync(ef)) {
+        try {
+          fs.unlinkSync(ef);
+        } catch (e) {}
+      }
+    }
+
+    // 4. Re-ensure fresh empty directories
+    ensureStorageDirectories();
+
+    return true;
+  } catch (err) {
+    console.error('Factory reset failed:', err);
+    return false;
+  }
+});
+
 ipcMain.handle('check-virtual-driver-installed', async () => {
   return new Promise((resolve) => {
     // Check multiple indicators: Registry uninstall entry, active audio devices, or driver inf presence

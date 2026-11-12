@@ -23,6 +23,7 @@ import {
   ExternalLink,
   Sparkles,
   Video,
+  Trash2,
 } from 'lucide-react';
 import { AudioSettings } from '../types';
 import { audioEngine } from '../services/audioEngine';
@@ -81,6 +82,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [storagePaths, setStoragePaths] = useState<{ root: string; sounds: string; videos: string } | null>(null);
   const [isRelocatingStorage, setIsRelocatingStorage] = useState(false);
   const [storageRelocateMsg, setStorageRelocateMsg] = useState<{ text: string; error?: boolean } | null>(null);
+  const [isResettingApp, setIsResettingApp] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const handleFactoryReset = async () => {
+    setIsResettingApp(true);
+    try {
+      if (window.soundboardAPI?.resetAllAppData) {
+        await window.soundboardAPI.resetAllAppData();
+      }
+      // Reload window to initiate clean fresh startup
+      window.location.reload();
+    } catch (err) {
+      console.error('Reset error:', err);
+      setIsResettingApp(false);
+    }
+  };
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [downloadProgressPercent, setDownloadProgressPercent] = useState<number>(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -1139,6 +1156,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Danger Zone: Factory Reset */}
+              <div className="p-5 bg-red-500/5 rounded-[16px] border border-red-500/20 space-y-3.5">
+                <div className="flex items-center gap-2.5 text-red-400">
+                  <AlertTriangle size={17} />
+                  <span className="text-[13.5px] font-bold">Danger Zone: Full Factory Reset</span>
+                </div>
+                <p className="text-[11.5px] text-[#8e95a5] leading-relaxed">
+                  Permanently deletes all saved sounds, audio files, video clips, and configuration settings from your PC, restoring Prism Soundboard to an absolute fresh state.
+                </p>
+
+                {showResetConfirm ? (
+                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3">
+                    <p className="text-[12px] font-bold text-red-400">
+                      Are you completely sure? This will delete EVERYTHING and restart the app!
+                    </p>
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        onClick={handleFactoryReset}
+                        disabled={isResettingApp}
+                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[12px] transition-all cursor-pointer shadow-lg disabled:opacity-50"
+                      >
+                        {isResettingApp ? 'Resetting Everything...' : 'Yes, Delete Everything'}
+                      </button>
+                      <button
+                        onClick={() => setShowResetConfirm(false)}
+                        disabled={isResettingApp}
+                        className="px-3.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-[12px] font-medium transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowResetConfirm(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Trash2 size={14} />
+                    <span>Reset All App Data & Files</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

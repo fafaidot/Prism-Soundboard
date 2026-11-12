@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   permanentlyDeleteSound: (soundId) => ipcRenderer.invoke('permanently-delete-sound', soundId),
   exportSoundboardBackup: () => ipcRenderer.invoke('export-soundboard-backup'),
   importSoundboardBackup: () => ipcRenderer.invoke('import-soundboard-backup'),
+  resetAllAppData: () => ipcRenderer.invoke('reset-all-app-data'),
   saveRecordedAudio: (data) => ipcRenderer.invoke('save-recorded-audio', data),
   checkVirtualDriverInstalled: () => ipcRenderer.invoke('check-virtual-driver-installed'),
   installVirtualDriver: () => ipcRenderer.invoke('install-virtual-driver'),

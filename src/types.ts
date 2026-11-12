@@ -154,6 +154,7 @@ export interface SoundboardAPI {
   permanentlyDeleteSound?: (soundId: string) => Promise<boolean>;
   exportSoundboardBackup?: () => Promise<boolean>;
   importSoundboardBackup?: () => Promise<{ sounds: SoundItem[]; settings?: AudioSettings } | null>;
+  resetAllAppData?: () => Promise<boolean>;
   saveRecordedAudio?: (data: { base64: string; duration: number; title: string }) => Promise<{
     filePath: string;
     audioData: string;
