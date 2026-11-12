@@ -9,8 +9,25 @@ process.on('uncaughtException', (err) => {
   } catch (e) {}
 });
 
-const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Tray, Menu, nativeImage, session, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Tray, Menu, nativeImage, session, desktopCapturer, protocol } = require('electron');
 const { spawn, execFile } = require('child_process');
+
+// Enable secure context privileges for file:// so WebCodecs (VideoEncoder, AudioEncoder) work in production
+try {
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: 'file',
+      privileges: {
+        standard: true,
+        secure: true,
+        allowServiceWorkers: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
+      },
+    },
+  ]);
+} catch (e) {}
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // Prevent Windows from sleeping / de-prioritizing the event loop and GPU swapchain when in a game
