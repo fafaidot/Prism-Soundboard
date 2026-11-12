@@ -1566,7 +1566,10 @@ export const App: React.FC = () => {
                       <div className="flex items-center gap-2.5">
                         <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ff0000]/15 border border-[#ff0000]/30 text-[#ff0000]">
-                          Experimental
+                          Very Experimental
+                        </span>
+                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ff0000]/15 border border-[#ff0000]/30 text-[#ff0000]">
+                          May not work as meant
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
