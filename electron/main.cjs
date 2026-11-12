@@ -32,6 +32,7 @@ let panicHotkey = 'Escape';
 let repeatLastHotkey = 'F7';
 let overlayHotkey = 'F8';
 let recordHotkey = 'F9';
+let videoClipHotkey = 'F10';
 
 function normalizeKey(k) {
   if (!k) return '';
@@ -233,6 +234,14 @@ function handleHookKeyDown(rawKey) {
     return;
   }
 
+  // Check screen video clip hotkey (Medal-like instant replay clip)
+  if (videoClipHotkey && norm === normalizeKey(videoClipHotkey)) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('video-clip-hotkey-triggered');
+    }
+    return;
+  }
+
   // Check sound hotkey
   const soundId = registeredHotkeys.get(norm);
   if (soundId) {
@@ -323,6 +332,9 @@ try {
     }
     if (s.recordHotkey) {
       recordHotkey = s.recordHotkey;
+    }
+    if (s.videoClipHotkey) {
+      videoClipHotkey = s.videoClipHotkey;
     }
   }
 } catch (e) {}

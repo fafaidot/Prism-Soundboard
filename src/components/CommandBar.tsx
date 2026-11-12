@@ -114,58 +114,8 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 
   return (
     <div className="h-11 px-4 bg-[var(--theme-bg-header,#090a0f)] border-b border-[var(--theme-border,#222436)] flex items-center justify-between gap-3 select-none relative z-30 transition-colors duration-150">
-      {/* View Switcher: Sounds vs Clips */}
-      {onChangeView && (
-        <div className="h-[30px] flex items-center gap-0.5 bg-[var(--theme-bg-surface,#12131d)] p-0.5 rounded-[8px] border border-[var(--theme-border,#222436)] shrink-0">
-          <button
-            onClick={() => onChangeView('sounds')}
-            style={
-              activeView === 'sounds'
-                ? {
-                    backgroundColor: `${accent}25`,
-                    borderColor: `${accent}50`,
-                    color: '#ffffff',
-                  }
-                : undefined
-            }
-            className={`h-full px-2.5 flex items-center gap-1.5 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${
-              activeView === 'sounds'
-                ? 'shadow-sm border'
-                : 'text-[#9da5b7] hover:text-white'
-            }`}
-          >
-            <span>Sounds</span>
-            <span className="text-[10px] opacity-70 font-mono">({totalSounds})</span>
-          </button>
-
-          <button
-            onClick={() => onChangeView('clips')}
-            style={
-              activeView === 'clips'
-                ? {
-                    backgroundColor: `${accent}25`,
-                    borderColor: `${accent}50`,
-                    color: '#ffffff',
-                  }
-                : undefined
-            }
-            className={`h-full px-2.5 flex items-center gap-1.5 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${
-              activeView === 'clips'
-                ? 'shadow-sm border'
-                : 'text-[#9da5b7] hover:text-white'
-            }`}
-          >
-            <Clapperboard size={12} style={activeView === 'clips' ? { color: accent } : undefined} />
-            <span>Clips</span>
-            {clipsCount > 0 && (
-              <span className="text-[10px] opacity-70 font-mono">({clipsCount})</span>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Left: Compact Icon-Only Search, Filters & Sort */}
-      <div className="flex items-center gap-2 flex-1">
+      <div className="flex items-center gap-2">
         {/* Compact Expandable Icon-Only Search */}
         <div className="relative flex items-center">
           {isSearchExpanded || searchQuery ? (
@@ -179,7 +129,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   if (!searchQuery) setIsSearchExpanded(false);
                 }}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder={`Search ${totalSounds}...`}
+                placeholder={activeView === 'clips' ? `Search ${clipsCount} clips...` : `Search ${totalSounds}...`}
                 className="w-full h-full pl-8 pr-7 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] rounded-[8px] text-[11.5px] text-white placeholder-[#687084] focus:outline-none transition-all shadow-inner box-border"
                 style={{ ['--tw-ring-color' as any]: accent }}
               />
@@ -194,7 +144,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               </button>
             </div>
           ) : (
-            <Tooltip content={`Search sounds (${totalSounds})`} position="bottom">
+            <Tooltip content={activeView === 'clips' ? `Search clips (${clipsCount})` : `Search sounds (${totalSounds})`} position="bottom">
               <button
                 onClick={() => setIsSearchExpanded(true)}
                 className="h-[30px] w-[30px] flex items-center justify-center rounded-[8px] bg-[var(--theme-bg-surface,#12131d)] hover:bg-[var(--theme-bg-card,#171826)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] text-[#9da5b7] hover:text-white transition-all cursor-pointer box-border"
@@ -205,20 +155,26 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           )}
         </div>
 
-        {/* Compact Icon-Only Filter Tabs */}
+        {/* Compact Icon-Only Filter Tabs (In Videos mode: shows ONLY All and Favorites; hides YouTube and Clips) */}
         <div className="h-[30px] flex items-center gap-0.5 bg-[var(--theme-bg-surface,#12131d)] p-0.5 rounded-[8px] border border-[var(--theme-border,#222436)] box-border">
-          {([
-            { id: 'all', label: 'All Sounds', icon: null },
-            { id: 'clips', label: 'Clips Only', icon: Clapperboard },
-            { id: 'youtube', label: 'YouTube Sounds', icon: Video },
-            { id: 'favorites', label: 'Favorites', icon: Star },
-          ] as const).map((tab) => {
+          {(activeView === 'clips'
+            ? [
+                { id: 'all', label: 'All Clips', icon: null },
+                { id: 'favorites', label: 'Favorite Clips', icon: Star },
+              ]
+            : [
+                { id: 'all', label: 'All Sounds', icon: null },
+                { id: 'clips', label: 'Clips Only', icon: Clapperboard },
+                { id: 'youtube', label: 'YouTube Sounds', icon: Video },
+                { id: 'favorites', label: 'Favorites', icon: Star },
+              ]
+          ).map((tab) => {
             const Icon = (tab as any).icon;
             const isActive = activeFilter === tab.id;
             return (
               <Tooltip key={tab.id} content={tab.label} position="bottom">
                 <button
-                  onClick={() => onFilterChange(tab.id)}
+                  onClick={() => onFilterChange(tab.id as any)}
                   style={
                     isActive
                       ? {
@@ -268,7 +224,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           {showSortMenu && (
             <div className="absolute left-0 top-full mt-1.5 w-44 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[12px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-1.5 z-[100] animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#8e97aa]">
-                Sort Sounds By
+                Sort By
               </div>
               {(Object.keys(sortLabels) as SortOption[]).map((key) => (
                 <button
@@ -291,7 +247,57 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         </div>
       </div>
 
-      {/* Center/Right: Clip Last X Seconds, Hear Myself, Stop All, & Add Sound */}
+      {/* Exact Center: Sounds | Videos View Switcher */}
+      {onChangeView && (
+        <div className="absolute left-1/2 -translate-x-1/2 h-[30px] flex items-center gap-0.5 bg-[var(--theme-bg-surface,#12131d)] p-0.5 rounded-[8px] border border-[var(--theme-border,#222436)] shrink-0 z-20 shadow-sm">
+          <button
+            onClick={() => onChangeView('sounds')}
+            style={
+              activeView === 'sounds'
+                ? {
+                    backgroundColor: `${accent}25`,
+                    borderColor: `${accent}50`,
+                    color: '#ffffff',
+                  }
+                : undefined
+            }
+            className={`h-full px-3 flex items-center gap-1.5 rounded-[6px] text-[11.5px] font-bold transition-all cursor-pointer ${
+              activeView === 'sounds'
+                ? 'shadow-sm border'
+                : 'text-[#9da5b7] hover:text-white'
+            }`}
+          >
+            <span>Sounds</span>
+            <span className="text-[10px] opacity-70 font-mono">({totalSounds})</span>
+          </button>
+
+          <button
+            onClick={() => onChangeView('clips')}
+            style={
+              activeView === 'clips'
+                ? {
+                    backgroundColor: `${accent}25`,
+                    borderColor: `${accent}50`,
+                    color: '#ffffff',
+                  }
+                : undefined
+            }
+            className={`h-full px-3 flex items-center gap-1.5 rounded-[6px] text-[11.5px] font-bold transition-all cursor-pointer ${
+              activeView === 'clips'
+                ? 'shadow-sm border'
+                : 'text-[#9da5b7] hover:text-white'
+            }`}
+          >
+            <Clapperboard size={13} style={activeView === 'clips' ? { color: accent } : undefined} />
+            <span>Videos</span>
+            {clipsCount > 0 && (
+              <span className="text-[10px] opacity-70 font-mono">({clipsCount})</span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Right: Clip Last X Seconds, Hear Myself, Stop All, & Add Sound */}
       <div className="flex items-center gap-2 relative z-10">
         {/* Clip Last Seconds Button with Duration Selector (Icon + Length only) */}
         <div className="relative flex items-center">

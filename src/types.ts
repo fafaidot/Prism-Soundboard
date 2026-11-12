@@ -57,7 +57,9 @@ export interface AudioSettings {
   repeatLastHotkey?: string; // default "F7" (Replay last played sound)
   overlayHotkey?: string; // default "F8" (In-game Always-On-Top Mini Overlay)
   recordHotkey?: string; // default "F9" (Quick Microphone/System Clip Recording)
+  videoClipHotkey?: string; // default "F10" (Instant Replay Video Screen Capture)
   recordDuration?: number; // default 5 (seconds, e.g. 3, 5, 10, 15, 30)
+  videoClipDuration?: number; // default 15 (seconds, e.g. 15, 30, 45, 60)
   recordSource?: 'all' | 'screen' | 'mic'; // 'all' = screen + mic, 'screen' = raw game/system audio only, 'mic' = voice only
   theme: string; // 'cyber-violet' | 'neon-emerald' | 'electric-cyan' | 'crimson-noir' | 'solar-gold' | 'titanium-slate' | 'dark';
   accentColor: string;
@@ -130,6 +132,7 @@ export interface SoundboardAPI {
   onRepeatLastHotkeyTriggered?: (callback: () => void) => () => void;
   onOverlayHotkeyTriggered?: (callback: () => void) => () => void;
   onRecordHotkeyTriggered?: (callback: () => void) => () => void;
+  onVideoClipHotkeyTriggered?: (callback: () => void) => () => void;
 
   // Audio helper
   readAudioBuffer: (filePath: string) => Promise<string>; // base64

@@ -22,6 +22,7 @@ import {
   RotateCcw,
   ExternalLink,
   Sparkles,
+  Video,
 } from 'lucide-react';
 import { AudioSettings } from '../types';
 import { audioEngine } from '../services/audioEngine';
@@ -55,6 +56,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [recordingRepeatLast, setRecordingRepeatLast] = useState(false);
   const [recordingOverlay, setRecordingOverlay] = useState(false);
   const [recordingRecordClip, setRecordingRecordClip] = useState(false);
+  const [recordingVideoClip, setRecordingVideoClip] = useState(false);
   const [activeTab, setActiveTab] = useState<'devices' | 'voice' | 'hotkeys' | 'backup' | 'updates'>('devices');
   const [micLevel, setMicLevel] = useState<number>(0);
   const [rawDb, setRawDb] = useState<number>(-100);
@@ -188,7 +190,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Hotkey recorder listener
   useEffect(() => {
-    if (!recordingPanic && !recordingRepeatLast && !recordingOverlay && !recordingRecordClip) return;
+    if (!recordingPanic && !recordingRepeatLast && !recordingOverlay && !recordingRecordClip && !recordingVideoClip) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
@@ -225,13 +227,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         } else if (recordingRecordClip) {
           setLocalSettings((prev) => ({ ...prev, recordHotkey: chord }));
           setRecordingRecordClip(false);
+        } else if (recordingVideoClip) {
+          setLocalSettings((prev) => ({ ...prev, videoClipHotkey: chord }));
+          setRecordingVideoClip(false);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [recordingPanic, recordingRepeatLast, recordingOverlay, recordingRecordClip]);
+  }, [recordingPanic, recordingRepeatLast, recordingOverlay, recordingRecordClip, recordingVideoClip]);
 
   if (!isOpen) return null;
 
@@ -702,16 +707,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* TAB 3: SHORTCUTS & HOTKEYS */}
           {activeTab === 'hotkeys' && (
             <div className="space-y-5">
-              {/* Quick Instant Replay Clip Recording */}
+              {/* Quick Instant Replay Audio Clip Recording */}
               <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 text-white">
                     <Clapperboard size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">Instant Replay Clip Shortcut</span>
+                    <span className="text-[13.5px] font-bold">Audio Clip Shortcut</span>
                   </div>
                   <button
                     onClick={() => {
                       setRecordingRecordClip(true);
+                      setRecordingVideoClip(false);
                       setRecordingPanic(false);
                       setRecordingOverlay(false);
                     }}
@@ -776,6 +782,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <option value="mic">Microphone Only</option>
                     </select>
                   </div>
+                </div>
+              </div>
+
+              {/* Medal-like Game/Screen Video Clipping Shortcut */}
+              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-white">
+                    <Video size={17} style={{ color: accent }} />
+                    <span className="text-[13.5px] font-bold">Screen Video Clip Shortcut (Medal-like)</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setRecordingVideoClip(true);
+                      setRecordingRecordClip(false);
+                      setRecordingPanic(false);
+                      setRecordingOverlay(false);
+                    }}
+                    style={
+                      recordingVideoClip
+                        ? { backgroundColor: accent, color: '#000000', borderColor: accent }
+                        : undefined
+                    }
+                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-mono border transition-all cursor-pointer ${
+                      recordingVideoClip
+                        ? 'animate-pulse font-extrabold'
+                        : 'bg-[#111319] text-white border-[#2a2f3f] hover:border-white/40'
+                    }`}
+                  >
+                    {recordingVideoClip ? 'Press any Key...' : localSettings.videoClipHotkey || 'F10'}
+                  </button>
+                </div>
+                <p className="text-[11.5px] text-[#7e8697]">
+                  Captures the last {localSettings.videoClipDuration || 15} seconds of game/screen video and saves to your Videos folder.
+                </p>
+
+                <div className="w-1/2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#8e97aa] mb-1.5">
+                    Video Clip Length
+                  </label>
+                  <select
+                    value={localSettings.videoClipDuration || 15}
+                    onChange={(e) =>
+                      setLocalSettings((prev) => ({
+                        ...prev,
+                        videoClipDuration: parseInt(e.target.value) || 15,
+                      }))
+                    }
+                    className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white focus:outline-none transition-colors"
+                  >
+                    <option value={15}>Last 15 Seconds</option>
+                    <option value={30}>Last 30 Seconds</option>
+                    <option value={45}>Last 45 Seconds</option>
+                    <option value={60}>Last 60 Seconds</option>
+                  </select>
                 </div>
               </div>
 

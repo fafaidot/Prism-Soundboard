@@ -12,6 +12,7 @@ import { RestoreDeletedModal } from './components/RestoreDeletedModal';
 import { EditSoundModal } from './components/EditSoundModal';
 import { InGameOverlayModal } from './components/InGameOverlayModal';
 import { audioEngine } from './services/audioEngine';
+import { videoClipper } from './services/videoClipper';
 import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem } from './types';
 import { ClipCard } from './components/ClipCard';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
@@ -391,6 +392,12 @@ export const App: React.FC = () => {
         })
       : () => {};
 
+    const cleanupVideoClip = window.soundboardAPI.onVideoClipHotkeyTriggered
+      ? window.soundboardAPI.onVideoClipHotkeyTriggered(() => {
+          handleTriggerVideoClip();
+        })
+      : () => {};
+
     // Listen for cross-window synchronized state (Overlay <-> Main)
     const cleanupActiveSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('active-sounds-updated', (activeIds: string[]) => {
@@ -505,6 +512,7 @@ export const App: React.FC = () => {
       cleanupRepeatLast();
       cleanupOverlay();
       cleanupRecord();
+      cleanupVideoClip();
       cleanupTriggerClip();
       cleanupActiveSync();
       cleanupPausedSync();
@@ -874,6 +882,21 @@ export const App: React.FC = () => {
     } catch (err) {
       setIsRecordingClip(false);
       console.error('Clip last seconds failed:', err);
+    }
+  };
+
+  // Medal-like Screen/Game Video Clip Trigger
+  const handleTriggerVideoClip = async () => {
+    try {
+      const dur = settings.videoClipDuration || 15;
+      videoClipper.setDuration(dur);
+      const res = await videoClipper.clipLastSeconds();
+      if (res.success && res.clip) {
+        setVideoClips((prev) => [res.clip, ...prev.filter((c) => c.id !== res.clip.id)]);
+        setActiveView('clips');
+      }
+    } catch (err) {
+      console.error('Trigger video clip failed:', err);
     }
   };
 

@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
     return () => ipcRenderer.removeListener('record-hotkey-triggered', handler);
   },
 
+  onVideoClipHotkeyTriggered: (callback) => {
+    ipcRenderer.removeAllListeners('video-clip-hotkey-triggered');
+    const handler = () => callback();
+    ipcRenderer.on('video-clip-hotkey-triggered', handler);
+    return () => ipcRenderer.removeListener('video-clip-hotkey-triggered', handler);
+  },
+
   // Audio helper
   readAudioBuffer: (filePath) => ipcRenderer.invoke('read-audio-buffer', filePath),
 
