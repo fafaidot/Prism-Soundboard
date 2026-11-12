@@ -8,6 +8,7 @@ import { YouTubeSearchModal } from './components/YouTubeSearchModal';
 import { AudioTrimmerModal } from './components/AudioTrimmerModal';
 import { SettingsModal } from './components/SettingsModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
+import { ClearAllSoundsModal } from './components/ClearAllSoundsModal';
 import { RestoreDeletedModal } from './components/RestoreDeletedModal';
 import { EditSoundModal } from './components/EditSoundModal';
 import { InGameOverlayModal } from './components/InGameOverlayModal';
@@ -97,6 +98,7 @@ export const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isTrimmerModalOpen, setIsTrimmerModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
@@ -1052,6 +1054,31 @@ export const App: React.FC = () => {
     setIsDeleteModalOpen(false);
   };
 
+  // Clear all sounds with archiving
+  const handleClearAllSounds = async () => {
+    // Unregister all hotkeys
+    if (window.soundboardAPI?.unregisterAllHotkeys) {
+      window.soundboardAPI.unregisterAllHotkeys();
+    }
+
+    // Move sounds to deleted archive
+    for (const s of sounds) {
+      if (window.soundboardAPI?.moveToDeleted) {
+        await window.soundboardAPI.moveToDeleted(s).catch(() => {});
+      }
+    }
+
+    // Refresh deleted archive count
+    if (window.soundboardAPI?.loadDeletedSounds) {
+      const updatedDeleted = await window.soundboardAPI.loadDeletedSounds().catch(() => []);
+      if (updatedDeleted) setDeletedSounds(updatedDeleted);
+    }
+
+    // Clear active sounds
+    updateAndSaveSounds([], true);
+    setSelectedSoundId(null);
+  };
+
   // Restore sound from deleted folder
   const handleRestoreSound = async (soundId: string) => {
     if (window.soundboardAPI?.restoreDeletedSound) {
@@ -1616,44 +1643,59 @@ export const App: React.FC = () => {
                 ) : (
                   /* Sounds Grid View matching Image 1 */
                   <div>
-                    {/* Header: Title + Subtitle with Sort Dropdown */}
-                    <div className="flex flex-col gap-1 mb-5">
-                      <h1 className="text-2xl font-bold text-white tracking-tight">Sound library</h1>
-                      <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
-                        <span>{filteredSounds.length} sounds</span>
-                        <span className="text-[#3b4758]">SORT BY</span>
-                        <div className="relative">
-                          <button
-                            onClick={() => setShowSortMenu(!showSortMenu)}
-                            className="flex items-center gap-1.5 text-white/90 hover:text-[#22d3ee] font-medium cursor-pointer transition-colors"
-                          >
-                            <span>{sortLabels[sortBy] || 'Recently added'}</span>
-                            <ChevronDown size={13} />
-                          </button>
-                          {showSortMenu && (
-                            <div className="absolute left-0 top-6 w-44 rounded-xl bg-[#0d141d] border border-[#182432] p-1 shadow-2xl z-50 flex flex-col gap-0.5">
-                              {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
-                                <button
-                                  key={opt}
-                                  onClick={() => {
-                                    setSortBy(opt);
-                                    handleSaveSettings({ ...settings, sortBy: opt });
-                                    setShowSortMenu(false);
-                                  }}
-                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
-                                    sortBy === opt
-                                      ? 'bg-[#0e3b52] text-[#22d3ee] font-medium'
-                                      : 'text-[#8e95a5] hover:bg-white/5 hover:text-white'
-                                  }`}
-                                >
-                                  <span>{sortLabels[opt]}</span>
-                                  {sortBy === opt && <Check size={12} className="text-[#22d3ee]" />}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                    {/* Header: Title + Subtitle with Sort Dropdown & Clear All */}
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold text-white tracking-tight">Sound library</h1>
+                        <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
+                          <span>{filteredSounds.length} sounds</span>
+                          <span className="text-[#3b4758]">SORT BY</span>
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowSortMenu(!showSortMenu)}
+                              className="flex items-center gap-1.5 text-white/90 hover:text-[#22d3ee] font-medium cursor-pointer transition-colors"
+                            >
+                              <span>{sortLabels[sortBy] || 'Recently added'}</span>
+                              <ChevronDown size={13} />
+                            </button>
+                            {showSortMenu && (
+                              <div className="absolute left-0 top-6 w-44 rounded-xl bg-[#0d141d] border border-[#182432] p-1 shadow-2xl z-50 flex flex-col gap-0.5">
+                                {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
+                                  <button
+                                    key={opt}
+                                    onClick={() => {
+                                      setSortBy(opt);
+                                      handleSaveSettings({ ...settings, sortBy: opt });
+                                      setShowSortMenu(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
+                                      sortBy === opt
+                                        ? 'bg-[#0e3b52] text-[#22d3ee] font-medium'
+                                        : 'text-[#8e95a5] hover:bg-white/5 hover:text-white'
+                                    }`}
+                                  >
+                                    <span>{sortLabels[opt]}</span>
+                                    {sortBy === opt && <Check size={12} className="text-[#22d3ee]" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
+
+                      {/* Clear All Sounds Button */}
+                      {sounds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setIsClearAllModalOpen(true)}
+                          className="px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-red-500/10 border border-[#1B222E] hover:border-red-500/40 text-[#8e95a5] hover:text-red-400 text-[11.5px] font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                          title="Clear all sounds from library"
+                        >
+                          <Trash2 size={13} />
+                          <span>Clear All</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* 5-Column Grid */}
@@ -1850,6 +1892,18 @@ export const App: React.FC = () => {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
+      />
+
+      <ClearAllSoundsModal
+        isOpen={isClearAllModalOpen}
+        soundCount={sounds.length}
+        onClose={() => setIsClearAllModalOpen(false)}
+        onConfirmClear={handleClearAllSounds}
+        onExportBackup={async () => {
+          if (window.soundboardAPI?.exportSoundboardBackup) {
+            return await window.soundboardAPI.exportSoundboardBackup();
+          }
+        }}
       />
 
       <EditSoundModal

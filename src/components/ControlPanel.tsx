@@ -33,7 +33,7 @@ interface ControlPanelProps {
   onDuplicateSound?: () => void;
 }
 
-export const ControlPanel: React.FC<ControlPanelProps> = ({
+const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   sound,
   isListeningHotkey = false,
   onUpdateSound,
@@ -363,3 +363,17 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     </aside>
   );
 };
+
+export const ControlPanel = React.memo(ControlPanelComponent, (prev, next) => {
+  return (
+    prev.sound?.id === next.sound?.id &&
+    prev.sound?.volume === next.sound?.volume &&
+    prev.sound?.speed === next.sound?.speed &&
+    prev.sound?.reproductionMode === next.sound?.reproductionMode &&
+    prev.sound?.isFavorite === next.sound?.isFavorite &&
+    prev.sound?.hotkey === next.sound?.hotkey &&
+    prev.isPlaying === next.isPlaying &&
+    prev.isListeningHotkey === next.isListeningHotkey &&
+    prev.accentColor === next.accentColor
+  );
+});
