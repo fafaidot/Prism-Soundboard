@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Volume2, VolumeX, Mic, Play, Pause, ChevronLeft, ChevronRight, Music } from 'lucide-react';
 import { audioEngine } from '../services/audioEngine';
 import { SoundItem } from '../types';
+import { Slider } from './Slider';
 
 interface BottomToolbarProps {
   speakerVolume: number;
@@ -67,17 +68,16 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           >
             {isMuted ? <VolumeX size={15} className="text-[#ff3b30]" /> : <Volume2 size={15} />}
           </button>
-          <input
-            type="range"
+          <Slider
             min={0}
             max={200}
+            step={1}
             value={speakerVolume}
-            onChange={(e) => {
-              const val = parseInt(e.target.value) || 0;
+            onChange={(val) => {
               audioEngine.setMasterSpeakerVolume(val);
               onSpeakerVolumeChange(val);
             }}
-            className="w-32 h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4]"
+            className="w-32"
           />
           <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-9 text-right flex-shrink-0">
             {speakerVolume}%
@@ -88,17 +88,16 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         {onMicProjectionVolumeChange && (
           <div className="flex items-center gap-3">
             <Mic size={15} className="flex-shrink-0 text-[#31C5F4]" />
-            <input
-              type="range"
+            <Slider
               min={0}
               max={200}
+              step={1}
               value={micProjectionVolume}
-              onChange={(e) => {
-                const val = parseInt(e.target.value) || 0;
+              onChange={(val) => {
                 audioEngine.setMicInputVolume(val);
                 onMicProjectionVolumeChange(val);
               }}
-              className="w-32 h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4]"
+              className="w-32"
             />
             <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-9 text-right flex-shrink-0">
               {micProjectionVolume}%
@@ -134,15 +133,18 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
         {/* Scrubber Timeline */}
         <div className="flex-1 flex items-center min-w-0">
-          <input
-            type="range"
+          <Slider
             min={0}
             max={1}
             step={0.002}
             value={playbackProgress}
-            onChange={handleScrubberChange}
+            onChange={(val) => {
+              if (onSeekSound && activeSound) {
+                onSeekSound(val);
+              }
+            }}
             disabled={!activeSound}
-            className="w-full h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4] disabled:opacity-40"
+            className="w-full"
           />
         </div>
 

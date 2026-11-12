@@ -19,7 +19,7 @@ interface SoundCardProps {
   onClearHotkey: () => void;
 }
 
-export const SoundCard: React.FC<SoundCardProps> = ({
+const SoundCardComponent: React.FC<SoundCardProps> = ({
   sound,
   isSelected,
   isPlaying,
@@ -108,3 +108,18 @@ export const SoundCard: React.FC<SoundCardProps> = ({
     </div>
   );
 };
+
+export const SoundCard = React.memo(SoundCardComponent, (prev, next) => {
+  return (
+    prev.sound.id === next.sound.id &&
+    prev.sound.title === next.sound.title &&
+    prev.sound.hotkey === next.sound.hotkey &&
+    prev.sound.duration === next.sound.duration &&
+    prev.sound.thumbnail === next.sound.thumbnail &&
+    prev.sound.isFavorite === next.sound.isFavorite &&
+    prev.isSelected === next.isSelected &&
+    prev.isPlaying === next.isPlaying &&
+    prev.isDragging === next.isDragging &&
+    prev.accentColor === next.accentColor
+  );
+});

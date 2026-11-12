@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { SoundItem, ReproductionMode } from '../types';
 import { audioEngine } from '../services/audioEngine';
+import { Slider } from './Slider';
 
 interface ControlPanelProps {
   sound: SoundItem | null;
@@ -47,13 +48,33 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const volumeDebounceRef = useRef<any>(null);
   const speedDebounceRef = useRef<any>(null);
 
+  const [localMode, setLocalMode] = useState<ReproductionMode>(sound?.reproductionMode || 'stop');
+  const [localOptions, setLocalOptions] = useState(
+    sound?.reproductionOptions || {
+      stopOtherSounds: true,
+      muteOtherSounds: false,
+      muteVoice: false,
+      loop: false,
+    }
+  );
+  const optionsDebounceRef = useRef<any>(null);
+
   // Sync state when sound changes
   useEffect(() => {
     if (sound) {
       setLocalVolume(sound.volume ?? 100);
       setLocalSpeed(sound.speed ?? 1.0);
+      setLocalMode(sound.reproductionMode || 'stop');
+      setLocalOptions(
+        sound.reproductionOptions || {
+          stopOtherSounds: true,
+          muteOtherSounds: false,
+          muteVoice: false,
+          loop: false,
+        }
+      );
     }
-  }, [sound?.id, sound?.volume, sound?.speed]);
+  }, [sound?.id, sound?.volume, sound?.speed, sound?.reproductionMode, sound?.reproductionOptions]);
 
   if (!sound) {
     return (
@@ -69,29 +90,33 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     );
   }
 
-  const currentMode = sound.reproductionMode || 'stop';
-  const options = sound.reproductionOptions || {
-    stopOtherSounds: true,
-    muteOtherSounds: false,
-    muteVoice: false,
-    loop: false,
-  };
+  const currentMode = localMode;
+  const options = localOptions;
 
   const handleModeChange = (mode: ReproductionMode) => {
-    onUpdateSound({
-      ...sound,
-      reproductionMode: mode,
-    });
+    setLocalMode(mode);
+    if (optionsDebounceRef.current) clearTimeout(optionsDebounceRef.current);
+    optionsDebounceRef.current = setTimeout(() => {
+      onUpdateSound({
+        ...sound,
+        reproductionMode: mode,
+      });
+    }, 150);
   };
 
   const handleOptionToggle = (key: keyof typeof options) => {
-    onUpdateSound({
-      ...sound,
-      reproductionOptions: {
-        ...options,
-        [key]: !options[key],
-      },
-    });
+    const updatedOptions = {
+      ...localOptions,
+      [key]: !localOptions[key],
+    };
+    setLocalOptions(updatedOptions);
+    if (optionsDebounceRef.current) clearTimeout(optionsDebounceRef.current);
+    optionsDebounceRef.current = setTimeout(() => {
+      onUpdateSound({
+        ...sound,
+        reproductionOptions: updatedOptions,
+      });
+    }, 150);
   };
 
   const handleVolumeChange = (newVol: number) => {
@@ -206,13 +231,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Volume */}
         <div className="flex items-center justify-between gap-3 text-[12px]">
           <span className="text-[#8e95a5] w-14">Volume</span>
-          <input
-            type="range"
+          <Slider
             min={0}
             max={200}
+            step={1}
             value={localVolume}
-            onChange={(e) => handleVolumeChange(parseInt(e.target.value) || 0)}
-            className="flex-1 h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4]"
+            onChange={(val) => handleVolumeChange(val)}
+            className="flex-1"
           />
           <span className="font-mono text-[#31C5F4] w-10 text-right font-medium">
             {localVolume}%
@@ -222,14 +247,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Speed */}
         <div className="flex items-center justify-between gap-3 text-[12px]">
           <span className="text-[#8e95a5] w-14">Speed</span>
-          <input
-            type="range"
+          <Slider
             min={0.25}
             max={2.0}
             step={0.05}
             value={localSpeed}
-            onChange={(e) => handleSpeedChange(parseFloat(e.target.value) || 1.0)}
-            className="flex-1 h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4]"
+            onChange={(val) => handleSpeedChange(val)}
+            className="flex-1"
           />
           <span className="font-mono text-[#31C5F4] w-10 text-right font-medium">
             {localSpeed.toFixed(2)}x
