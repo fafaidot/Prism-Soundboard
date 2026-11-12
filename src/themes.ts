@@ -23,23 +23,23 @@ export interface ThemeDefinition {
 export const DARK_THEME: ThemeDefinition = {
   id: 'dark',
   name: 'Prism Slate Dark',
-  accent: '#22d3ee', // Vibrant cyan matching uploaded UI
+  accent: '#31C5F4', // Selection stroke / vibrant cyan
   accentHover: '#38bdf8',
-  accentSoft: 'rgba(34, 211, 238, 0.15)',
-  bgApp: '#080c12', // Deep slate navy
-  bgSurface: '#0d131b',
-  bgCard: '#111a24',
-  bgCardHover: '#162332',
-  bgCardSelected: '#18283a',
-  bgSidebar: '#070a0e',
-  bgHeader: '#070a0e',
-  border: '#16222f',
-  borderHover: '#233346',
-  borderHighlight: 'rgba(34, 211, 238, 0.55)',
+  accentSoft: 'rgba(49, 197, 244, 0.15)',
+  bgApp: '#090B10', // User requested: 090B10
+  bgSurface: '#0E131A',
+  bgCard: '#151B25', // User requested: 151B25
+  bgCardHover: '#1B2330',
+  bgCardSelected: '#123244', // User requested selected button: 123244
+  bgSidebar: '#10141C', // User requested sidebar: 10141C
+  bgHeader: '#090B10',
+  border: '#1B222E',
+  borderHover: '#232E3F',
+  borderHighlight: '#31C5F4',
   textPrimary: '#ffffff',
   textSecondary: '#94a3b8',
   textMuted: '#5a687c',
-  tagColor: '#22d3ee',
+  tagColor: '#31C5F4',
 };
 
 export const DEFAULT_THEME = DARK_THEME;

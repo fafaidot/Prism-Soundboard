@@ -88,12 +88,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         e.preventDefault();
         setShowMenu(true);
       }}
-      className="group relative bg-[#111a24] border border-[#182432] hover:border-[#22d3ee]/60 rounded-2xl overflow-hidden flex flex-col transition-all duration-200 shadow-md hover:shadow-2xl select-none"
+      className="group relative bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4] rounded-2xl overflow-hidden flex flex-col transition-all duration-200 select-none"
     >
       {/* 16:9 Video Canvas Container */}
       <div
         onClick={onClick}
-        className="relative w-full aspect-video bg-[#14202c] cursor-pointer overflow-hidden"
+        className="relative w-full aspect-video bg-[#0E131A] cursor-pointer overflow-hidden"
       >
         <video
           ref={videoRef}
@@ -145,13 +145,13 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   setTitleInput(clip.title);
                 }
               }}
-              className="flex-1 bg-[#182432] text-white text-[13px] font-semibold px-2 py-1 rounded outline-none border border-[#22d3ee]"
+              className="flex-1 bg-[#0E131A] text-white text-[13px] font-semibold px-2 py-1 rounded outline-none border border-[#31C5F4]"
             />
           ) : (
             <h3
               onClick={onClick}
               title={clip.title}
-              className="text-[13px] font-semibold text-white truncate cursor-pointer hover:text-[#22d3ee] transition-colors"
+              className="text-[13px] font-semibold text-white truncate cursor-pointer hover:text-[#31C5F4] transition-colors"
             >
               {clip.title}
             </h3>
@@ -186,7 +186,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       {showMenu && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-3 bottom-12 w-48 rounded-xl bg-[#0d141d] border border-[#182432] p-1.5 shadow-2xl z-50 flex flex-col gap-0.5 text-[12px]"
+          className="absolute right-3 bottom-12 w-48 rounded-xl bg-[#151B25] border border-[#1B222E] p-1.5 shadow-2xl z-50 flex flex-col gap-0.5 text-[12px]"
         >
           <button
             onClick={() => {
@@ -195,7 +195,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             }}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
           >
-            <FolderOpen size={13} className="text-[#22d3ee]" />
+            <FolderOpen size={13} className="text-[#31C5F4]" />
             <span>Open in folder</span>
           </button>
           <button
@@ -205,7 +205,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             }}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
           >
-            <Edit2 size={13} className="text-[#38bdf8]" />
+            <Edit2 size={13} className="text-[#31C5F4]" />
             <span>Rename</span>
           </button>
           <button
@@ -235,10 +235,10 @@ export const ClipCard: React.FC<ClipCardProps> = ({
             }}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
           >
-            <Scissors size={13} className="text-[#38bdf8]" />
+            <Scissors size={13} className="text-[#31C5F4]" />
             <span>Trim Clip</span>
           </button>
-          <div className="my-1 border-t border-[#182432]" />
+          <div className="my-1 border-t border-[#1B222E]" />
           <button
             onClick={() => {
               setShowMenu(false);

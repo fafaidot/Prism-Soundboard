@@ -34,13 +34,10 @@ interface ControlPanelProps {
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
   sound,
-  isPlaying,
-  accentColor,
   isListeningHotkey = false,
   onUpdateSound,
   onPlaySound,
   onStartListeningHotkey,
-  onClearHotkey,
   onOpenTrimmer,
   onDeleteSound,
   onDuplicateSound,
@@ -60,8 +57,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   if (!sound) {
     return (
-      <aside className="w-[310px] min-w-[310px] h-full bg-[#080c12] border-l border-[#16222f] flex flex-col items-center justify-center p-6 text-center select-none transition-colors duration-150">
-        <div className="w-14 h-14 rounded-2xl bg-[#0d141d] border border-[#182432] flex items-center justify-center mb-3 text-[#5a687c]">
+      <aside className="w-[310px] min-w-[310px] h-full bg-[#10141C] border-l border-[#1B222E] flex flex-col items-center justify-center p-6 text-center select-none transition-colors duration-150">
+        <div className="w-14 h-14 rounded-2xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center mb-3 text-[#5a687c]">
           <Disc size={28} />
         </div>
         <h3 className="text-[13px] font-bold text-white mb-1">No Sound Selected</h3>
@@ -124,13 +121,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   return (
-    <aside className="w-[320px] min-w-[320px] h-full bg-[#080c12] border-l border-[#16222f] flex flex-col overflow-y-auto p-5 select-none transition-colors duration-150 gap-5">
+    <aside className="w-[320px] min-w-[320px] h-full bg-[#10141C] border-l border-[#1B222E] flex flex-col overflow-y-auto p-5 select-none transition-colors duration-150 gap-5">
       {/* Top Action Row: [Scissors] [Duplicate] [Favorite] [Delete] */}
       <div className="grid grid-cols-4 gap-2">
         <button
           onClick={onOpenTrimmer}
           title="Trim Audio"
-          className="h-10 rounded-xl bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-10 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
         >
           <Scissors size={15} />
         </button>
@@ -138,7 +135,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           onClick={onDuplicateSound}
           title="Duplicate Sound"
-          className="h-10 rounded-xl bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-10 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
         >
           <Copy size={15} />
         </button>
@@ -149,7 +146,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           className={`h-10 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
             sound.isFavorite
               ? 'bg-[#292212] border-yellow-500/50 text-yellow-400'
-              : 'bg-[#0d141d] border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5] hover:text-white'
+              : 'bg-[#151B25] border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
           }`}
         >
           <Star size={15} className={sound.isFavorite ? 'fill-yellow-400' : ''} />
@@ -158,7 +155,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           onClick={onDeleteSound}
           title="Delete Sound"
-          className="h-10 rounded-xl bg-[#0d141d] border border-[#182432] hover:border-red-500/50 text-[#8e95a5] hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+          className="h-10 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-red-500/50 text-[#8e95a5] hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
         >
           <Trash2 size={15} />
         </button>
@@ -166,7 +163,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {/* Selected Sound Info Card */}
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-[#0c3144] border border-[#1a5b7c] flex items-center justify-center text-[#22d3ee] flex-shrink-0">
+        <div className="w-12 h-12 rounded-xl bg-[#123244] border border-[#31C5F4]/30 flex items-center justify-center text-[#31C5F4] flex-shrink-0">
           <Music size={22} />
         </div>
         <div className="flex-1 min-w-0">
@@ -184,8 +181,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           isListeningHotkey
             ? 'bg-[#ff9500] text-black font-bold animate-pulse'
             : sound.hotkey
-            ? 'bg-[#0e3b52] text-[#22d3ee] border border-[#1b6288]'
-            : 'bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-white'
+            ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40'
+            : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-white'
         }`}
       >
         {isListeningHotkey ? (
@@ -194,7 +191,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <span>Shortcut: {sound.hotkey}</span>
         ) : (
           <>
-            <Plus size={13} className="text-[#22d3ee]" />
+            <Plus size={13} className="text-[#31C5F4]" />
             <span>+ Add shortcut</span>
           </>
         )}
@@ -215,9 +212,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             max={200}
             value={localVolume}
             onChange={(e) => handleVolumeChange(parseInt(e.target.value) || 0)}
-            className="flex-1 h-1.5 bg-[#182432] rounded cursor-pointer accent-[#22d3ee]"
+            className="flex-1 h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4]"
           />
-          <span className="font-mono text-[#22d3ee] w-10 text-right font-medium">
+          <span className="font-mono text-[#31C5F4] w-10 text-right font-medium">
             {localVolume}%
           </span>
         </div>
@@ -232,9 +229,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             step={0.05}
             value={localSpeed}
             onChange={(e) => handleSpeedChange(parseFloat(e.target.value) || 1.0)}
-            className="flex-1 h-1.5 bg-[#182432] rounded cursor-pointer accent-[#22d3ee]"
+            className="flex-1 h-1.5 bg-[#0E131A] rounded cursor-pointer accent-[#31C5F4]"
           />
-          <span className="font-mono text-[#22d3ee] w-10 text-right font-medium">
+          <span className="font-mono text-[#31C5F4] w-10 text-right font-medium">
             {localSpeed.toFixed(2)}x
           </span>
         </div>
@@ -251,7 +248,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             onClick={onPlaySound}
             title="Play Sound"
-            className="w-10 h-10 rounded-full bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-all cursor-pointer"
+            className="w-10 h-10 rounded-full bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-all cursor-pointer"
           >
             <Play size={14} className="fill-current ml-0.5" />
           </button>
@@ -260,19 +257,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             onClick={() => audioEngine.pauseSound(sound.id)}
             title="Pause Sound"
-            className="w-10 h-10 rounded-full bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-all cursor-pointer"
+            className="w-10 h-10 rounded-full bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-all cursor-pointer"
           >
             <Pause size={14} />
           </button>
 
-          {/* Restart / Overlap Mode (Active Cyan as in Image 1) */}
+          {/* Restart / Overlap Mode */}
           <button
             onClick={() => handleModeChange('restart')}
             title="Overlap / Restart Mode"
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'restart'
-                ? 'bg-[#22d3ee] text-[#070a0e] shadow-[0_0_15px_rgba(34,211,238,0.35)]'
-                : 'bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5]'
+                ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5]'
             }`}
           >
             <RotateCcw size={14} />
@@ -284,8 +281,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             title="Stop Mode"
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'stop'
-                ? 'bg-[#0d141d] border border-[#22d3ee] text-[#22d3ee]'
-                : 'bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5]'
+                ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5]'
             }`}
           >
             <SkipForward size={14} />
@@ -297,8 +294,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             title="Toggle Loop"
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               options.loop
-                ? 'bg-[#22d3ee] text-[#070a0e]'
-                : 'bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/50 text-[#8e95a5]'
+                ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5]'
             }`}
           >
             <Repeat size={14} />
@@ -323,14 +320,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             <div
               key={key}
               onClick={() => handleOptionToggle(key as any)}
-              className="flex items-center justify-between p-3 rounded-xl bg-[#0d141d] border border-[#182432] hover:border-[#22d3ee]/40 transition-colors cursor-pointer text-[12px]"
+              className="flex items-center justify-between p-3 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 transition-colors cursor-pointer text-[12px]"
             >
               <span className="text-[#8e95a5] font-medium">{label}</span>
               <div
                 className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
                   isChecked
-                    ? 'bg-[#22d3ee] text-[#070a0e]'
-                    : 'border border-[#233346] bg-[#090e15]'
+                    ? 'bg-[#31C5F4] text-[#090B10]'
+                    : 'border border-[#233346] bg-[#0E131A]'
                 }`}
               >
                 {isChecked && <Check size={11} strokeWidth={3} />}

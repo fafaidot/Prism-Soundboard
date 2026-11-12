@@ -18,7 +18,7 @@ import { ClipCard } from './components/ClipCard';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
-import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Home, Music, Video, Settings, ChevronDown, Check } from 'lucide-react';
+import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Music, Video, Settings, ChevronDown, Check, Trash2 } from 'lucide-react';
 import prismLogo from './assets/Prism.png';
 
 const DEFAULT_SETTINGS: AudioSettings = {
@@ -1281,29 +1281,16 @@ export const App: React.FC = () => {
       {/* Main Container below TitleBar: Left Navigation Rail + Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Navigation Rail (Dock) */}
-        <div className="w-[68px] min-w-[68px] h-full bg-[#070a0e] border-r border-[#16222f] flex flex-col items-center justify-between py-4 select-none z-40">
+        <div className="w-[68px] min-w-[68px] h-full bg-[#10141C] border-r border-[#1B222E] flex flex-col items-center justify-between py-4 select-none z-40">
           <div className="flex flex-col items-center gap-2.5">
-            {/* Home Icon */}
-            <button
-              onClick={() => setActiveView('sounds')}
-              title="Home"
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                activeView === 'sounds'
-                  ? 'bg-[#0c3144] border border-[#1b6b90] text-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
-                  : 'text-[#5a687c] hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Home size={18} />
-            </button>
-
             {/* Sound Library Icon */}
             <button
               onClick={() => setActiveView('sounds')}
               title="Sound Library"
               className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeView === 'sounds'
-                  ? 'bg-[#0c3144] border border-[#1b6b90] text-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
-                  : 'text-[#5a687c] hover:text-white hover:bg-white/5'
+                  ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
+                  : 'bg-[#151B25] border border-[#1B222E] text-[#5a687c] hover:text-white hover:bg-[#1B2330]'
               }`}
             >
               <Music size={18} />
@@ -1315,22 +1302,39 @@ export const App: React.FC = () => {
               title="Video Library"
               className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeView === 'clips'
-                  ? 'bg-[#0c3144] border border-[#1b6b90] text-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
-                  : 'text-[#5a687c] hover:text-white hover:bg-white/5'
+                  ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
+                  : 'bg-[#151B25] border border-[#1B222E] text-[#5a687c] hover:text-white hover:bg-[#1B2330]'
               }`}
             >
               <Video size={18} />
             </button>
           </div>
 
-          {/* Bottom: Settings */}
-          <button
-            onClick={() => setIsSettingsModalOpen(true)}
-            title="Settings"
-            className="w-11 h-11 rounded-xl text-[#5a687c] hover:text-white hover:bg-white/5 flex items-center justify-center transition-all cursor-pointer"
-          >
-            <Settings size={18} />
-          </button>
+          {/* Bottom Rail Cluster: Deleted Archive Button + Settings Button */}
+          <div className="flex flex-col items-center gap-2.5">
+            {/* Deleted Archive Button */}
+            <button
+              onClick={() => setIsRestoreModalOpen(true)}
+              title={deletedSounds.length > 0 ? `Deleted Sounds Archive (${deletedSounds.length})` : 'Deleted Sounds Archive'}
+              className="w-11 h-11 rounded-xl bg-[#151B25] border border-[#1B222E] text-[#8e95a5] hover:text-white hover:bg-[#1B2330] flex items-center justify-center transition-all cursor-pointer relative"
+            >
+              <Trash2 size={16} />
+              {deletedSounds.length > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-[#123244] border border-[#31C5F4]/60 text-[#31C5F4] font-mono text-[9px] font-bold">
+                  {deletedSounds.length}
+                </span>
+              )}
+            </button>
+
+            {/* Settings */}
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              title="Settings"
+              className="w-11 h-11 rounded-xl bg-[#151B25] border border-[#1B222E] text-[#5a687c] hover:text-white hover:bg-[#1B2330] flex items-center justify-center transition-all cursor-pointer"
+            >
+              <Settings size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Main Content Area */}

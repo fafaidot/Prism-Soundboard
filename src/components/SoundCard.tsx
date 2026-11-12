@@ -1,5 +1,5 @@
 import React from 'react';
-import { Music, Clapperboard } from 'lucide-react';
+import { Music, Clapperboard, Play } from 'lucide-react';
 import { SoundItem } from '../types';
 
 interface SoundCardProps {
@@ -24,14 +24,12 @@ export const SoundCard: React.FC<SoundCardProps> = ({
   isSelected,
   isPlaying,
   playbackProgress = 0,
-  accentColor,
   isDragging = false,
   onCardPointerDown,
   onSelect,
   onPlay,
 }) => {
   const hasThumbnail = !!sound.thumbnail;
-  const accent = accentColor || '#22d3ee';
 
   const formatDuration = (sec?: number) => {
     if (!sec) return '0:08';
@@ -52,19 +50,18 @@ export const SoundCard: React.FC<SoundCardProps> = ({
           onCardPointerDown(e, sound);
         }
       }}
-      onClick={onSelect}
-      onDoubleClick={(e) => {
-        e.stopPropagation();
+      onClick={() => {
+        onSelect();
         onPlay();
       }}
       className={`group relative flex flex-col p-2.5 rounded-xl border transition-all duration-150 cursor-pointer select-none ${
         isSelected
-          ? 'bg-[#142332] border-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.2)]'
-          : 'bg-[#111a24] border-[#16222f] hover:border-[#22d3ee]/50 hover:bg-[#14202d]'
-      } ${isDragging ? 'opacity-30 scale-95 border-dashed border-[#22d3ee]' : ''}`}
+          ? 'bg-[#123244] border-[#31C5F4]'
+          : 'bg-[#151B25] border-[#1B222E] hover:border-[#31C5F4]/50 hover:bg-[#1B2330]'
+      } ${isDragging ? 'opacity-30 scale-95 border-dashed border-[#31C5F4]' : ''}`}
     >
       {/* Artwork / Media Area */}
-      <div className="relative w-full aspect-[4/3] rounded-lg bg-[#0d151e] overflow-hidden flex items-center justify-center">
+      <div className="relative w-full aspect-[4/3] rounded-lg bg-[#0E131A] overflow-hidden flex items-center justify-center">
         {hasThumbnail ? (
           <img
             src={sound.thumbnail}
@@ -72,14 +69,28 @@ export const SoundCard: React.FC<SoundCardProps> = ({
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 pointer-events-none"
           />
         ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
-          <Clapperboard size={30} className="text-[#22d3ee] group-hover:scale-110 transition-transform duration-150" />
+          <Clapperboard size={30} className="text-[#31C5F4] group-hover:scale-110 transition-transform duration-150" />
         ) : (
-          <Music size={30} className="text-[#22d3ee] group-hover:scale-110 transition-transform duration-150" />
+          <Music size={30} className="text-[#31C5F4] group-hover:scale-110 transition-transform duration-150" />
         )}
 
         {/* Live playback indicator ring / progress */}
         {isPlaying && (
-          <div className="absolute inset-0 border-2 border-[#22d3ee] rounded-lg pointer-events-none animate-pulse" />
+          <div className="absolute inset-0 border-2 border-[#31C5F4] rounded-lg pointer-events-none" />
+        )}
+
+        {/* Hover play icon indicator */}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+          <div className="w-9 h-9 rounded-full bg-black/60 flex items-center justify-center text-white">
+            <Play size={16} className="fill-current ml-0.5" />
+          </div>
+        </div>
+
+        {/* Sound Shortcut in Top-Left Corner (if set) */}
+        {sound.hotkey && (
+          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[10px] font-mono text-[#31C5F4] font-semibold border border-white/10 shadow-sm pointer-events-none">
+            {sound.hotkey}
+          </div>
         )}
 
         {/* Duration badge at bottom right */}
@@ -90,7 +101,7 @@ export const SoundCard: React.FC<SoundCardProps> = ({
 
       {/* Title */}
       <div className="mt-2.5 px-1 text-center">
-        <h4 className="text-[12px] font-medium text-white truncate group-hover:text-[#22d3ee] transition-colors">
+        <h4 className="text-[12px] font-medium text-white truncate group-hover:text-[#31C5F4] transition-colors">
           {sound.title}
         </h4>
       </div>
