@@ -956,12 +956,13 @@ ipcMain.handle('load-sounds', async () => {
       } catch (_) {}
     }
 
-    // Safety Fallback: If SOUNDS_FILE is empty, look for sounds.json or backups
+    // Safety Fallback: If SOUNDS_FILE is empty, look for backups or sounds.json
     if (!Array.isArray(sounds) || sounds.length === 0) {
       const candidates = [
+        path.join(USER_DATA_DIR, 'sounds_backup_57.json'),
         path.join(USER_DATA_DIR, 'sounds.json'),
-        path.join(APP_DATA_ROOT, 'Electron', 'sounds.json'),
         path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json'),
+        path.join(APP_DATA_ROOT, 'Electron', 'sounds.json'),
       ];
 
       for (const candidate of candidates) {
