@@ -79,6 +79,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
 
   // Window Controls
   getDesktopAudioSource: () => ipcRenderer.invoke('get-desktop-audio-source'),
+  getDesktopScreenSources: () => ipcRenderer.invoke('get-desktop-screen-sources'),
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
   closeWindow: () => ipcRenderer.invoke('window-close'),

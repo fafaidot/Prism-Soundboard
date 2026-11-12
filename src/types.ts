@@ -139,6 +139,7 @@ export interface SoundboardAPI {
 
   // Window Controls
   getDesktopAudioSource?: () => Promise<string | null>;
+  getDesktopScreenSources?: () => Promise<Array<{ id: string; name: string; display_id?: string }>>;
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;

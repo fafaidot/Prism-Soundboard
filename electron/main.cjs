@@ -13,10 +13,6 @@ const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Tray, Menu, 
 const { spawn, execFile } = require('child_process');
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-// High performance GPU flags for zero-latency transparent overlays during gaming
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
 // Prevent Windows from sleeping / de-prioritizing the event loop and GPU swapchain when in a game
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
@@ -312,6 +308,48 @@ function ensureStorageDirectories() {
     }
   } catch (err) {
     console.error('ensureStorageDirectories error:', err);
+  }
+}
+
+let videosWatcher = null;
+
+function startVideosDirectoryWatcher() {
+  if (videosWatcher) {
+    try { videosWatcher.close(); } catch (e) {}
+    videosWatcher = null;
+  }
+  if (!fs.existsSync(VIDEOS_DIR)) return;
+  try {
+    videosWatcher = fs.watch(VIDEOS_DIR, { persistent: false }, (eventType, filename) => {
+      if (eventType === 'rename' && filename) {
+        const fullPath = path.join(VIDEOS_DIR, filename);
+        // If file no longer exists, it was deleted — sync the clips JSON
+        if (!fs.existsSync(fullPath)) {
+          try {
+            if (fs.existsSync(CLIPS_FILE)) {
+              const clips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+              const updated = clips.filter(c => path.basename(c.filePath) !== filename);
+              if (updated.length !== clips.length) {
+                fs.writeFileSync(CLIPS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('video-clips-updated', updated);
+                }
+                if (overlayWindow && !overlayWindow.isDestroyed()) {
+                  overlayWindow.webContents.send('video-clips-updated', updated);
+                }
+                console.log(`[VideoWatch] Removed deleted clip from list: ${filename}`);
+              }
+            }
+          } catch (e) {
+            console.warn('[VideoWatch] Error syncing deleted clip:', e);
+          }
+        }
+      }
+    });
+    videosWatcher.on('error', err => console.warn('[VideoWatch] Watcher error:', err));
+    console.log(`[VideoWatch] Watching ${VIDEOS_DIR} for file deletions`);
+  } catch (e) {
+    console.warn('[VideoWatch] Could not start watcher:', e);
   }
 }
 
@@ -647,6 +685,7 @@ public class CoreAudioHelper {
     createOverlayWindow(); // Pre-warm transparent overlay immediately so in-game launch is instant with zero stutter!
     createTray();
     startGlobalKeyHook();
+    startVideosDirectoryWatcher();
   });
 
   app.on('will-quit', () => {
@@ -825,7 +864,7 @@ ipcMain.handle('open-external', (_event, url) => {
   shell.openExternal(url);
 });
 
-// Provide Desktop Audio Loopback source ID for system audio capture (Zero thumbnail memory allocation)
+// Provide Desktop Screen & Audio Loopback source ID for screen video recording
 ipcMain.handle('get-desktop-audio-source', async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -840,6 +879,20 @@ ipcMain.handle('get-desktop-audio-source', async () => {
     console.warn('[desktopCapturer] Failed to get screen sources for audio loopback:', err);
   }
   return null;
+});
+
+ipcMain.handle('get-desktop-screen-sources', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 0, height: 0 },
+      fetchWindowIcons: false,
+    });
+    return sources.map(s => ({ id: s.id, name: s.name, display_id: s.display_id }));
+  } catch (err) {
+    console.warn('[desktopCapturer] Failed to get screen sources:', err);
+    return [];
+  }
 });
 
 // Storage handlers
@@ -2082,7 +2135,7 @@ ipcMain.handle('save-recorded-video-clip', async (_event, { base64, duration, ti
       ? base64.substring(markerIndex + base64Marker.length) 
       : (base64.includes(',') ? base64.substring(base64.lastIndexOf(',') + 1) : base64);
     const buffer = Buffer.from(cleanBase64, 'base64');
-    const fileName = `${clipId}.mp4`;
+    const fileName = `${clipId}.webm`;
     const filePath = path.join(VIDEOS_DIR, fileName);
     fs.writeFileSync(filePath, buffer);
 
@@ -2352,6 +2405,7 @@ ipcMain.handle('change-storage-location', async (_event, newRootPath) => {
     activeStorageRoot = targetRoot;
     AUDIO_DIR = newSoundsDir;
     VIDEOS_DIR = newVideosDir;
+    startVideosDirectoryWatcher(); // Re-watch the new location
     DELETED_DIR = newDeletedDir;
 
     // 4. Update file pointers in soundboard_sounds.json

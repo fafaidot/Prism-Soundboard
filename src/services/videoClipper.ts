@@ -3,6 +3,7 @@
 // Zero CPU spike, hardware-accelerated video pipeline with instant export on hotkey trigger
 
 import { audioEngine } from './audioEngine';
+import fixWebmDuration from 'fix-webm-duration';
 
 export interface VideoClipperConfig {
   durationSeconds: number; // e.g. 15, 30, 45, 60
@@ -10,14 +11,15 @@ export interface VideoClipperConfig {
 
 class VideoClipper {
   private mediaRecorder: MediaRecorder | null = null;
-  private displayStream: MediaStream | null = null;
+  private screenStream: MediaStream | null = null;
   private mixedStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
+  private headerChunk: Blob | null = null;
   private chunks: { blob: Blob; timestamp: number }[] = [];
   private isBuffering: boolean = false;
   private isExporting: boolean = false;
   private bufferDurationSeconds: number = 15;
-  private recordedMimeType: string = 'video/webm;codecs=vp9,opus';
+  private recordedMimeType: string = 'video/webm;codecs=vp8,opus';
 
   public isRecordingActive(): boolean {
     return this.isBuffering;
@@ -43,35 +45,74 @@ class VideoClipper {
     try {
       this.bufferDurationSeconds = durationSeconds;
       this.chunks = [];
+      this.headerChunk = null;
 
-      // Request screen video + system desktop loopback audio
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        console.warn('[VideoClipper] navigator.mediaDevices.getDisplayMedia is unavailable.');
+      let stream: MediaStream | null = null;
+
+      // 1. First priority: Try native Electron desktopCapturer screen capture via getUserMedia
+      // This is 100% reliable in Electron on Windows and never produces a black screen
+      if (window.soundboardAPI?.getDesktopScreenSources) {
+        try {
+          const sources = await window.soundboardAPI.getDesktopScreenSources();
+          const primary = sources && sources.length > 0 ? sources[0] : null;
+          if (primary) {
+            console.log('[VideoClipper] Using Electron desktopCapturer source:', primary.name, primary.id);
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                },
+              } as any,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: primary.id,
+                  minWidth: 1280,
+                  maxWidth: 1920,
+                  minHeight: 720,
+                  maxHeight: 1080,
+                  maxFrameRate: 60,
+                },
+              } as any,
+            });
+          }
+        } catch (srcErr) {
+          console.warn('[VideoClipper] getUserMedia with desktopCapturer source failed, trying getDisplayMedia fallback:', srcErr);
+        }
+      }
+
+      // 2. Fallback: getDisplayMedia (intercepted by session.setDisplayMediaRequestHandler in main.cjs)
+      if (!stream && navigator.mediaDevices?.getDisplayMedia) {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 60, max: 60 },
+          } as any,
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          } as any,
+        });
+      }
+
+      if (!stream) {
+        console.warn('[VideoClipper] Could not acquire display stream.');
         return false;
       }
 
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 60, max: 60 },
-        } as any,
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        } as any,
-      });
+      this.screenStream = stream;
 
-      this.displayStream = screenStream;
-
-      // Handle user stopping screen sharing manually from OS banner
-      const videoTrack = screenStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.onended = () => {
-          this.stopBuffer();
-        };
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) {
+        console.warn('[VideoClipper] Stream has no video track.');
+        return false;
       }
+
+      videoTrack.onended = () => {
+        this.stopBuffer();
+      };
 
       // Mix System Desktop Audio + Physical Microphone Audio into a single synchronized audio track
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -79,17 +120,31 @@ class VideoClipper {
       this.audioContext = audioCtx;
       const audioDestination = audioCtx.createMediaStreamDestination();
 
-      // 1. Connect system loopback audio from screenStream (if track present)
-      const systemAudioTracks = screenStream.getAudioTracks();
+      // Keep audio stream active with silent oscillator to avoid Chrome audio track sleeping
+      try {
+        const dummyOsc = audioCtx.createOscillator();
+        const dummyGain = audioCtx.createGain();
+        dummyGain.gain.setValueAtTime(0.00001, audioCtx.currentTime);
+        dummyOsc.connect(dummyGain);
+        dummyGain.connect(audioDestination);
+        dummyOsc.start();
+      } catch (e) {}
+
+      // A. Connect system loopback audio from screenStream (if track present)
+      const systemAudioTracks = stream.getAudioTracks();
       if (systemAudioTracks.length > 0) {
-        const sysAudioSource = audioCtx.createMediaStreamSource(new MediaStream([systemAudioTracks[0]]));
-        const sysGain = audioCtx.createGain();
-        sysGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
-        sysAudioSource.connect(sysGain);
-        sysGain.connect(audioDestination);
+        try {
+          const sysAudioSource = audioCtx.createMediaStreamSource(new MediaStream([systemAudioTracks[0]]));
+          const sysGain = audioCtx.createGain();
+          sysGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+          sysAudioSource.connect(sysGain);
+          sysGain.connect(audioDestination);
+        } catch (sysErr) {
+          console.warn('[VideoClipper] Error routing system loopback audio:', sysErr);
+        }
       }
 
-      // 2. Connect physical microphone audio from audioEngine (or getUserMedia fallback)
+      // B. Connect physical microphone audio from audioEngine (or getUserMedia fallback)
       let micStream = audioEngine.getMicrophoneStream();
       if (!micStream || micStream.getAudioTracks().length === 0) {
         try {
@@ -119,8 +174,7 @@ class VideoClipper {
       }
 
       // Combine video track + mixed audio track into single recorded stream
-      const tracks: MediaStreamTrack[] = [];
-      if (videoTrack) tracks.push(videoTrack);
+      const tracks: MediaStreamTrack[] = [videoTrack];
       const mixedAudioTrack = audioDestination.stream.getAudioTracks()[0];
       if (mixedAudioTrack) {
         tracks.push(mixedAudioTrack);
@@ -130,10 +184,10 @@ class VideoClipper {
 
       this.mixedStream = new MediaStream(tracks);
 
-      // Select robust supported codec
-      let mimeType = 'video/webm;codecs=vp9,opus';
+      // Select robust supported codec (VP8 is universally accelerated on Windows and doesn't produce black screens)
+      let mimeType = 'video/webm;codecs=vp8,opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp8,opus';
+        mimeType = 'video/webm;codecs=vp9,opus';
       }
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'video/webm';
@@ -142,12 +196,18 @@ class VideoClipper {
 
       const recorder = new MediaRecorder(this.mixedStream, {
         mimeType,
-        videoBitsPerSecond: 12000000, // 12 Mbps crystal-clear 1080p gaming clips
+        videoBitsPerSecond: 8000000, // 8 Mbps high-quality 60fps video
       });
 
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           const now = Date.now();
+          // Store the very first chunk permanently as the EBML Header template!
+          // Sliced subsequent chunks require this header to decode properly.
+          if (!this.headerChunk) {
+            this.headerChunk = event.data;
+          }
+
           this.chunks.push({ blob: event.data, timestamp: now });
 
           // Prune chunks older than buffer duration (with 2s leeway)
@@ -203,13 +263,34 @@ class VideoClipper {
         .filter((c) => c.timestamp >= cutoff)
         .map((c) => c.blob);
 
-      const clipBlobs = validChunks.length > 0 ? validChunks : this.chunks.map((c) => c.blob);
+      let clipBlobs = validChunks.length > 0 ? validChunks : this.chunks.map((c) => c.blob);
       if (clipBlobs.length === 0) {
         return { success: false, error: 'No video frames buffered yet.' };
       }
 
+      // CRITICAL FIX: Ensure EBML Header is prepended so media players (VLC, Chrome) can decode
+      if (this.headerChunk && clipBlobs[0] !== this.headerChunk) {
+        clipBlobs = [this.headerChunk, ...clipBlobs];
+      }
+
       const mimeType = this.recordedMimeType || 'video/webm';
-      const completeBlob = new Blob(clipBlobs, { type: mimeType });
+      let completeBlob = new Blob(clipBlobs, { type: mimeType });
+
+      // Fix WebM Duration metadata so VLC and HTML5 player can seek and don't stall
+      try {
+        const actualDurationMs = this.bufferDurationSeconds * 1000;
+        completeBlob = await new Promise<Blob>((resolve) => {
+          try {
+            fixWebmDuration(completeBlob, actualDurationMs, (fixed: Blob) => {
+              resolve(fixed);
+            });
+          } catch {
+            resolve(completeBlob);
+          }
+        });
+      } catch (durationErr) {
+        console.warn('[VideoClipper] Could not patch WebM duration header:', durationErr);
+      }
 
       // Convert Blob to Base64 Data URL safely via FileReader
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -283,13 +364,13 @@ class VideoClipper {
     }
     this.mediaRecorder = null;
 
-    if (this.displayStream) {
-      this.displayStream.getTracks().forEach((track) => {
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((track) => {
         try {
           track.stop();
         } catch (e) {}
       });
-      this.displayStream = null;
+      this.screenStream = null;
     }
 
     if (this.mixedStream) {
@@ -309,6 +390,7 @@ class VideoClipper {
     }
 
     this.chunks = [];
+    this.headerChunk = null;
   }
 }
 

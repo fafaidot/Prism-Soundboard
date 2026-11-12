@@ -279,6 +279,7 @@ export const App: React.FC = () => {
         window.soundboardAPI.saveSettings(effectiveSettings);
 
         setSettings(effectiveSettings);
+        (window as any).__prismSettings = effectiveSettings;
         if (effectiveSettings.sortBy) setSortBy(effectiveSettings.sortBy);
         if (effectiveSettings.activeFilter) setActiveFilter(effectiveSettings.activeFilter);
         await audioEngine.updateSettings(effectiveSettings);
@@ -313,6 +314,20 @@ export const App: React.FC = () => {
             setVideoClips(savedClips);
           }
         }
+
+        // Auto-start the rolling video clip buffer immediately on app launch
+        // This ensures the buffer is always full when the user presses the clip hotkey
+        setTimeout(async () => {
+          try {
+            const dur = (window as any).__prismSettings?.videoClipDuration || 15;
+            const started = await videoClipper.startBuffer(dur);
+            if (started) {
+              console.log('[App] Video clip buffer auto-started on launch');
+            }
+          } catch (e) {
+            console.warn('[App] Video buffer auto-start deferred (needs user interaction):', e);
+          }
+        }, 2000); // 2s delay to let Electron permissions settle
       }
     };
 
