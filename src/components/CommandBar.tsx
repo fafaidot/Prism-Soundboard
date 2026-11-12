@@ -89,6 +89,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   onChangeRecordDuration,
   onChangeRecordSource,
 }) => {
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDurationMenu, setShowDurationMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -105,91 +106,111 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   };
 
   return (
-    <div className="h-14 px-6 bg-[var(--theme-bg-header,#090a0f)] border-b border-[var(--theme-border,#222436)] flex items-center justify-between gap-4 select-none relative z-30 transition-colors duration-150">
-      {/* Left: Search Bar, Category Filters & Sort */}
-      <div className="flex items-center gap-3 flex-1 max-w-2xl">
-        {/* Search Input */}
-        <div className="relative w-64 h-[34px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#687084]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={`Search ${totalSounds} sounds...`}
-            className="w-full h-full pl-9 pr-7 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] rounded-[9px] text-[12px] text-white placeholder-[#687084] focus:outline-none transition-all shadow-inner box-border"
-            style={{ ['--tw-ring-color' as any]: accent }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#687084] hover:text-white"
-            >
-              <X size={13} />
-            </button>
+    <div className="h-11 px-4 bg-[var(--theme-bg-header,#090a0f)] border-b border-[var(--theme-border,#222436)] flex items-center justify-between gap-3 select-none relative z-30 transition-colors duration-150">
+      {/* Left: Compact Icon-Only Search, Filters & Sort */}
+      <div className="flex items-center gap-2 flex-1">
+        {/* Compact Expandable Icon-Only Search */}
+        <div className="relative flex items-center">
+          {isSearchExpanded || searchQuery ? (
+            <div className="relative w-52 h-[30px] animate-in fade-in zoom-in-95 duration-100">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#687084]" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onBlur={() => {
+                  if (!searchQuery) setIsSearchExpanded(false);
+                }}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder={`Search ${totalSounds}...`}
+                className="w-full h-full pl-8 pr-7 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] rounded-[8px] text-[11.5px] text-white placeholder-[#687084] focus:outline-none transition-all shadow-inner box-border"
+                style={{ ['--tw-ring-color' as any]: accent }}
+              />
+              <button
+                onClick={() => {
+                  onSearchChange('');
+                  setIsSearchExpanded(false);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#687084] hover:text-white"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <Tooltip content={`Search sounds (${totalSounds})`} position="bottom">
+              <button
+                onClick={() => setIsSearchExpanded(true)}
+                className="h-[30px] w-[30px] flex items-center justify-center rounded-[8px] bg-[var(--theme-bg-surface,#12131d)] hover:bg-[var(--theme-bg-card,#171826)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] text-[#9da5b7] hover:text-white transition-all cursor-pointer box-border"
+              >
+                <Search size={14} />
+              </button>
+            </Tooltip>
           )}
         </div>
 
-        {/* Filter Tabs (Clips & YouTube next to All) */}
-        <div className="h-[34px] flex items-center gap-1 bg-[var(--theme-bg-surface,#12131d)] p-0.5 rounded-[9px] border border-[var(--theme-border,#222436)] box-border">
+        {/* Compact Icon-Only Filter Tabs */}
+        <div className="h-[30px] flex items-center gap-0.5 bg-[var(--theme-bg-surface,#12131d)] p-0.5 rounded-[8px] border border-[var(--theme-border,#222436)] box-border">
           {([
-            { id: 'all', label: 'All' },
-            { id: 'clips', label: 'Clips', icon: Clapperboard },
-            { id: 'youtube', label: 'YouTube', icon: Video },
+            { id: 'all', label: 'All Sounds', icon: null },
+            { id: 'clips', label: 'Clips Only', icon: Clapperboard },
+            { id: 'youtube', label: 'YouTube Sounds', icon: Video },
             { id: 'favorites', label: 'Favorites', icon: Star },
           ] as const).map((tab) => {
             const Icon = (tab as any).icon;
             const isActive = activeFilter === tab.id;
             return (
-              <button
-                key={tab.id}
-                onClick={() => onFilterChange(tab.id)}
-                style={
-                  isActive
-                    ? {
-                        backgroundColor: `${accent}25`,
-                        borderColor: `${accent}50`,
-                        color: '#ffffff',
-                      }
-                    : undefined
-                }
-                className={`h-full px-2.5 flex items-center gap-1.5 justify-center rounded-[7px] text-[11px] font-bold capitalize transition-all cursor-pointer ${
-                  isActive
-                    ? 'shadow-sm border'
-                    : 'text-[#9da5b7] hover:text-white'
-                }`}
-              >
-                {Icon && (
-                  <Icon
-                    size={12}
-                    style={isActive ? { color: accent } : undefined}
-                    className={!isActive ? 'text-[#7e8697]' : undefined}
-                  />
-                )}
-                <span>{tab.label}</span>
-              </button>
+              <Tooltip key={tab.id} content={tab.label} position="bottom">
+                <button
+                  onClick={() => onFilterChange(tab.id)}
+                  style={
+                    isActive
+                      ? {
+                          backgroundColor: `${accent}25`,
+                          borderColor: `${accent}50`,
+                          color: '#ffffff',
+                        }
+                      : undefined
+                  }
+                  className={`h-full min-w-[28px] px-2 flex items-center justify-center rounded-[6px] text-[10.5px] font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'shadow-sm border'
+                      : 'text-[#9da5b7] hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {Icon ? (
+                    <Icon
+                      size={13}
+                      style={isActive ? { color: accent } : undefined}
+                      className={!isActive ? 'text-[#7e8697]' : undefined}
+                    />
+                  ) : (
+                    <span>All</span>
+                  )}
+                </button>
+              </Tooltip>
             );
           })}
         </div>
 
-        {/* Sorting Dropdown */}
+        {/* Compact Icon-Only Sorting Button */}
         <div className="relative">
-          <button
-            onClick={() => {
-              setShowSortMenu(!showSortMenu);
-              setShowDurationMenu(false);
-              setShowAddMenu(false);
-            }}
-            className="h-[34px] px-3 whitespace-nowrap min-w-fit flex items-center gap-1.5 bg-[var(--theme-bg-surface,#12131d)] hover:bg-[var(--theme-bg-card,#171826)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] rounded-[9px] text-[#9da5b7] hover:text-white text-[11px] font-semibold transition-all cursor-pointer"
-            title="Sort Sounds"
-          >
-            <ArrowUpDown size={12} style={{ color: accent }} className="shrink-0" />
-            <span className="whitespace-nowrap">{sortLabels[sortBy] || 'Sort'}</span>
-            <ChevronDown size={11} className="text-[#656d81] shrink-0" />
-          </button>
+          <Tooltip content={`Sort Order: ${sortLabels[sortBy] || 'Sort'}`} position="bottom">
+            <button
+              onClick={() => {
+                setShowSortMenu(!showSortMenu);
+                setShowDurationMenu(false);
+                setShowAddMenu(false);
+              }}
+              style={showSortMenu ? { borderColor: accent } : undefined}
+              className="h-[30px] w-[30px] flex items-center justify-center bg-[var(--theme-bg-surface,#12131d)] hover:bg-[var(--theme-bg-card,#171826)] border border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] rounded-[8px] text-[#9da5b7] hover:text-white transition-all cursor-pointer"
+            >
+              <ArrowUpDown size={13} style={{ color: accent }} />
+            </button>
+          </Tooltip>
 
           {showSortMenu && (
-            <div className="absolute left-0 top-full mt-2 w-44 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[12px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-1.5 z-[100] animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#8e97aa]">
+            <div className="absolute left-0 top-full mt-1.5 w-44 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[12px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-1.5 z-[100] animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#8e97aa]">
                 Sort Sounds By
               </div>
               {(Object.keys(sortLabels) as SortOption[]).map((key) => (
@@ -214,14 +235,14 @@ export const CommandBar: React.FC<CommandBarProps> = ({
       </div>
 
       {/* Center/Right: Clip Last X Seconds, Hear Myself, Stop All, & Add Sound */}
-      <div className="flex items-center gap-2.5 relative z-10">
+      <div className="flex items-center gap-2 relative z-10">
         {/* Clip Last Seconds Button with Duration Selector (Icon + Length only) */}
         <div className="relative flex items-center">
           <Tooltip
             content={
               isRecording
                 ? `Clipping last ${recordDuration}s...`
-                : `Instant Replay: Click or press [${recordHotkey}] to capture the last ${recordDuration} seconds of audio into your soundboard`
+                : `Instant Replay: Click or press [${recordHotkey}] to capture the last ${recordDuration}s into soundboard`
             }
             position="bottom"
           >
@@ -241,18 +262,18 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                     }
                   : undefined
               }
-              className={`h-[34px] flex items-center justify-center gap-1.5 px-2.5 rounded-l-[9px] text-[11px] font-bold border transition-all cursor-pointer box-border ${
+              className={`h-[30px] flex items-center justify-center gap-1.5 px-2 rounded-l-[8px] text-[11px] font-bold border transition-all cursor-pointer box-border ${
                 isRecording
                   ? 'animate-pulse cursor-wait'
                   : 'bg-[var(--theme-bg-surface,#12131d)] hover:bg-[var(--theme-bg-card,#171826)] border-[var(--theme-border,#222436)] hover:border-[var(--theme-border-hover,#323650)] text-white'
               }`}
             >
               <Clapperboard
-                size={14}
+                size={13}
                 style={{ color: accent }}
                 className={isRecording ? 'animate-spin' : ''}
               />
-              <span className="font-bold" style={{ color: accent }}>
+              <span className="font-bold text-[10.5px]" style={{ color: accent }}>
                 {isRecording ? 'Clipping...' : `${recordDuration}s`}
               </span>
             </button>
@@ -262,19 +283,19 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           <button
             onClick={() => setShowDurationMenu(!showDurationMenu)}
             disabled={isRecording}
-            title="Configure Clip Duration (last 3s, 5s, 10s, etc.)"
-            className={`h-[34px] px-2 rounded-r-[9px] border-y border-r border-[var(--theme-border,#222436)] text-[#8a92a6] hover:text-white transition-all cursor-pointer box-border flex items-center justify-center ${
+            title="Configure Clip Duration"
+            className={`h-[30px] px-1.5 rounded-r-[8px] border-y border-r border-[var(--theme-border,#222436)] text-[#8a92a6] hover:text-white transition-all cursor-pointer box-border flex items-center justify-center ${
               isRecording
                 ? 'opacity-50'
                 : 'bg-[var(--theme-bg-surface,#12131d)] hover:bg-[var(--theme-bg-card,#171826)]'
             }`}
           >
-            <ChevronDown size={12} />
+            <ChevronDown size={11} />
           </button>
 
           {/* Duration & Source Dropdown Menu */}
           {showDurationMenu && (
-            <div className="absolute left-0 top-full mt-2 w-52 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[12px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-2 z-[100] animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute left-0 top-full mt-1.5 w-52 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[12px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-2 z-[100] animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#8e97aa]">
                 Clip Buffer Duration
               </div>
@@ -346,13 +367,13 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   }
                 : undefined
             }
-            className={`h-[34px] w-[34px] flex items-center justify-center rounded-[9px] border transition-all cursor-pointer box-border ${
+            className={`h-[30px] w-[30px] flex items-center justify-center rounded-[8px] border transition-all cursor-pointer box-border ${
               hearMyself
                 ? ''
                 : 'bg-[var(--theme-bg-surface,#12131d)] border-[var(--theme-border,#222436)] text-[#8a92a6] hover:text-white hover:border-[var(--theme-border-hover,#323650)]'
             }`}
           >
-            <Headphones size={15} />
+            <Headphones size={14} />
           </button>
         </Tooltip>
 
@@ -362,7 +383,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span>Stop All Sounds</span>
               <span
-                className="px-1.5 py-0.5 rounded bg-black/60 font-mono text-[11px] border border-white/10 font-bold"
+                className="px-1.5 py-0.5 rounded bg-black/60 font-mono text-[10.5px] border border-white/10 font-bold"
                 style={{ color: accent }}
               >
                 {panicHotkey || 'Esc'}
@@ -373,18 +394,18 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         >
           <button
             onClick={onStopAll}
-            className={`h-[34px] flex items-center justify-center gap-1.5 px-3 rounded-[9px] text-[11px] font-bold transition-all duration-150 cursor-pointer border box-border ${
+            className={`h-[30px] flex items-center justify-center gap-1.5 px-2.5 rounded-[8px] text-[10.5px] font-bold transition-all duration-150 cursor-pointer border box-border ${
               isStopAllActive || hasActiveSounds
                 ? 'bg-[#e81123]/20 border-[#e81123] text-[#ff4d5e] hover:bg-[#e81123]/30'
                 : 'bg-[var(--theme-bg-surface,#12131d)] border-[var(--theme-border,#222436)] text-[#8a92a6] hover:text-white hover:border-[var(--theme-border-hover,#323650)]'
             }`}
           >
-            <Square size={13} className={isStopAllActive || hasActiveSounds ? 'fill-current text-[#ff4d5e]' : 'text-[#8a92a6]'} />
+            <Square size={12} className={isStopAllActive || hasActiveSounds ? 'fill-current text-[#ff4d5e]' : 'text-[#8a92a6]'} />
             <span className={isStopAllActive || hasActiveSounds ? 'font-bold text-[#ff4d5e]' : 'font-semibold text-white'}>
-              Stop All
+              Stop
             </span>
             {activeSoundsCount > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-[#ff4d5e] text-white text-[10px] font-mono font-bold leading-tight">
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-[#ff4d5e] text-white text-[9px] font-mono font-bold leading-tight">
                 {activeSoundsCount}
               </span>
             )}
@@ -399,27 +420,27 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               style={{
                 backgroundColor: accent,
               }}
-              className="h-[34px] w-[34px] rounded-[9px] text-black flex items-center justify-center transition-all hover:brightness-110 active:scale-98 cursor-pointer box-border"
+              className="h-[30px] w-[30px] rounded-[8px] text-black flex items-center justify-center transition-all hover:brightness-110 active:scale-98 cursor-pointer box-border"
             >
-              <Plus size={17} className="stroke-[3]" />
+              <Plus size={16} className="stroke-[3]" />
             </button>
           </Tooltip>
 
           {showAddMenu && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[14px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-1.5 z-[100] animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute right-0 top-full mt-1.5 w-52 bg-[var(--theme-bg-surface,#12131d)] border border-[var(--theme-border,#222436)] rounded-[14px] shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-1.5 z-[100] animate-in fade-in zoom-in-95 duration-100">
               <button
                 onClick={() => {
                   setShowAddMenu(false);
                   onOpenYouTubeSearch();
                 }}
-                className="w-full px-3.5 py-2.5 text-left text-[12px] font-semibold text-white hover:bg-white/10 flex items-center gap-3 transition-colors cursor-pointer"
+                className="w-full px-3.5 py-2 text-left text-[11.5px] font-semibold text-white hover:bg-white/10 flex items-center gap-3 transition-colors cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-md bg-[#ff0000]/15 flex items-center justify-center text-[#ff0000]">
-                  <Video size={14} />
+                <div className="w-5 h-5 rounded-md bg-[#ff0000]/15 flex items-center justify-center text-[#ff0000]">
+                  <Video size={13} />
                 </div>
                 <div>
                   <div className="leading-tight">YouTube Audio</div>
-                  <div className="text-[11px] font-normal text-[#9ea7ba]">Search, preview & download</div>
+                  <div className="text-[10px] font-normal text-[#9ea7ba]">Search, preview & download</div>
                 </div>
               </button>
               <button
@@ -427,17 +448,17 @@ export const CommandBar: React.FC<CommandBarProps> = ({
                   setShowAddMenu(false);
                   onImportLocalFiles();
                 }}
-                className="w-full px-3.5 py-2.5 text-left text-[12px] font-semibold text-white hover:bg-white/10 flex items-center gap-3 transition-colors cursor-pointer"
+                className="w-full px-3.5 py-2 text-left text-[11.5px] font-semibold text-white hover:bg-white/10 flex items-center gap-3 transition-colors cursor-pointer"
               >
                 <div
-                  className="w-6 h-6 rounded-md flex items-center justify-center"
+                  className="w-5 h-5 rounded-md flex items-center justify-center"
                   style={{ backgroundColor: `${accent}20`, color: accent }}
                 >
-                  <FolderOpen size={14} />
+                  <FolderOpen size={13} />
                 </div>
                 <div>
                   <div className="leading-tight">Local Audio File</div>
-                  <div className="text-[11px] font-normal text-[#9ea7ba]">MP3, WAV, OGG, FLAC</div>
+                  <div className="text-[10px] font-normal text-[#9ea7ba]">MP3, WAV, OGG, FLAC</div>
                 </div>
               </button>
             </div>
