@@ -950,20 +950,32 @@ ipcMain.handle('load-sounds', async () => {
   try {
     let sounds = [];
     if (fs.existsSync(SOUNDS_FILE)) {
-      const data = fs.readFileSync(SOUNDS_FILE, 'utf-8');
-      sounds = JSON.parse(data);
+      try {
+        const data = fs.readFileSync(SOUNDS_FILE, 'utf-8');
+        sounds = JSON.parse(data);
+      } catch (_) {}
     }
 
-    // Fallback: If SOUNDS_FILE is empty or has very few items, inspect AppData/Electron/soundboard_sounds.json or sounds.json
-    const electronSoundsFile = path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json');
-    if ((!sounds || sounds.length <= 1) && fs.existsSync(electronSoundsFile)) {
-      try {
-        const fallbackData = JSON.parse(fs.readFileSync(electronSoundsFile, 'utf-8'));
-        if (Array.isArray(fallbackData) && fallbackData.length > sounds.length) {
-          sounds = fallbackData;
-          fs.writeFileSync(SOUNDS_FILE, JSON.stringify(sounds, null, 2), 'utf-8');
+    // Safety Fallback: If SOUNDS_FILE is empty, look for sounds.json or backups
+    if (!Array.isArray(sounds) || sounds.length === 0) {
+      const candidates = [
+        path.join(USER_DATA_DIR, 'sounds.json'),
+        path.join(APP_DATA_ROOT, 'Electron', 'sounds.json'),
+        path.join(APP_DATA_ROOT, 'Electron', 'soundboard_sounds.json'),
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          try {
+            const fallbackData = JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+            if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+              sounds = fallbackData;
+              fs.writeFileSync(SOUNDS_FILE, JSON.stringify(sounds, null, 2), 'utf-8');
+              break;
+            }
+          } catch (_) {}
         }
-      } catch (e) {}
+      }
     }
 
     return sounds;
