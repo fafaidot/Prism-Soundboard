@@ -39,6 +39,7 @@ interface SettingsModalProps {
   deletedCount?: number;
   onOpenDeletedArchive?: () => void;
   sounds?: any[];
+  videoClips?: any[];
   onOpenClearAllModal?: () => void;
 }
 
@@ -51,6 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   deletedCount = 0,
   onOpenDeletedArchive,
   sounds,
+  videoClips,
   onOpenClearAllModal,
 }) => {
   const [localSettings, setLocalSettings] = useState<AudioSettings>(settings);
@@ -303,7 +305,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleBackupExport = async () => {
     if (window.soundboardAPI?.exportSoundboardBackup) {
-      const res = await window.soundboardAPI.exportSoundboardBackup(sounds);
+      const res = await window.soundboardAPI.exportSoundboardBackup(sounds, videoClips);
       if (res) {
         setBackupMsg({ text: 'Backup exported successfully!' });
       } else {
@@ -334,7 +336,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.0',
+        currentVersion: '1.5.1',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -1076,7 +1078,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-[13.5px] font-bold">Soundboard Full Library Backup (.prism)</span>
                 </div>
                 <p className="text-[11.5px] text-[#7e8697] leading-relaxed">
-                  Export all your added sounds, audio files, and keybind settings into a single bundled <span className="font-mono font-bold" style={{ color: accent }}>.prism</span> backup archive or restore one on any PC.
+                  Export all your added sounds, audio files, game video clips, and keybind settings into a single bundled <span className="font-mono font-bold" style={{ color: accent }}>.prism</span> backup archive or restore one on any PC.
                 </p>
 
                 {backupMsg && (
@@ -1243,7 +1245,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
                         <span>Prism Soundboard</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.0</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.1</span>
                       </h4>
                       <p className="text-[11.5px] text-[#7e8697]">
                         Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -1428,7 +1430,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Clean Footer */}
         <div className="px-7 py-4.5 border-t border-[var(--theme-border,#222436)] flex items-center justify-between bg-[var(--theme-bg-header,#090a0f)]">
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.0</span>
+            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.1</span>
             <span className="text-[#3b4152]">•</span>
             <button
               onClick={() => {

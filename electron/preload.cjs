@@ -92,7 +92,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   moveToDeleted: (sound) => ipcRenderer.invoke('move-to-deleted', sound),
   restoreDeletedSound: (soundId) => ipcRenderer.invoke('restore-deleted-sound', soundId),
   permanentlyDeleteSound: (soundId) => ipcRenderer.invoke('permanently-delete-sound', soundId),
-  exportSoundboardBackup: (sounds) => ipcRenderer.invoke('export-soundboard-backup', sounds),
+  exportSoundboardBackup: (sounds, videoClips) => ipcRenderer.invoke('export-soundboard-backup', sounds, videoClips),
   importSoundboardBackup: () => ipcRenderer.invoke('import-soundboard-backup'),
   resetAllAppData: () => ipcRenderer.invoke('reset-all-app-data'),
   saveRecordedAudio: (data) => ipcRenderer.invoke('save-recorded-audio', data),

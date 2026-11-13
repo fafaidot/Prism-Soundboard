@@ -67,7 +67,7 @@ export interface AudioSettings {
   startOnBoot?: boolean;
   startInTray?: boolean;
   githubRepo?: string; // Optional custom GitHub repository "owner/repo" for update checks
-  sortBy?: 'custom' | 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration';
+  sortBy?: 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration';
   activeFilter?: 'all' | 'clips' | 'youtube' | 'favorites';
   storageLocation?: string; // Unified root folder, e.g. "D:\Prism" -> contains /Sounds and /Videos
 }
@@ -152,8 +152,8 @@ export interface SoundboardAPI {
   moveToDeleted?: (sound: SoundItem) => Promise<SoundItem | false>;
   restoreDeletedSound?: (soundId: string) => Promise<SoundItem | null>;
   permanentlyDeleteSound?: (soundId: string) => Promise<boolean>;
-  exportSoundboardBackup?: (sounds?: SoundItem[]) => Promise<boolean>;
-  importSoundboardBackup?: () => Promise<{ sounds: SoundItem[]; settings?: AudioSettings } | null>;
+  exportSoundboardBackup?: (sounds?: SoundItem[], videoClips?: VideoClipItem[]) => Promise<boolean>;
+  importSoundboardBackup?: () => Promise<{ sounds: SoundItem[]; videoClips?: VideoClipItem[]; settings?: AudioSettings } | null>;
   resetAllAppData?: () => Promise<boolean>;
   saveRecordedAudio?: (data: { base64: string; duration: number; title: string }) => Promise<{
     filePath: string;

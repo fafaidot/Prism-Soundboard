@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
-export type SortOption = 'custom' | 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration';
+export type SortOption = 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration';
 
 interface CommandBarProps {
   totalSounds: number;

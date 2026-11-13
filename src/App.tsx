@@ -77,7 +77,6 @@ export const App: React.FC = () => {
   const [showSortMenu, setShowSortMenu] = useState(false);
 
   const sortLabels: Record<SortOption, string> = {
-    custom: 'Custom Order',
     newest: 'Recently added',
     oldest: 'Oldest Added',
     alphabetical: 'A to Z',
@@ -654,16 +653,6 @@ export const App: React.FC = () => {
           updateAndSaveSounds(currentSounds);
           return currentSounds;
         });
-
-        // Automatically switch sorting to 'custom' and persist it
-        setSortBy('custom');
-        setSettings((prev) => {
-          const updated = { ...prev, sortBy: 'custom' as const };
-          if (window.soundboardAPI?.saveSettings) {
-            window.soundboardAPI.saveSettings(updated);
-          }
-          return updated;
-        });
       }
 
       // Cleanup
@@ -703,8 +692,20 @@ export const App: React.FC = () => {
       e.preventDefault();
       e.stopPropagation();
 
-      // Cancel on Escape
+      // Cancel on Escape or Delete/Backspace to clear
       if (e.key === 'Escape') {
+        setListeningSoundId(null);
+        return;
+      }
+
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        const target = soundsRef.current.find((s) => s.id === listeningSoundId);
+        if (target) {
+          handleUpdateSound({
+            ...target,
+            hotkey: '',
+          });
+        }
         setListeningSoundId(null);
         return;
       }
@@ -1883,6 +1884,7 @@ export const App: React.FC = () => {
         deletedCount={deletedSounds.length}
         onOpenDeletedArchive={() => setIsRestoreModalOpen(true)}
         sounds={sounds}
+        videoClips={videoClips}
         onOpenClearAllModal={() => setIsClearAllModalOpen(true)}
         onReloadSounds={async () => {
           if (window.soundboardAPI?.loadSounds) {
@@ -1890,6 +1892,12 @@ export const App: React.FC = () => {
             if (reloaded) {
               setSounds(reloaded);
               if (reloaded.length > 0) setSelectedSoundId(reloaded[0].id);
+            }
+          }
+          if (window.soundboardAPI?.loadVideoClips) {
+            const reloadedClips = await window.soundboardAPI.loadVideoClips();
+            if (reloadedClips) {
+              setVideoClips(reloadedClips);
             }
           }
         }}

@@ -1163,8 +1163,8 @@ ipcMain.handle('permanently-delete-sound', async (_event, soundId) => {
   }
 });
 
-// Export Backup (Packages all audio files + sounds.json + settings.json into a .prism zip archive)
-ipcMain.handle('export-soundboard-backup', async (_event, liveSounds) => {
+// Export Backup (Packages all audio files + video clips + sounds.json + video_clips.json + settings.json into a .prism zip archive)
+ipcMain.handle('export-soundboard-backup', async (_event, liveSounds, liveClips) => {
   try {
     const defaultName = `prism-soundboard-backup-${new Date().toISOString().slice(0, 10)}.prism`;
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -1178,6 +1178,7 @@ ipcMain.handle('export-soundboard-backup', async (_event, liveSounds) => {
     const zip = new AdmZip();
 
     let sounds = [];
+    let videoClips = [];
     let settings = {};
 
     // 1. Prioritize live sounds passed directly from the client UI
@@ -1202,6 +1203,18 @@ ipcMain.handle('export-soundboard-backup', async (_event, liveSounds) => {
           } catch (e) {}
         }
       }
+    }
+
+    // Video clips
+    if (Array.isArray(liveClips) && liveClips.length > 0) {
+      videoClips = liveClips;
+    } else if (fs.existsSync(CLIPS_FILE)) {
+      try {
+        const parsedClips = JSON.parse(fs.readFileSync(CLIPS_FILE, 'utf-8'));
+        if (Array.isArray(parsedClips)) {
+          videoClips = parsedClips;
+        }
+      } catch (e) {}
     }
 
     if (fs.existsSync(SETTINGS_FILE)) {
@@ -1239,10 +1252,40 @@ ipcMain.handle('export-soundboard-backup', async (_event, liveSounds) => {
       }
     }
 
+    // Embed all physical video files referenced by video clips
+    const packagedClips = videoClips.map((clip) => {
+      const cloned = { ...clip };
+      if (cloned.filePath && fs.existsSync(cloned.filePath)) {
+        try {
+          const fileName = path.basename(cloned.filePath);
+          const zipVideoPath = `videos/${fileName}`;
+          zip.addLocalFile(cloned.filePath, 'videos');
+          cloned.filePath = zipVideoPath; // Relative path inside backup package
+        } catch (err) {
+          console.warn('Failed to pack video file:', cloned.filePath, err);
+        }
+      }
+      return cloned;
+    });
+
+    // Also include any other video files in VIDEOS_DIR
+    if (fs.existsSync(VIDEOS_DIR)) {
+      const files = fs.readdirSync(VIDEOS_DIR);
+      for (const f of files) {
+        const fullPath = path.join(VIDEOS_DIR, f);
+        if (fs.statSync(fullPath).isFile()) {
+          try {
+            zip.addLocalFile(fullPath, 'videos');
+          } catch (e) {}
+        }
+      }
+    }
+
     const manifest = {
       prismVersion: '1.0.6',
       exportedAt: new Date().toISOString(),
       sounds: packagedSounds,
+      videoClips: packagedClips,
       settings,
     };
 
@@ -1256,7 +1299,7 @@ ipcMain.handle('export-soundboard-backup', async (_event, liveSounds) => {
   }
 });
 
-// Import Backup (Extracts audio files to AUDIO_DIR and restores sounds & settings from .prism)
+// Import Backup (Extracts audio and video files, restores sounds, videoClips & settings from .prism)
 ipcMain.handle('import-soundboard-backup', async () => {
   try {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
@@ -1272,7 +1315,7 @@ ipcMain.handle('import-soundboard-backup', async () => {
 
     const selectedFile = filePaths[0];
 
-    // Handle .prism (Zip bundle containing audio/ directory + manifest.json)
+    // Handle .prism (Zip bundle containing audio/ + videos/ directory + manifest.json)
     if (selectedFile.endsWith('.prism') || selectedFile.endsWith('.zip')) {
       const zip = new AdmZip(selectedFile);
       const manifestEntry = zip.getEntry('manifest.json');
@@ -1288,14 +1331,23 @@ ipcMain.handle('import-soundboard-backup', async () => {
       if (!fs.existsSync(AUDIO_DIR)) {
         fs.mkdirSync(AUDIO_DIR, { recursive: true });
       }
+      if (!fs.existsSync(VIDEOS_DIR)) {
+        fs.mkdirSync(VIDEOS_DIR, { recursive: true });
+      }
 
-      // Extract all audio entries to AUDIO_DIR
+      // Extract all audio and video entries
       const entries = zip.getEntries();
       for (const entry of entries) {
-        if (!entry.isDirectory && (entry.entryName.startsWith('audio/') || entry.entryName.startsWith('audio\\'))) {
-          const fileName = path.basename(entry.entryName);
-          const destPath = path.join(AUDIO_DIR, fileName);
-          fs.writeFileSync(destPath, entry.getData());
+        if (!entry.isDirectory) {
+          if (entry.entryName.startsWith('audio/') || entry.entryName.startsWith('audio\\')) {
+            const fileName = path.basename(entry.entryName);
+            const destPath = path.join(AUDIO_DIR, fileName);
+            fs.writeFileSync(destPath, entry.getData());
+          } else if (entry.entryName.startsWith('videos/') || entry.entryName.startsWith('videos\\')) {
+            const fileName = path.basename(entry.entryName);
+            const destPath = path.join(VIDEOS_DIR, fileName);
+            fs.writeFileSync(destPath, entry.getData());
+          }
         }
       }
 
@@ -1312,6 +1364,29 @@ ipcMain.handle('import-soundboard-backup', async () => {
         return item;
       });
 
+      // Re-point video clips to absolute paths on the local system
+      let restoredClips = [];
+      if (Array.isArray(manifest.videoClips)) {
+        restoredClips = manifest.videoClips.map((clip) => {
+          const item = { ...clip };
+          if (item.filePath) {
+            const fileName = path.basename(item.filePath);
+            const localVideoPath = path.join(VIDEOS_DIR, fileName);
+            if (fs.existsSync(localVideoPath)) {
+              item.filePath = localVideoPath;
+            }
+          }
+          return item;
+        });
+        fs.writeFileSync(CLIPS_FILE, JSON.stringify(restoredClips, null, 2), 'utf-8');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('video-clips-updated', restoredClips);
+        }
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send('video-clips-updated', restoredClips);
+        }
+      }
+
       fs.writeFileSync(SOUNDS_FILE, JSON.stringify(restoredSounds, null, 2), 'utf-8');
       if (manifest.settings) {
         fs.writeFileSync(SETTINGS_FILE, JSON.stringify(manifest.settings, null, 2), 'utf-8');
@@ -1319,6 +1394,7 @@ ipcMain.handle('import-soundboard-backup', async () => {
 
       return {
         sounds: restoredSounds,
+        videoClips: restoredClips,
         settings: manifest.settings || null,
       };
     }
@@ -1338,6 +1414,13 @@ ipcMain.handle('import-soundboard-backup', async () => {
 
     return {
       sounds: parsed.sounds,
+      settings: parsed.settings || null,
+    };
+  } catch (err) {
+    console.error('Import backup failed:', err);
+    return null;
+  }
+});
       settings: parsed.settings || null,
     };
   } catch (err) {
@@ -2040,7 +2123,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.0';
+    let currentVersion = '1.5.1';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {

@@ -105,7 +105,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   const [isHudYouTubeOpen, setIsHudYouTubeOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'clips' | 'youtube' | 'favorites'>('all');
-  const [sortBy, setSortBy] = useState<'custom' | 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration'>('custom');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration'>('newest');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showClipMenu, setShowClipMenu] = useState(false);
   const [isClipping, setIsClipping] = useState(false);
@@ -195,10 +195,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
       return matchSearch && matchFilter;
     });
 
-    if (sortBy === 'custom') {
-      return result;
-    }
-
     return [...result].sort((a, b) => {
       switch (sortBy) {
         case 'newest':
@@ -218,7 +214,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   }, [sounds, searchQuery, activeFilter, sortBy]);
 
   const sortLabels = {
-    custom: 'Custom Order',
     newest: 'Newest First',
     oldest: 'Oldest First',
     alphabetical: 'Alphabetical (A-Z)',

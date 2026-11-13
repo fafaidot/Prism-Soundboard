@@ -14,6 +14,7 @@ import {
   Repeat,
   Check,
   Disc,
+  X,
 } from 'lucide-react';
 import { SoundItem, ReproductionMode } from '../types';
 import { audioEngine } from '../services/audioEngine';
@@ -40,6 +41,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   onUpdateSound,
   onPlaySound,
   onStartListeningHotkey,
+  onClearHotkey,
   onOpenTrimmer,
   onDeleteSound,
   onDuplicateSound,
@@ -210,28 +212,54 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      {/* Shortcut Button */}
-      <button
-        onClick={onStartListeningHotkey}
-        className={`w-full py-2.5 px-4 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
-          isListeningHotkey
-            ? 'bg-[#ff9500] text-black font-bold animate-pulse'
-            : sound.hotkey
-            ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40'
-            : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-white'
-        }`}
-      >
-        {isListeningHotkey ? (
-          <span>Press Any Key...</span>
-        ) : sound.hotkey ? (
-          <span>Shortcut: {sound.hotkey}</span>
-        ) : (
-          <>
-            <Plus size={13} className="text-[#31C5F4]" />
-            <span>+ Add shortcut</span>
-          </>
-        )}
-      </button>
+      {/* Shortcut Button / Display */}
+      {sound.hotkey ? (
+        <div className="flex items-center gap-1.5 w-full">
+          <button
+            onClick={onStartListeningHotkey}
+            className={`flex-1 py-2 px-3 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              isListeningHotkey
+                ? 'bg-[#ff9500] text-black font-bold animate-pulse'
+                : 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40 hover:bg-[#153c52]'
+            }`}
+            title="Click to rebind shortcut"
+          >
+            {isListeningHotkey ? (
+              <span>Press Key (Del to clear)...</span>
+            ) : (
+              <span className="truncate">Shortcut: {sound.hotkey}</span>
+            )}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClearHotkey();
+            }}
+            className="w-9 h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#ff3b30]/50 hover:bg-[#ff3b30]/10 text-[#8e95a5] hover:text-[#ff453a] flex items-center justify-center transition-all cursor-pointer shrink-0"
+            title="Remove shortcut"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onStartListeningHotkey}
+          className={`w-full py-2.5 px-4 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            isListeningHotkey
+              ? 'bg-[#ff9500] text-black font-bold animate-pulse'
+              : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-white'
+          }`}
+        >
+          {isListeningHotkey ? (
+            <span>Press Any Key...</span>
+          ) : (
+            <>
+              <Plus size={13} className="text-[#31C5F4]" />
+              <span>+ Add shortcut</span>
+            </>
+          )}
+        </button>
+      )}
 
       {/* PLAYBACK Section */}
       <div className="flex flex-col gap-3">
