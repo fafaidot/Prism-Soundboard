@@ -37,7 +37,7 @@ class VideoClipper {
 
   private isBuffering: boolean = false;
   private isExporting: boolean = false;
-  private bufferDurationSeconds: number = 15;
+  private bufferDurationSeconds: number = 30;
 
   private captureWidth: number = 1920;
   private captureHeight: number = 1080;
@@ -55,11 +55,10 @@ class VideoClipper {
   public setDuration(seconds: number) {
     const newDur = Math.max(5, Math.min(120, seconds));
     if (this.bufferDurationSeconds !== newDur) {
+      console.log(`[VideoClipper] Setting buffer duration to ${newDur}s (was ${this.bufferDurationSeconds}s)`);
       this.bufferDurationSeconds = newDur;
-      // Restart the rotation schedule if currently buffering so timers match the new duration
-      if (this.isBuffering && this.combinedStream) {
-        this.resetRotationSchedule();
-      }
+      // Note: We deliberately do NOT wipe or cancel existing slots here.
+      // Any video frames already buffered are safely preserved.
     }
   }
 
@@ -152,7 +151,7 @@ class VideoClipper {
    * Initializes screen capture, mixes system sound + microphone,
    * and begins dual-staggered MediaRecorder replay buffer
    */
-  public async startBuffer(durationSeconds: number = 15): Promise<boolean> {
+  public async startBuffer(durationSeconds: number = 30): Promise<boolean> {
     if (this.isBuffering && this.slots.length > 0) {
       this.setDuration(durationSeconds);
       return true;
@@ -362,54 +361,68 @@ class VideoClipper {
 
     if (!this.combinedStream) return;
 
-    // Start slot A immediately
+    // Start primary slot immediately
     const slotA = this.createSlot();
     this.slots.push(slotA);
 
-    const halfDurationMs = (this.bufferDurationSeconds * 1000) / 2;
+    // Stagger interval: half the buffer duration (e.g. 15s for 30s buffer)
+    const staggerIntervalMs = Math.max(5000, Math.min(15000, (this.bufferDurationSeconds * 1000) / 2));
 
-    // Start slot B after half the buffer duration
+    // Start secondary staggered slot after staggerIntervalMs
     this.slotBTimeout = setTimeout(() => {
       if (!this.isBuffering || !this.combinedStream) return;
       const slotB = this.createSlot();
       this.slots.push(slotB);
+    }, staggerIntervalMs);
 
-      // Begin rotation check every 500ms to precisely cap and rotate slots
-      this.rotationTimer = setInterval(() => {
-        this.checkSlotRotation();
-      }, 500);
-    }, halfDurationMs);
+    // Continuous rotation loop: checks every 1000ms
+    this.rotationTimer = setInterval(() => {
+      this.checkSlotRotation();
+    }, 1000);
   }
 
   /**
-   * Checks slots continuously and rotates whenever a slot reaches the configured bufferDuration
+   * Continuous slot rotation:
+   * Keeps active recording slots overlapping seamlessly.
+   * An older slot is ONLY retired after it has reached (target + staggerInterval),
+   * guaranteeing the younger slot has ALREADY reached the target buffer duration!
    */
   private async checkSlotRotation() {
     if (!this.isBuffering || !this.combinedStream || this.slots.length === 0) return;
 
     const targetMs = this.bufferDurationSeconds * 1000;
+    const staggerIntervalMs = Math.max(5000, Math.min(15000, targetMs / 2));
+    const maxLifespanMs = targetMs + staggerIntervalMs; // e.g. 30s + 15s = 45s
 
+    // 1. Maintain dual-staggered coverage if we only have 1 active slot
+    const activeSlots = this.slots.filter((s) => !s.stopped && s.recorder.state !== 'inactive');
+    if (activeSlots.length === 1) {
+      const elapsed = performance.now() - activeSlots[0].startTime;
+      if (elapsed >= staggerIntervalMs) {
+        const newSlot = this.createSlot();
+        this.slots.push(newSlot);
+      }
+    }
+
+    // 2. Rotate out any slot that has exceeded maxLifespanMs
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
       if (slot.stopped) continue;
 
       const elapsed = performance.now() - slot.startTime;
-      // When a slot reaches the exact target buffer duration, finalize it and start a new replacement slot
-      if (elapsed >= targetMs) {
+      if (elapsed >= maxLifespanMs) {
         try {
           const { blob, durationMs } = await this.stopSlot(slot);
           if (blob.size > 0) {
             this.lastCompletedBlob = blob;
             this.lastCompletedDurationMs = durationMs;
           }
-
-          // Remove stopped slot
           this.slots = this.slots.filter((s) => !s.stopped);
 
-          // Start a replacement slot to maintain dual coverage
-          if (this.isBuffering && this.combinedStream && this.slots.length < 2) {
-            const newSlot = this.createSlot();
-            this.slots.push(newSlot);
+          // Start a replacement slot to maintain continuous overlap
+          if (this.isBuffering && this.combinedStream && this.slots.filter((s) => !s.stopped).length < 2) {
+            const replacement = this.createSlot();
+            this.slots.push(replacement);
           }
         } catch (err) {
           console.warn('[VideoClipper] Rotation error:', err);
@@ -421,7 +434,7 @@ class VideoClipper {
 
   /**
    * Clips the configured seconds from the replay buffer.
-   * Chooses the slot closest to the target duration (e.g. 15s) so the clip length doesn't fluctuate.
+   * Guarantees that once the buffer has warmed up, the clip is ALWAYS at least the full target duration!
    */
   public async clipLastSeconds(title?: string): Promise<{ success: boolean; clip?: any; error?: string }> {
     if (this.isExporting) {
@@ -444,52 +457,56 @@ class VideoClipper {
       this.isExporting = true;
       const targetMs = this.bufferDurationSeconds * 1000;
 
-    // Choose the slot with the longest elapsed recording time (up to target duration + 10%)
-    let bestSlot: RecorderSlot | null = null;
-    let longestElapsed = 0;
+      // Find active slots
+      const activeSlots = this.slots.filter((s) => !s.stopped && s.recorder.state !== 'inactive');
 
-    for (const slot of this.slots) {
-      if (slot.stopped) continue;
-      const elapsed = performance.now() - slot.startTime;
-      if (elapsed > longestElapsed) {
-        longestElapsed = elapsed;
-        bestSlot = slot;
+      let chosenSlot: RecorderSlot | null = null;
+      let chosenElapsed = 0;
+
+      // Case A: Look for a slot that has recorded at least targetMs (e.g. >= 30s)
+      const matureSlots = activeSlots.filter((s) => performance.now() - s.startTime >= targetMs);
+      if (matureSlots.length > 0) {
+        // Pick the mature slot closest to targetMs (so it represents the most recent targetMs)
+        matureSlots.sort((a, b) => (performance.now() - a.startTime) - (performance.now() - b.startTime));
+        chosenSlot = matureSlots[0];
+        chosenElapsed = performance.now() - chosenSlot.startTime;
+      } else {
+        // Case B: Buffer is still warming up, find the longest running active slot
+        for (const slot of activeSlots) {
+          const elapsed = performance.now() - slot.startTime;
+          if (elapsed > chosenElapsed) {
+            chosenElapsed = elapsed;
+            chosenSlot = slot;
+          }
+        }
       }
-    }
 
-    // If the longest active slot is already near the target duration (>= 75% of targetMs)
-    // or if we don't have a completed blob, use the longest slot!
-    if (bestSlot && longestElapsed >= targetMs * 0.75) {
-      const { blob, durationMs } = await this.stopSlot(bestSlot);
+      console.log(
+        `[VideoClipper] Clipping request: target ${this.bufferDurationSeconds}s, ` +
+        `chosen slot: ${(chosenElapsed / 1000).toFixed(1)}s, ` +
+        `active slots count: ${activeSlots.length}`
+      );
+
+      // Guard: If the longest slot has recorded less than 3 seconds (just started),
+      // DO NOT export a 1-second blank black screen!
+      if (!chosenSlot || chosenElapsed < 3000) {
+        return {
+          success: false,
+          error: `Replay buffer is filling up (${Math.round(chosenElapsed / 1000)}s of ${this.bufferDurationSeconds}s). Please wait a few seconds and try again.`,
+        };
+      }
+
+      // Stop the chosen slot and retrieve the recorded video
+      const { blob, durationMs } = await this.stopSlot(chosenSlot);
       this.slots = this.slots.filter((s) => !s.stopped);
+
+      // Immediately start a replacement slot to keep coverage uninterrupted
       if (this.isBuffering && this.combinedStream) {
-        const newSlot = this.createSlot();
-        this.slots.push(newSlot);
+        const replacement = this.createSlot();
+        this.slots.push(replacement);
       }
-      return await this.exportBlob(blob, durationMs, title);
-    }
 
-    // Otherwise, if we have an already completed buffer of the target length, use it
-    if (this.lastCompletedBlob && this.lastCompletedBlob.size > 0) {
-      const blob = this.lastCompletedBlob;
-      const durationMs = this.lastCompletedDurationMs || targetMs;
       return await this.exportBlob(blob, durationMs, title);
-    }
-
-    if (bestSlot) {
-      const { blob, durationMs } = await this.stopSlot(bestSlot);
-      this.slots = this.slots.filter((s) => !s.stopped);
-      if (this.isBuffering && this.combinedStream) {
-        const newSlot = this.createSlot();
-        this.slots.push(newSlot);
-      }
-      return await this.exportBlob(blob, durationMs, title);
-    }
-
-    return {
-      success: false,
-      error: 'Buffer is still filling up. Wait a few more seconds and try again.',
-    };
     } catch (err: any) {
       console.error('[VideoClipper] Export failed:', err);
       return { success: false, error: err.message || 'Unknown export error.' };
@@ -506,11 +523,9 @@ class VideoClipper {
     durationMs: number,
     title?: string
   ): Promise<{ success: boolean; clip?: any; error?: string }> {
-    // Lock duration to configured target seconds if the slot captured at least 70% of the buffer
-    const targetMs = this.bufferDurationSeconds * 1000;
-    const effectiveDurationMs = durationMs >= targetMs * 0.7 ? targetMs : durationMs;
+    const effectiveDurationMs = Math.max(1000, durationMs);
 
-    // Fix WebM duration metadata with the exact duration
+    // Fix WebM duration metadata with the exact recorded duration
     let fixedBlob: Blob;
     try {
       fixedBlob = await fixWebmDuration(rawBlob, effectiveDurationMs);
@@ -559,7 +574,8 @@ class VideoClipper {
    */
   private playClipCueSound() {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioCtx = audioEngine.getAudioContext();
+      if (!audioCtx) return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'sine';

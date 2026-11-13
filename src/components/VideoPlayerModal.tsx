@@ -11,8 +11,6 @@ import {
   Scissors,
   Music,
   FolderOpen,
-  RotateCcw,
-  Check,
 } from 'lucide-react';
 
 interface VideoPlayerModalProps {
@@ -41,6 +39,9 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFillMode, setIsFillMode] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const hideTimerRef = useRef<any>(null);
 
   // Trimming Mode
   const [isTrimming, setIsTrimming] = useState(false);
@@ -48,7 +49,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [trimEnd, setTrimEnd] = useState(clip.duration || 15);
   const [isSavingTrim, setIsSavingTrim] = useState(false);
 
-  const accent = accentColor || 'var(--accent-color, #38bdf8)';
+  const accent = accentColor || '#31C5F4';
 
   // Format mm:ss
   const formatTime = (sec: number) => {
@@ -56,6 +57,28 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const s = Math.floor(sec % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
+
+  const handlePointerActivity = () => {
+    setShowControls(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (isFullscreen && isPlaying) {
+      hideTimerRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 2500);
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      if (!isFull) {
+        setShowControls(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -66,6 +89,9 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         } else {
           onClose();
         }
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
       }
       if (e.key === ' ') {
         e.preventDefault();
@@ -84,6 +110,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
+      setShowControls(true);
     }
   };
 
@@ -132,18 +159,36 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-150 p-6 select-none">
+    <div
+      onMouseMove={handlePointerActivity}
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/95 select-none ${
+        isFullscreen ? 'p-0' : 'p-6 backdrop-blur-xl animate-in fade-in duration-150'
+      }`}
+    >
       <div
         ref={containerRef}
-        className="relative w-full max-w-5xl bg-[#0e1017] border border-[#232738] rounded-[20px] overflow-hidden flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.9)] max-h-[92vh]"
+        onMouseMove={handlePointerActivity}
+        className={`relative w-full flex flex-col shadow-2xl transition-all duration-150 ${
+          isFullscreen
+            ? 'w-screen h-screen max-w-none max-h-none rounded-none border-none p-0 m-0 bg-black'
+            : 'max-w-5xl bg-[#0E121A] border border-[#1B222E] rounded-2xl overflow-hidden max-h-[92vh]'
+        }`}
       >
         {/* Top Header Bar */}
-        <div className="h-12 px-5 bg-[#12141d] border-b border-[#1f2333] flex items-center justify-between text-white z-20">
+        <div
+          className={`transition-opacity duration-200 z-30 flex items-center justify-between text-white ${
+            isFullscreen
+              ? `absolute top-0 left-0 right-0 h-16 px-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent ${
+                  showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                }`
+              : 'h-14 px-6 bg-[#0A0D14] border-b border-[#151B25] relative z-20'
+          }`}
+        >
           <div className="flex items-center gap-3">
-            <span className="font-extrabold text-[14px] text-white truncate max-w-md">
+            <span className="font-bold text-[14px] text-white truncate max-w-md tracking-wide">
               {clip.title}
             </span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 font-mono text-[#9da5b7]">
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#123244] border border-[#31C5F4]/30 font-mono font-bold text-[#31C5F4]">
               {formatTime(duration)}
             </span>
           </div>
@@ -151,7 +196,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={onExtractToSoundboard}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-white/5 hover:bg-white/10 text-white text-[12px] font-semibold border border-white/10 hover:border-white/30 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] text-white text-[12px] font-bold border border-[#1B222E] hover:border-[#31C5F4]/40 transition-all cursor-pointer shadow-sm active:scale-95"
             >
               <Music size={13} style={{ color: accent }} />
               <span>Extract to Soundboard</span>
@@ -159,7 +204,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
             <button
               onClick={onOpenFolder}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-white/5 hover:bg-white/10 text-white text-[12px] font-semibold border border-white/10 hover:border-white/30 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] text-white text-[12px] font-bold border border-[#1B222E] hover:border-[#31C5F4]/40 transition-all cursor-pointer shadow-sm active:scale-95"
             >
               <FolderOpen size={13} style={{ color: accent }} />
               <span>Open in Folder</span>
@@ -174,7 +219,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 }
               }}
               style={isTrimming ? { backgroundColor: `${accent}25`, borderColor: accent, color: accent } : undefined}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-white/5 hover:bg-white/10 text-white text-[12px] font-semibold border border-white/10 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] text-white text-[12px] font-bold border border-[#1B222E] hover:border-[#31C5F4]/40 transition-all cursor-pointer shadow-sm active:scale-95"
             >
               <Scissors size={13} />
               <span>Trim</span>
@@ -182,7 +227,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[#8e95a5] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer ml-1"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-white/5 transition-colors cursor-pointer ml-1"
             >
               <X size={16} />
             </button>
@@ -192,7 +237,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         {/* Video Canvas Element */}
         <div
           onClick={togglePlayPause}
-          className="relative flex-1 bg-black flex items-center justify-center cursor-pointer min-h-[360px]"
+          onDoubleClick={toggleFullscreen}
+          className={`relative bg-black flex items-center justify-center cursor-pointer overflow-hidden ${
+            isFullscreen ? 'absolute inset-0 w-full h-full z-10' : 'flex-1 min-h-[360px]'
+          }`}
         >
           <video
             ref={videoRef}
@@ -208,7 +256,11 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             }}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
-            className="w-full max-h-[64vh] object-contain"
+            className={`transition-all duration-150 ${
+              isFullscreen
+                ? `w-full h-full max-h-none max-w-none ${isFillMode ? 'object-cover' : 'object-contain'}`
+                : `w-full max-h-[64vh] ${isFillMode ? 'object-cover' : 'object-contain'}`
+            }`}
           />
 
           {/* Central Play/Pause Flash Overlay */}
@@ -223,20 +275,20 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
         {/* Trimming Controls Pod (When Active) */}
         {isTrimming && (
-          <div className="p-4 bg-[#11131a] border-t border-[#1e2231] space-y-3 animate-in fade-in duration-100">
+          <div className="p-4 bg-[#10141C] border-t border-[#1B222E] space-y-3 animate-in fade-in duration-100 z-30">
             <div className="flex items-center justify-between text-[12px]">
               <span className="text-white font-bold flex items-center gap-1.5">
                 <Scissors size={14} style={{ color: accent }} />
                 <span>Video Trimming Range</span>
               </span>
-              <span className="text-[#38bdf8] font-mono font-bold">
+              <span className="text-[#31C5F4] font-mono font-bold">
                 {formatTime(trimStart)} - {formatTime(trimEnd)} (Length: {(trimEnd - trimStart).toFixed(1)}s)
               </span>
             </div>
 
             <div className="flex items-center gap-4">
               <div className="flex-1 space-y-1">
-                <div className="flex justify-between text-[11px] text-[#7e8697]">
+                <div className="flex justify-between text-[11px] text-[#5a687c]">
                   <span>Start: {formatTime(trimStart)}</span>
                   <span>End: {formatTime(trimEnd)}</span>
                 </div>
@@ -252,7 +304,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                       setTrimStart(v);
                       if (videoRef.current) videoRef.current.currentTime = v;
                     }}
-                    className="w-full accent-[#38bdf8] cursor-pointer"
+                    className="w-full accent-[#31C5F4] cursor-pointer"
                   />
                   <input
                     type="range"
@@ -265,7 +317,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                       setTrimEnd(v);
                       if (videoRef.current) videoRef.current.currentTime = v;
                     }}
-                    className="w-full accent-[#38bdf8] cursor-pointer"
+                    className="w-full accent-[#31C5F4] cursor-pointer"
                   />
                 </div>
               </div>
@@ -274,15 +326,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 <button
                   disabled={isSavingTrim}
                   onClick={() => handleSaveTrim(false)}
-                  className="px-3.5 py-2 rounded-[8px] bg-white/10 hover:bg-white/20 text-white font-bold text-[11.5px] transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] text-white font-bold text-[11.5px] border border-[#1B222E] transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Save (Overwrite)
                 </button>
                 <button
                   disabled={isSavingTrim}
                   onClick={() => handleSaveTrim(true)}
-                  style={{ backgroundColor: accent, color: '#000000' }}
-                  className="px-4 py-2 rounded-[8px] font-bold text-[11.5px] hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl font-bold text-[11.5px] bg-[#31C5F4] text-[#090C12] hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-50"
                 >
                   Save as New Clip
                 </button>
@@ -292,7 +343,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         )}
 
         {/* Video Scrubber & Playback Controls Bar */}
-        <div className="p-4 bg-[#13151f] border-t border-[#1f2333] flex flex-col gap-2.5">
+        <div
+          className={`transition-opacity duration-200 z-30 flex flex-col gap-2.5 ${
+            isFullscreen
+              ? `absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent ${
+                  showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                }`
+              : 'p-4 bg-[#0A0D14] border-t border-[#151B25]'
+          }`}
+        >
           {/* Progress Slider */}
           <div className="relative flex items-center group">
             <input
@@ -302,7 +361,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               step="0.05"
               value={currentTime}
               onChange={handleSeek}
-              className="w-full h-1.5 bg-[#252a3b] rounded-full appearance-none cursor-pointer accent-[#38bdf8] focus:outline-none"
+              className="w-full h-1.5 bg-[#1B222E] rounded-full appearance-none cursor-pointer accent-[#31C5F4] focus:outline-none"
             />
           </div>
 
@@ -311,19 +370,19 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             <div className="flex items-center gap-3">
               <button
                 onClick={togglePlayPause}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] flex items-center justify-center text-white transition-colors cursor-pointer"
               >
                 {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5 fill-white" />}
               </button>
 
               <div className="flex items-center gap-1.5 font-mono text-[12px] font-bold text-white">
                 <span>{formatTime(currentTime)}</span>
-                <span className="text-[#656d81]">/</span>
-                <span className="text-[#8e97aa]">{formatTime(duration)}</span>
+                <span className="text-[#5a687c]">/</span>
+                <span className="text-[#8e95a5]">{formatTime(duration)}</span>
               </div>
 
               {/* Volume Slider */}
-              <div className="flex items-center gap-2 pl-3 border-l border-white/10">
+              <div className="flex items-center gap-2 pl-3 border-l border-[#1B222E]">
                 <button
                   onClick={() => {
                     const newMuted = !isMuted;
@@ -349,17 +408,29 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                       videoRef.current.muted = false;
                     }
                   }}
-                  className="w-20 h-1 bg-[#252a3b] rounded-full appearance-none accent-[#38bdf8] cursor-pointer"
+                  className="w-20 h-1 bg-[#1B222E] rounded-full appearance-none accent-[#31C5F4] cursor-pointer"
                 />
               </div>
             </div>
 
-            {/* Right Controls: Fullscreen */}
+            {/* Right Controls: Fit/Fill Toggle & Fullscreen */}
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setIsFillMode(!isFillMode)}
+                title={isFillMode ? 'Switch to Fit (Letterbox to keep aspect ratio)' : 'Switch to Fill (Edge-to-edge fill without black bars)'}
+                className={`px-2.5 h-9 rounded-xl border flex items-center justify-center gap-1 transition-all cursor-pointer text-[11px] font-bold ${
+                  isFillMode
+                    ? 'bg-[#31C5F4]/20 border-[#31C5F4] text-[#31C5F4]'
+                    : 'bg-[#151B25] hover:bg-[#1B222E] border-[#1B222E] text-white/80 hover:text-white'
+                }`}
+              >
+                <span>{isFillMode ? 'Fill' : 'Fit'}</span>
+              </button>
+
+              <button
                 onClick={toggleFullscreen}
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-white transition-colors cursor-pointer"
+                title={isFullscreen ? 'Exit Fullscreen (Esc / F)' : 'Fullscreen (F)'}
+                className="w-9 h-9 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] flex items-center justify-center text-white transition-colors cursor-pointer"
               >
                 {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>

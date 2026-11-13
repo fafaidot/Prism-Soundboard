@@ -28,7 +28,7 @@ class GlobalKeyHook {
     private static extern IntPtr GetModuleHandle(string lpModuleName);
 
     [DllImport("user32.dll")]
-    private static extern short GetKeyState(int nVirtKey);
+    private static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
     private static extern bool GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
@@ -105,6 +105,11 @@ class GlobalKeyHook {
             case 0x6D: return "NumSub";
             case 0x6E: return "NumDec";
             case 0x6F: return "NumDiv";
+            case 0x14: return "CapsLock";
+            case 0x90: return "NumLock";
+            case 0x91: return "ScrollLock";
+            case 0x2C: return "PrintScreen";
+            case 0x13: return "Pause";
             case 0xBA: return ";";
             case 0xBB: return "=";
             case 0xBC: return ",";
@@ -120,39 +125,70 @@ class GlobalKeyHook {
         }
     }
 
+    private static void SafeWriteLine(string text) {
+        try {
+            Console.WriteLine(text);
+            Console.Out.Flush();
+        } catch {
+            // Silently ignore if pipe was closed
+        }
+    }
+
     private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
         if (nCode >= 0) {
             bool isDown = (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN);
             bool isUp = (wParam == (IntPtr)WM_KEYUP || wParam == (IntPtr)WM_SYSKEYUP);
 
             if (isDown || isUp) {
-                KBDLLHOOKSTRUCT hookStruct = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
-                int vk = hookStruct.vkCode;
+                try {
+                    KBDLLHOOKSTRUCT hookStruct = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+                    int vk = hookStruct.vkCode;
 
-                // Ignore pure modifier presses alone
-                if (vk != 0x10 && vk != 0x11 && vk != 0x12 && vk != 0x5B && vk != 0x5C &&
-                    vk != 0xA0 && vk != 0xA1 && vk != 0xA2 && vk != 0xA3 && vk != 0xA4 && vk != 0xA5) {
-                    
-                    string key = GetKeyName(vk);
-                    if (key != null) {
-                        bool ctrl = (GetKeyState(0x11) & 0x8000) != 0;
-                        bool alt = (GetKeyState(0x12) & 0x8000) != 0;
-                        bool shift = (GetKeyState(0x10) & 0x8000) != 0;
-
-                        StringBuilder sb = new StringBuilder();
-                        if (ctrl) sb.Append("Ctrl+");
-                        if (alt) sb.Append("Alt+");
-                        if (shift) sb.Append("Shift+");
-                        sb.Append(key);
-
-                        string fullKey = sb.ToString();
-                        if (isDown) {
-                            Console.WriteLine("KEY_DOWN:" + fullKey);
-                        } else {
-                            Console.WriteLine("KEY_UP:" + fullKey);
+                    // Handle modifier releases explicitly so chords never get stuck
+                    if (isUp) {
+                        if (vk == 0x11 || vk == 0xA2 || vk == 0xA3) {
+                            SafeWriteLine("KEY_UP:Ctrl");
+                        } else if (vk == 0x12 || vk == 0xA4 || vk == 0xA5) {
+                            SafeWriteLine("KEY_UP:Alt");
+                        } else if (vk == 0x10 || vk == 0xA0 || vk == 0xA1) {
+                            SafeWriteLine("KEY_UP:Shift");
+                        } else if (vk == 0x5B || vk == 0x5C) {
+                            SafeWriteLine("KEY_UP:Win");
                         }
-                        Console.Out.Flush();
                     }
+
+                    // Ignore pure modifier presses alone
+                    if (vk != 0x10 && vk != 0x11 && vk != 0x12 && vk != 0x5B && vk != 0x5C &&
+                        vk != 0xA0 && vk != 0xA1 && vk != 0xA2 && vk != 0xA3 && vk != 0xA4 && vk != 0xA5) {
+                        
+                        string key = GetKeyName(vk);
+                        if (key != null) {
+                            // Use GetAsyncKeyState for real-time physical key states across all applications/games
+                            bool ctrl = (GetAsyncKeyState(0x11) & 0x8000) != 0;
+                            bool alt = (GetAsyncKeyState(0x12) & 0x8000) != 0;
+                            bool shift = (GetAsyncKeyState(0x10) & 0x8000) != 0;
+                            bool win = (GetAsyncKeyState(0x5B) & 0x8000) != 0 || (GetAsyncKeyState(0x5C) & 0x8000) != 0;
+
+                            StringBuilder sb = new StringBuilder();
+                            if (ctrl) sb.Append("Ctrl+");
+                            if (alt) sb.Append("Alt+");
+                            if (shift) sb.Append("Shift+");
+                            if (win) sb.Append("Win+");
+                            sb.Append(key);
+
+                            string fullKey = sb.ToString();
+                            if (isDown) {
+                                SafeWriteLine("KEY_DOWN:" + fullKey);
+                            } else {
+                                SafeWriteLine("KEY_UP:" + fullKey);
+                                if (fullKey != key) {
+                                    SafeWriteLine("KEY_UP:" + key);
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    // Prevent any exception from terminating the low-level hook thread
                 }
             }
         }
@@ -161,10 +197,21 @@ class GlobalKeyHook {
     }
 
     public static void Main(string[] args) {
-        Console.OutputEncoding = Encoding.UTF8;
-        _hookId = SetHook(_proc);
-        Console.WriteLine("READY");
-        Console.Out.Flush();
+        try {
+            Console.OutputEncoding = Encoding.UTF8;
+        } catch {
+            // Safe fallback if console handle is redirected without a console attached
+        }
+
+        try {
+            _hookId = SetHook(_proc);
+            SafeWriteLine("READY");
+        } catch (Exception ex) {
+            try {
+                Console.Error.WriteLine("Error initializing hook: " + ex.Message);
+            } catch {}
+            return;
+        }
 
         MSG msg;
         while (GetMessage(out msg, IntPtr.Zero, 0, 0)) {
@@ -172,7 +219,8 @@ class GlobalKeyHook {
             DispatchMessage(ref msg);
         }
 
-        UnhookWindowsHookEx(_hookId);
+        if (_hookId != IntPtr.Zero) {
+            UnhookWindowsHookEx(_hookId);
+        }
     }
 }
-

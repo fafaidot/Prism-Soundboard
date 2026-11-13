@@ -59,7 +59,7 @@ export interface AudioSettings {
   recordHotkey?: string; // default "F9" (Quick Microphone/System Clip Recording)
   videoClipHotkey?: string; // default "F10" (Instant Replay Video Screen Capture)
   recordDuration?: number; // default 5 (seconds, e.g. 3, 5, 10, 15, 30)
-  videoClipDuration?: number; // default 15 (seconds, e.g. 15, 30, 45, 60)
+  videoClipDuration?: number; // default 30 (seconds, e.g. 15, 30, 45, 60)
   recordSource?: 'all' | 'screen' | 'mic'; // 'all' = screen + mic, 'screen' = raw game/system audio only, 'mic' = voice only
   theme: string; // 'cyber-violet' | 'neon-emerald' | 'electric-cyan' | 'crimson-noir' | 'solar-gold' | 'titanium-slate' | 'dark';
   accentColor: string;
@@ -154,6 +154,8 @@ export interface SoundboardAPI {
   permanentlyDeleteSound?: (soundId: string) => Promise<boolean>;
   exportSoundboardBackup?: (sounds?: SoundItem[], videoClips?: VideoClipItem[]) => Promise<boolean>;
   importSoundboardBackup?: () => Promise<{ sounds: SoundItem[]; videoClips?: VideoClipItem[]; settings?: AudioSettings } | null>;
+  onBackupProgress?: (callback: (progress: { percent: number; stage: string; detail: string }) => void) => () => void;
+  onStorageRelocationProgress?: (callback: (progress: { percent: number; stage: string; detail: string }) => void) => () => void;
   resetAllAppData?: () => Promise<boolean>;
   saveRecordedAudio?: (data: { base64: string; duration: number; title: string }) => Promise<{
     filePath: string;

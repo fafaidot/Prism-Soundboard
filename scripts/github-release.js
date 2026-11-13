@@ -107,7 +107,20 @@ async function run() {
       tag_name: version,
       target_commitish: 'main',
       name: `Prism Soundboard ${version}`,
-      body: `### Prism Soundboard ${version}\n\n- In-app seamless auto-updater with direct download progress\n- Full background gaming & streaming audio routing\n- Global hotkeys & WASAPI low-latency engine\n- Setup installer and standalone executables`,
+      body: `### Prism Soundboard ${version} Release Notes
+
+#### 🎬 Instant Replay & Video Clipper Enhancements
+- **Edge-to-Edge True Fullscreen Video Player:** Removed layout boundary restrictions (\`max-w-5xl\` and \`max-h-[64vh]\`). The player now seamlessly expands to 100% monitor dimensions edge-to-edge.
+- **Fit vs. Fill Screen Toggle:** Added a dedicated toggle in playback controls to switch between Fit (exact aspect ratio) and Fill (zero black bars on ultra-wide or 16:10 monitors).
+- **Auto-Hiding Floating Controls:** Header and scrubber overlay automatically fade out after 2.5 seconds of mouse idle during playback.
+- **Reliable 30s Rolling Replay Buffer:** Resolved slot-wiping on duration checks and extended recorder slot lifespan to guarantee mature slots with full configured footage without 1-second blank clips.
+- **In-Game HUD Video Clipping:** Synchronized durations and wired IPC commands so triggering instant replay from the in-game overlay captures full 30-second clips.
+
+#### 🎛️ Audio Engine & Overlay Modernization
+- **Modern Obsidian & Cyan Palette:** Refined styling across all modal dialogues and submenus to match the core design language.
+- **Waveform Trimmer:** Enhanced progress tracking and trimmer controls for audio precision.
+- **Key Hook Repeat Prevention:** Improved GlobalKeyHook handling so holding a key does not re-trigger sounds repeatedly until released.
+- **JSON Metadata Protection:** Strengthened storage manager checks to preserve soundboard library files upon app startup.`,
       draft: false,
       prerelease: false,
     }

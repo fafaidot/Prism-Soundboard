@@ -2,14 +2,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   Play,
+  Pause,
   Square,
   Scissors,
-  Check,
   RotateCcw,
-  ZoomIn,
-  ZoomOut,
-  SkipBack,
-  SkipForward,
+  Repeat,
+  Plus,
+  Minus,
+  Check,
+  CopyPlus,
+  Volume2,
 } from 'lucide-react';
 import { SoundItem } from '../types';
 
@@ -19,7 +21,10 @@ interface AudioTrimmerModalProps {
   onClose: () => void;
   accentColor: string;
   onSaveTrim: (soundId: string, trimStart: number, trimEnd: number) => void;
+  onSaveAsNewTrim?: (soundId: string, trimStart: number, trimEnd: number) => void;
 }
+
+const TOTAL_BARS = 120;
 
 export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
   sound,
@@ -27,33 +32,31 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
   onClose,
   accentColor,
   onSaveTrim,
+  onSaveAsNewTrim,
 }) => {
   const [duration, setDuration] = useState<number>(0);
   const [trimStart, setTrimStart] = useState<number>(0);
   const [trimEnd, setTrimEnd] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isPlayingFull, setIsPlayingFull] = useState<boolean>(false);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isLoadingWaveform, setIsLoadingWaveform] = useState<boolean>(true);
   const [dragMode, setDragMode] = useState<'start' | 'end' | 'window' | null>(null);
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [scrollOffset, setScrollOffset] = useState<number>(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const waveformContainerRef = useRef<HTMLDivElement | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const waveformRef = useRef<HTMLDivElement | null>(null);
   const animFrameRef = useRef<number>(0);
-  const dragStartData = useRef<{ mouseX: number; initialStart: number; initialEnd: number; initialScroll: number }>({
-    mouseX: 0,
+  const dragStartRef = useRef<{ clientX: number; initialStart: number; initialEnd: number }>({
+    clientX: 0,
     initialStart: 0,
     initialEnd: 0,
-    initialScroll: 0,
   });
 
-  const TOTAL_BARS = 200;
-  const accent = accentColor || 'var(--accent-color, #8b5cf6)';
+  const accent = accentColor || '#31C5F4';
 
-  // Decode audio file and extract waveform peaks
+  // Decode audio peaks for the waveform & obtain high-precision duration
   useEffect(() => {
     if (!sound || !isOpen) return;
 
@@ -89,6 +92,16 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
           return;
         }
 
+        const exactDur = audioBuffer.duration;
+        if (exactDur > 0 && isFinite(exactDur)) {
+          setDuration(exactDur);
+          const initStart = sound.trimStart && sound.trimStart < exactDur ? sound.trimStart : 0;
+          const initEnd = sound.trimEnd && sound.trimEnd > initStart && sound.trimEnd <= exactDur ? sound.trimEnd : exactDur;
+          setTrimStart(Math.round(initStart * 100) / 100);
+          setTrimEnd(Math.round(initEnd * 100) / 100);
+          setCurrentTime(initStart);
+        }
+
         const rawData = audioBuffer.getChannelData(0);
         const blockSize = Math.floor(rawData.length / TOTAL_BARS);
         const peaks: number[] = [];
@@ -97,7 +110,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
           const start = i * blockSize;
           const end = Math.min(start + blockSize, rawData.length);
           let peak = 0;
-          for (let j = start; j < end; j += 2) {
+          for (let j = start; j < end; j += 4) {
             const val = Math.abs(rawData[j]);
             if (val > peak) peak = val;
           }
@@ -105,7 +118,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
         }
 
         const maxPeak = Math.max(...peaks, 0.05);
-        const normalized = peaks.map((p) => Math.max(0.06, Math.min(1.0, p / maxPeak)));
+        const normalized = peaks.map((p) => Math.max(0.12, Math.min(1.0, p / maxPeak)));
 
         if (!isCancelled) {
           setWaveformData(normalized);
@@ -113,9 +126,8 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
         }
         tempCtx.close().catch(() => {});
       } catch (err) {
-        console.warn('Waveform decode fallback:', err);
         if (!isCancelled) {
-          const fallback = Array.from({ length: TOTAL_BARS }, (_, i) => 0.15 + 0.65 * Math.abs(Math.sin(i * 0.12)));
+          const fallback = Array.from({ length: TOTAL_BARS }, (_, i) => 0.2 + 0.6 * Math.abs(Math.sin(i * 0.15)));
           setWaveformData(fallback);
           setIsLoadingWaveform(false);
         }
@@ -123,142 +135,218 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     };
 
     decodeWaveform();
-    return () => { isCancelled = true; };
+    return () => {
+      isCancelled = true;
+    };
   }, [sound, isOpen]);
 
-  // Load audio element
+  // Audio element setup and playback sync
   useEffect(() => {
-    if (sound && isOpen) {
-      const audio = new Audio(sound.audioData || sound.audioPath);
-      audioRef.current = audio;
+    if (!sound || !isOpen) return;
 
-      audio.onloadedmetadata = () => {
-        const d = audio.duration || sound.duration || 10;
-        setDuration(d);
-        setTrimStart(sound.trimStart || 0);
-        setTrimEnd(sound.trimEnd && sound.trimEnd <= d ? sound.trimEnd : d);
-        setCurrentTime(sound.trimStart || 0);
-        setZoomLevel(1);
-        setScrollOffset(0);
-      };
-
-      audio.onended = () => {
-        setIsPlaying(false);
-      };
-
-      return () => {
-        audio.pause();
-        audioRef.current = null;
-      };
+    let src = sound.audioData || sound.audioPath;
+    if (src && !src.startsWith('data:') && !src.startsWith('http') && !src.startsWith('file:')) {
+      src = 'file:///' + src.replace(/\\/g, '/');
     }
-  }, [sound, isOpen]);
 
-  // High-precision playhead via requestAnimationFrame
-  const updatePlayhead = useCallback(() => {
+    const audio = new Audio(src);
+    audioRef.current = audio;
+
+    const onLoaded = () => {
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+        setDuration((prev) => (prev > 0 ? prev : audio.duration));
+      }
+    };
+
+    const onTimeUpdate = () => {
+      if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+      }
+    };
+
+    audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('timeupdate', onTimeUpdate);
+
+    audio.onended = () => {
+      if (isLooping && !isPlayingFull) {
+        audio.currentTime = trimStart;
+        audio.play().catch(() => {});
+      } else {
+        setIsPlaying(false);
+        setIsPlayingFull(false);
+        setCurrentTime(trimStart);
+      }
+    };
+
+    return () => {
+      audio.pause();
+      audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audioRef.current = null;
+    };
+  }, [sound, isOpen, isLooping, isPlayingFull, trimStart]);
+
+  // Precision playhead animation loop
+  const checkPlayback = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || audio.paused) return;
 
     const time = audio.currentTime;
     setCurrentTime(time);
 
-    if (trimEnd > 0 && time >= trimEnd) {
-      audio.pause();
-      setIsPlaying(false);
-      audio.currentTime = trimStart;
-      setCurrentTime(trimStart);
-      return;
+    // If auditing the trimmed range, stop or loop when trimEnd is reached
+    if (!isPlayingFull && trimEnd > 0 && time >= trimEnd) {
+      if (isLooping) {
+        audio.currentTime = trimStart;
+        setCurrentTime(trimStart);
+        animFrameRef.current = requestAnimationFrame(checkPlayback);
+        return;
+      } else {
+        audio.pause();
+        setIsPlaying(false);
+        audio.currentTime = trimStart;
+        setCurrentTime(trimStart);
+        return;
+      }
     }
 
-    animFrameRef.current = requestAnimationFrame(updatePlayhead);
-  }, [trimStart, trimEnd]);
+    animFrameRef.current = requestAnimationFrame(checkPlayback);
+  }, [trimStart, trimEnd, isLooping, isPlayingFull]);
 
   useEffect(() => {
-    if (isPlaying) {
-      animFrameRef.current = requestAnimationFrame(updatePlayhead);
+    if (isPlaying || isPlayingFull) {
+      animFrameRef.current = requestAnimationFrame(checkPlayback);
     }
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isPlaying, updatePlayhead]);
+  }, [isPlaying, isPlayingFull, checkPlayback]);
 
-  // Drag handlers
+  // Drag logic for Start Handle, End Handle, and Middle Window
   useEffect(() => {
     if (!dragMode) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!waveformContainerRef.current || duration <= 0) return;
-      const rect = waveformContainerRef.current.getBoundingClientRect();
-      const deltaX = e.clientX - dragStartData.current.mouseX;
-      // Account for zoom: visible duration is duration/zoomLevel
-      const visibleDuration = duration / zoomLevel;
-      const deltaTime = (deltaX / rect.width) * visibleDuration;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!waveformRef.current || duration <= 0) return;
+      const rect = waveformRef.current.getBoundingClientRect();
+      const deltaX = e.clientX - dragStartRef.current.clientX;
+      const deltaTime = (deltaX / rect.width) * duration;
 
       if (dragMode === 'start') {
-        const newStart = Math.max(
-          0,
-          Math.min(dragStartData.current.initialEnd - 0.05, dragStartData.current.initialStart + deltaTime)
-        );
-        setTrimStart(Math.round(newStart * 1000) / 1000);
-        if (audioRef.current) {
-          audioRef.current.currentTime = newStart;
-          setCurrentTime(newStart);
+        const newStart = Math.max(0, Math.min(dragStartRef.current.initialEnd - 0.1, dragStartRef.current.initialStart + deltaTime));
+        const rounded = Math.round(newStart * 100) / 100;
+        setTrimStart(rounded);
+        if (audioRef.current && !isPlaying) {
+          audioRef.current.currentTime = rounded;
+          setCurrentTime(rounded);
         }
       } else if (dragMode === 'end') {
-        const newEnd = Math.min(
-          duration,
-          Math.max(dragStartData.current.initialStart + 0.05, dragStartData.current.initialEnd + deltaTime)
-        );
-        setTrimEnd(Math.round(newEnd * 1000) / 1000);
+        const newEnd = Math.min(duration, Math.max(dragStartRef.current.initialStart + 0.1, dragStartRef.current.initialEnd + deltaTime));
+        const rounded = Math.round(newEnd * 100) / 100;
+        setTrimEnd(rounded);
       } else if (dragMode === 'window') {
-        const windowDuration = dragStartData.current.initialEnd - dragStartData.current.initialStart;
-        let newStart = dragStartData.current.initialStart + deltaTime;
-        let newEnd = dragStartData.current.initialEnd + deltaTime;
+        const span = dragStartRef.current.initialEnd - dragStartRef.current.initialStart;
+        let newStart = dragStartRef.current.initialStart + deltaTime;
+        let newEnd = dragStartRef.current.initialEnd + deltaTime;
 
         if (newStart < 0) {
           newStart = 0;
-          newEnd = windowDuration;
-        }
-        if (newEnd > duration) {
+          newEnd = span;
+        } else if (newEnd > duration) {
           newEnd = duration;
-          newStart = Math.max(0, duration - windowDuration);
+          newStart = Math.max(0, duration - span);
         }
 
-        setTrimStart(Math.round(newStart * 1000) / 1000);
-        setTrimEnd(Math.round(newEnd * 1000) / 1000);
+        setTrimStart(Math.round(newStart * 100) / 100);
+        setTrimEnd(Math.round(newEnd * 100) / 100);
       }
     };
 
-    const handleMouseUp = () => setDragMode(null);
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+    const onMouseUp = () => {
+      setDragMode(null);
     };
-  }, [dragMode, duration, zoomLevel]);
 
-  // Scroll to keep selection visible when zoomed
-  useEffect(() => {
-    if (zoomLevel > 1 && scrollContainerRef.current) {
-      const midPoint = ((trimStart + trimEnd) / 2 / duration) * 100 * zoomLevel;
-      const containerWidth = scrollContainerRef.current.clientWidth;
-      const scrollTarget = (midPoint / 100) * containerWidth - containerWidth / 2;
-      scrollContainerRef.current.scrollLeft = Math.max(0, scrollTarget);
-    }
-  }, [zoomLevel]);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [dragMode, duration, isPlaying]);
 
   if (!isOpen || !sound) return null;
 
-  const handleTogglePlay = () => {
-    if (!audioRef.current) return;
+  // Formatting helpers
+  const formatTime = (secs: number): string => {
+    if (isNaN(secs) || secs < 0) secs = 0;
+    const mins = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    const ms = Math.floor((secs % 1) * 1000);
+    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+  };
+
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragMode || !waveformRef.current || duration <= 0) return;
+    const rect = waveformRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickRatio = Math.max(0, Math.min(1, clickX / rect.width));
+    const seekTime = Math.round(clickRatio * duration * 100) / 100;
+
+    setCurrentTime(seekTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = seekTime;
+    }
+  };
+
+  // Play / Pause Trimmed Selection
+  const handleTogglePlayTrim = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.currentTime = trimStart;
+      setIsPlayingFull(false);
+      audio.currentTime = trimStart;
       setCurrentTime(trimStart);
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(console.warn);
+      audio.play().then(() => setIsPlaying(true)).catch(() => {});
+    }
+  };
+
+  // Play / Pause Full Audio
+  const handleTogglePlayFull = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlayingFull) {
+      audio.pause();
+      setIsPlayingFull(false);
+    } else {
+      setIsPlaying(false);
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      audio.play().then(() => setIsPlayingFull(true)).catch(() => {});
+    }
+  };
+
+  const handleStop = () => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = trimStart;
+    }
+    setIsPlaying(false);
+    setIsPlayingFull(false);
+    setCurrentTime(trimStart);
+  };
+
+  const handleReset = () => {
+    setTrimStart(0);
+    setTrimEnd(duration);
+    setCurrentTime(0);
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
     }
   };
 
@@ -268,118 +356,41 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     onClose();
   };
 
-  // Format time as MM:SS.mmm
-  const formatTime = (secs: number): string => {
-    const mins = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    const ms = Math.floor((secs % 1) * 1000);
-    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-  };
-
-  const formatShortTime = (secs: number): string => {
-    const mins = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // Parse time input (MM:SS.mmm or MM:SS,mm or MM:SS)
-  const parseTimeInput = (input: string): number | null => {
-    const clean = input.replace(',', '.');
-    const parts = clean.split(':');
-    if (parts.length === 2) {
-      const mins = parseInt(parts[0], 10);
-      const secParts = parts[1].split('.');
-      const secs = parseInt(secParts[0], 10);
-      const ms = secParts[1] ? parseInt(secParts[1].padEnd(3, '0').slice(0, 3), 10) : 0;
-      if (!isNaN(mins) && !isNaN(secs) && !isNaN(ms)) {
-        return mins * 60 + secs + ms / 1000;
-      }
-    }
-    const num = parseFloat(clean);
-    if (!isNaN(num)) return num;
-    return null;
-  };
-
-  const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (dragMode || !waveformContainerRef.current || duration <= 0) return;
-    const rect = waveformContainerRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    // Account for zoom and scroll
-    const visibleStart = scrollOffset / duration;
-    const visibleDuration = 1 / zoomLevel;
-    const targetTime = (visibleStart + ratio * visibleDuration) * duration;
-    const clamped = Math.max(0, Math.min(duration, targetTime));
-    setCurrentTime(clamped);
-    if (audioRef.current) {
-      audioRef.current.currentTime = clamped;
-    }
-  };
-
-  // Zoom-aware positions
-  const visibleStartTime = scrollOffset;
-  const visibleEndTime = scrollOffset + duration / zoomLevel;
-  const visibleDuration = visibleEndTime - visibleStartTime;
-
-  const timeToPercent = (t: number) => ((t - visibleStartTime) / visibleDuration) * 100;
-
-  const startPercent = Math.max(0, timeToPercent(trimStart));
-  const endPercent = Math.min(100, timeToPercent(trimEnd));
-  const widthPercent = Math.max(0.5, endPercent - startPercent);
-  const playheadPercent = timeToPercent(currentTime);
-  const selectionDuration = Math.max(0, trimEnd - trimStart);
-
-  // Visible bar range for zoom
-  const barStartIdx = Math.floor((visibleStartTime / duration) * TOTAL_BARS);
-  const barEndIdx = Math.ceil((visibleEndTime / duration) * TOTAL_BARS);
-  const visibleBars = waveformData.slice(Math.max(0, barStartIdx), Math.min(TOTAL_BARS, barEndIdx));
-
-  const nudgeAmount = Math.max(0.01, duration / 1000); // ~1ms nudge steps
-
-  const handleZoomIn = () => {
-    const newZoom = Math.min(16, zoomLevel * 2);
-    // Center zoom on the selection midpoint
-    const mid = (trimStart + trimEnd) / 2;
-    const newVisibleDuration = duration / newZoom;
-    setScrollOffset(Math.max(0, Math.min(duration - newVisibleDuration, mid - newVisibleDuration / 2)));
-    setZoomLevel(newZoom);
-  };
-
-  const handleZoomOut = () => {
-    const newZoom = Math.max(1, zoomLevel / 2);
-    if (newZoom === 1) {
-      setScrollOffset(0);
+  const handleSaveAsNew = () => {
+    if (audioRef.current) audioRef.current.pause();
+    if (onSaveAsNewTrim) {
+      onSaveAsNewTrim(sound.id, trimStart, trimEnd);
     } else {
-      const mid = (trimStart + trimEnd) / 2;
-      const newVisibleDuration = duration / newZoom;
-      setScrollOffset(Math.max(0, Math.min(duration - newVisibleDuration, mid - newVisibleDuration / 2)));
+      onSaveTrim(sound.id, trimStart, trimEnd);
     }
-    setZoomLevel(newZoom);
+    onClose();
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    if (zoomLevel <= 1) return;
-    e.preventDefault();
-    const visibleDur = duration / zoomLevel;
-    const step = visibleDur * 0.1;
-    setScrollOffset((prev) => Math.max(0, Math.min(duration - visibleDur, prev + (e.deltaY > 0 ? step : -step))));
-  };
+  const trimmedLength = Math.max(0, trimEnd - trimStart);
+  const startPercent = duration > 0 ? (trimStart / duration) * 100 : 0;
+  const endPercent = duration > 0 ? (trimEnd / duration) * 100 : 100;
+  const playheadPercent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl bg-[#13151b] border border-[#252834] rounded-[16px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden select-none">
-        {/* Header */}
-        <div className="px-5 py-3.5 border-b border-[#252834] flex items-center justify-between bg-[#0f1117]">
-          <div className="flex items-center gap-2.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none">
+      <div className="w-full max-w-3xl bg-[#0E121A] border border-[#1E2636] rounded-2xl shadow-2xl flex flex-col overflow-hidden select-none">
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-[#1A2230] flex items-center justify-between bg-[#121722]">
+          <div className="flex items-center gap-3">
             <div
-              className="w-8 h-8 rounded-[10px] flex items-center justify-center"
-              style={{ backgroundColor: `${accent}20`, color: accent }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-black"
+              style={{ backgroundColor: accent }}
             >
-              <Scissors size={16} />
+              <Scissors size={20} className="text-black" />
             </div>
             <div>
-              <h2 className="text-[14px] font-bold text-white">Audio Trimmer</h2>
-              <p className="text-[11px] text-[#6b7280] truncate max-w-sm">{sound.title}</p>
+              <h2 className="text-[15px] font-bold text-white flex items-center gap-2">
+                Audio Trimmer
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#1B2230] text-[#71829B] border border-[#252E40]">
+                  {formatTime(duration)}
+                </span>
+              </h2>
+              <p className="text-[12px] text-[#6A7890] truncate max-w-md">{sound.title}</p>
             </div>
           </div>
           <button
@@ -387,378 +398,328 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
               if (audioRef.current) audioRef.current.pause();
               onClose();
             }}
-            className="p-1.5 rounded-lg text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-[#6A7890] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <X size={17} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-5 bg-[#13151b] flex flex-col gap-4">
-          {/* Time Display */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Current playback time */}
-              <div className="text-[13px] font-mono text-[#6b7280]">
-                <span className="text-white font-bold">{formatTime(currentTime)}</span>
-              </div>
+        {/* Modal Body */}
+        <div className="p-6 flex flex-col gap-5 bg-[#0E121A]">
+          {/* Top Info Badge Row */}
+          <div className="flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-2 text-[#7E8DA5]">
+              <span>Current:</span>
+              <span className="text-white font-bold">{formatTime(currentTime)}</span>
             </div>
-            {/* Selection duration */}
             <div
-              className="px-3 py-1 rounded-[8px] text-[13px] font-mono font-bold"
-              style={{ backgroundColor: `${accent}15`, color: accent }}
+              className="px-3 py-1 rounded-lg font-bold flex items-center gap-2 border"
+              style={{
+                backgroundColor: `${accent}15`,
+                borderColor: `${accent}40`,
+                color: accent,
+              }}
             >
-              {formatTime(selectionDuration)}
+              <span>Trimmed Span:</span>
+              <span className="text-white font-mono">{trimmedLength.toFixed(2)}s</span>
             </div>
           </div>
 
-          {/* Waveform */}
-          <div className="relative">
-            {/* Zoom controls */}
-            <div className="absolute -top-0.5 right-0 flex items-center gap-1 z-40">
-              <button
-                onClick={handleZoomOut}
-                disabled={zoomLevel <= 1}
-                className="p-1 rounded-md text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-default"
-                title="Zoom out"
-              >
-                <ZoomOut size={14} />
-              </button>
-              <span className="text-[10px] font-mono text-[#6b7280] min-w-[28px] text-center">
-                {zoomLevel}x
-              </span>
-              <button
-                onClick={handleZoomIn}
-                disabled={zoomLevel >= 16}
-                className="p-1 rounded-md text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-default"
-                title="Zoom in"
-              >
-                <ZoomIn size={14} />
-              </button>
-            </div>
-
-            {/* Waveform track */}
-            <div
-              ref={waveformContainerRef}
-              onClick={handleWaveformClick}
-              onWheel={handleWheel}
-              className="relative w-full h-24 bg-[#0a0c10] rounded-[12px] border border-[#1e2030] flex items-center overflow-hidden cursor-pointer mt-5"
-              style={{ padding: '0 2px' }}
-            >
+          {/* Interactive Waveform Track */}
+          <div
+            ref={waveformRef}
+            onClick={handleTrackClick}
+            className="relative w-full h-28 bg-[#090C12] rounded-2xl border border-[#1C2333] overflow-hidden cursor-crosshair group flex items-center"
+          >
+            {/* Waveform Bars (Clean flat rendering without fuzzy glows) */}
+            <div className="w-full h-full flex items-center justify-between gap-[2px] px-2 pointer-events-none">
               {isLoadingWaveform ? (
-                <div className="w-full flex items-center justify-center gap-2 text-[#6b7280]">
-                  <div
-                    className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
-                    style={{ borderColor: accent, borderTopColor: 'transparent' }}
-                  />
-                  <span className="text-[11px] font-mono">Analyzing waveform...</span>
+                <div className="w-full flex items-center justify-center text-[#5A6880] text-xs">
+                  <span>Analyzing audio waveform...</span>
                 </div>
               ) : (
-                <>
-                  {/* Waveform bars */}
-                  <div className="absolute inset-0 flex items-center px-1" style={{ gap: '1px' }}>
-                    {visibleBars.map((peak, idx) => {
-                      const globalIdx = barStartIdx + idx;
-                      const barTime = (globalIdx / TOTAL_BARS) * duration;
-                      const isInsideTrim = barTime >= trimStart && barTime <= trimEnd;
-                      const isBeforePlayhead = barTime <= currentTime && isInsideTrim;
-                      const heightPercent = Math.max(8, Math.round(peak * 88));
+                waveformData.map((peak, idx) => {
+                  const barPercent = (idx / TOTAL_BARS) * 100;
+                  const isInsideTrim = barPercent >= startPercent && barPercent <= endPercent;
 
-                      let barColor = '#2a2d3a';
-                      if (isInsideTrim) {
-                        barColor = isBeforePlayhead ? accent : `${accent}80`;
-                      }
-
-                      return (
-                        <div
-                          key={globalIdx}
-                          className="flex-1 rounded-full transition-colors duration-75"
-                          style={{
-                            height: `${heightPercent}%`,
-                            backgroundColor: barColor,
-                            minWidth: '1px',
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Selection overlay with handles */}
-                  {startPercent < 100 && endPercent > 0 && (
+                  return (
                     <div
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setDragMode('window');
-                        dragStartData.current = {
-                          mouseX: e.clientX,
-                          initialStart: trimStart,
-                          initialEnd: trimEnd,
-                          initialScroll: scrollOffset,
-                        };
-                      }}
-                      className="absolute top-0 bottom-0 z-20 cursor-grab active:cursor-grabbing flex items-stretch"
+                      key={idx}
+                      className="w-[3px] rounded-full flex-shrink-0"
                       style={{
-                        left: `${Math.max(0, startPercent)}%`,
-                        width: `${widthPercent}%`,
+                        height: `${Math.max(12, peak * 90)}%`,
+                        backgroundColor: isInsideTrim
+                          ? accent
+                          : 'rgba(255, 255, 255, 0.15)',
                       }}
-                    >
-                      {/* Top/bottom borders */}
-                      <div
-                        className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
-                        style={{ backgroundColor: accent }}
-                      />
-                      <div
-                        className="absolute inset-x-0 bottom-0 h-[2px] rounded-b-sm"
-                        style={{ backgroundColor: accent }}
-                      />
-
-                      {/* Left handle */}
-                      <div
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          setDragMode('start');
-                          dragStartData.current = {
-                            mouseX: e.clientX,
-                            initialStart: trimStart,
-                            initialEnd: trimEnd,
-                            initialScroll: scrollOffset,
-                          };
-                        }}
-                        className="w-3 h-full flex items-center justify-center cursor-ew-resize rounded-l-[6px] hover:brightness-125 transition-all -ml-[1px] shrink-0"
-                        style={{ backgroundColor: accent }}
-                        title="Drag start point"
-                      >
-                        <div className="w-[2px] h-4 bg-black/40 rounded-full" />
-                      </div>
-
-                      {/* Middle transparent grab area */}
-                      <div className="flex-1" />
-
-                      {/* Right handle */}
-                      <div
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          setDragMode('end');
-                          dragStartData.current = {
-                            mouseX: e.clientX,
-                            initialStart: trimStart,
-                            initialEnd: trimEnd,
-                            initialScroll: scrollOffset,
-                          };
-                        }}
-                        className="w-3 h-full flex items-center justify-center cursor-ew-resize rounded-r-[6px] hover:brightness-125 transition-all -mr-[1px] shrink-0"
-                        style={{ backgroundColor: accent }}
-                        title="Drag end point"
-                      >
-                        <div className="w-[2px] h-4 bg-black/40 rounded-full" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dark masks for unselected regions */}
-                  {startPercent > 0 && (
-                    <div
-                      className="absolute top-0 bottom-0 left-0 bg-black/55 pointer-events-none z-10"
-                      style={{ width: `${startPercent}%` }}
                     />
-                  )}
-                  {endPercent < 100 && (
-                    <div
-                      className="absolute top-0 bottom-0 right-0 bg-black/55 pointer-events-none z-10"
-                      style={{ width: `${Math.max(0, 100 - endPercent)}%` }}
-                    />
-                  )}
-
-                  {/* Playhead */}
-                  {duration > 0 && playheadPercent >= 0 && playheadPercent <= 100 && (
-                    <div
-                      className="absolute top-0 bottom-0 pointer-events-none z-30 flex flex-col items-center"
-                      style={{ left: `${playheadPercent}%` }}
-                    >
-                      <div className="w-[2px] h-full bg-white" />
-                      <div className="absolute -top-0.5 w-2 h-2 rounded-full bg-white shadow-md" />
-                    </div>
-                  )}
-                </>
+                  );
+                })
               )}
             </div>
 
-            {/* Time ruler below waveform */}
-            <div className="flex items-center justify-between text-[10px] font-mono text-[#4a4f63] px-1 mt-1.5">
-              <span>{formatShortTime(visibleStartTime)}</span>
-              <span>{formatShortTime(visibleStartTime + visibleDuration * 0.25)}</span>
-              <span>{formatShortTime(visibleStartTime + visibleDuration * 0.5)}</span>
-              <span>{formatShortTime(visibleStartTime + visibleDuration * 0.75)}</span>
-              <span>{formatShortTime(visibleEndTime)}</span>
-            </div>
-          </div>
+            {/* Left Out-of-Bounds Shroud */}
+            <div
+              className="absolute top-0 bottom-0 left-0 bg-black/60 pointer-events-none border-r border-white/10"
+              style={{ width: `${startPercent}%` }}
+            />
 
-          {/* Precise trim inputs */}
-          <div className="flex items-center gap-3">
-            {/* Start time */}
-            <div className="flex-1 flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#6b7280] uppercase tracking-wider">Start</label>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setTrimStart(Math.max(0, trimStart - nudgeAmount))}
-                  className="p-1 rounded-md text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Nudge start earlier"
-                >
-                  <SkipBack size={12} />
-                </button>
-                <input
-                  type="text"
-                  value={formatTime(trimStart)}
-                  onChange={(e) => {
-                    const parsed = parseTimeInput(e.target.value);
-                    if (parsed !== null && parsed >= 0 && parsed < trimEnd) {
-                      setTrimStart(Math.round(parsed * 1000) / 1000);
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const parsed = parseTimeInput(e.target.value);
-                    if (parsed !== null && parsed >= 0 && parsed < trimEnd) {
-                      setTrimStart(Math.round(parsed * 1000) / 1000);
-                      if (audioRef.current) {
-                        audioRef.current.currentTime = parsed;
-                        setCurrentTime(parsed);
-                      }
-                    }
-                  }}
-                  className="flex-1 bg-[#0a0c10] border border-[#1e2030] rounded-[8px] px-2.5 py-1.5 text-[12px] font-mono text-white text-center focus:outline-none focus:ring-1 transition-all"
-                  style={{ ['--tw-ring-color' as string]: accent } as React.CSSProperties}
-                />
-                <button
-                  onClick={() => setTrimStart(Math.min(trimEnd - 0.05, trimStart + nudgeAmount))}
-                  className="p-1 rounded-md text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Nudge start later"
-                >
-                  <SkipForward size={12} />
-                </button>
-              </div>
-            </div>
+            {/* Right Out-of-Bounds Shroud */}
+            <div
+              className="absolute top-0 bottom-0 right-0 bg-black/60 pointer-events-none border-l border-white/10"
+              style={{ width: `${100 - endPercent}%` }}
+            />
 
-            {/* Divider */}
-            <div className="h-8 w-px bg-[#1e2030] mt-5" />
+            {/* Middle Draggable Selection Window */}
+            <div
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                dragStartRef.current = {
+                  clientX: e.clientX,
+                  initialStart: trimStart,
+                  initialEnd: trimEnd,
+                };
+                setDragMode('window');
+              }}
+              title="Drag selection window"
+              className="absolute top-0 bottom-0 cursor-grab active:cursor-grabbing border-y border-transparent transition-colors hover:border-[#31C5F4]/40"
+              style={{
+                left: `${startPercent}%`,
+                width: `${endPercent - startPercent}%`,
+                backgroundColor: `${accent}15`,
+              }}
+            />
 
-            {/* End time */}
-            <div className="flex-1 flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#6b7280] uppercase tracking-wider">End</label>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setTrimEnd(Math.max(trimStart + 0.05, trimEnd - nudgeAmount))}
-                  className="p-1 rounded-md text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Nudge end earlier"
-                >
-                  <SkipBack size={12} />
-                </button>
-                <input
-                  type="text"
-                  value={formatTime(trimEnd)}
-                  onChange={(e) => {
-                    const parsed = parseTimeInput(e.target.value);
-                    if (parsed !== null && parsed > trimStart && parsed <= duration) {
-                      setTrimEnd(Math.round(parsed * 1000) / 1000);
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const parsed = parseTimeInput(e.target.value);
-                    if (parsed !== null && parsed > trimStart && parsed <= duration) {
-                      setTrimEnd(Math.round(parsed * 1000) / 1000);
-                    }
-                  }}
-                  className="flex-1 bg-[#0a0c10] border border-[#1e2030] rounded-[8px] px-2.5 py-1.5 text-[12px] font-mono text-white text-center focus:outline-none focus:ring-1 transition-all"
-                  style={{ ['--tw-ring-color' as string]: accent } as React.CSSProperties}
-                />
-                <button
-                  onClick={() => setTrimEnd(Math.min(duration, trimEnd + nudgeAmount))}
-                  className="p-1 rounded-md text-[#6b7280] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Nudge end later"
-                >
-                  <SkipForward size={12} />
-                </button>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="h-8 w-px bg-[#1e2030] mt-5" />
-
-            {/* Duration display */}
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#6b7280] uppercase tracking-wider">Duration</label>
+            {/* Start Handle */}
+            <div
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                dragStartRef.current = {
+                  clientX: e.clientX,
+                  initialStart: trimStart,
+                  initialEnd: trimEnd,
+                };
+                setDragMode('start');
+              }}
+              title="Drag Start Point"
+              className="absolute top-0 bottom-0 w-4 -ml-2 cursor-ew-resize flex flex-col items-center justify-between z-20 group/handle"
+              style={{ left: `${startPercent}%` }}
+            >
               <div
-                className="px-3 py-1.5 rounded-[8px] text-[12px] font-mono font-bold text-center"
-                style={{ backgroundColor: `${accent}15`, color: accent }}
+                className="w-3.5 h-5 rounded-md flex items-center justify-center text-[8px] font-bold text-black"
+                style={{ backgroundColor: accent }}
               >
-                {formatTime(selectionDuration)}
+                ◀
+              </div>
+              <div className="w-[2px] h-full" style={{ backgroundColor: accent }} />
+              <div
+                className="w-3.5 h-3.5 rounded-md flex items-center justify-center"
+                style={{ backgroundColor: accent }}
+              />
+            </div>
+
+            {/* End Handle */}
+            <div
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                dragStartRef.current = {
+                  clientX: e.clientX,
+                  initialStart: trimStart,
+                  initialEnd: trimEnd,
+                };
+                setDragMode('end');
+              }}
+              title="Drag End Point"
+              className="absolute top-0 bottom-0 w-4 -ml-2 cursor-ew-resize flex flex-col items-center justify-between z-20 group/handle"
+              style={{ left: `${endPercent}%` }}
+            >
+              <div
+                className="w-3.5 h-5 rounded-md flex items-center justify-center text-[8px] font-bold text-black"
+                style={{ backgroundColor: accent }}
+              >
+                ▶
+              </div>
+              <div className="w-[2px] h-full" style={{ backgroundColor: accent }} />
+              <div
+                className="w-3.5 h-3.5 rounded-md flex items-center justify-center"
+                style={{ backgroundColor: accent }}
+              />
+            </div>
+
+            {/* Dynamic Playhead Line (Follows exact audio frame with 0ms lag, no glow) */}
+            {(isPlaying || isPlayingFull) && (
+              <div
+                className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none"
+                style={{ left: `${playheadPercent}%` }}
+              >
+                <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white rotate-45" />
+                <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white rotate-45" />
+              </div>
+            )}
+          </div>
+
+          {/* Micro-Adjustment Fine-Tuning Pods */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Start Fine-Tuner */}
+            <div className="p-3.5 rounded-xl bg-[#121622] border border-[#1E2536] flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6A7890]">Start Time</span>
+                <button
+                  onClick={() => {
+                    setTrimStart(Math.round(currentTime * 100) / 100);
+                  }}
+                  className="text-[10px] font-semibold text-[#31C5F4] hover:underline cursor-pointer"
+                >
+                  Set to Playhead
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-base font-mono font-bold text-white">{formatTime(trimStart)}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setTrimStart((prev) => Math.max(0, Math.round((prev - 0.1) * 100) / 100))}
+                    className="p-1.5 rounded-lg bg-[#182030] border border-[#252E40] text-white hover:border-[#31C5F4] transition-colors cursor-pointer"
+                    title="-0.1s"
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <button
+                    onClick={() => setTrimStart((prev) => Math.min(trimEnd - 0.1, Math.round((prev + 0.1) * 100) / 100))}
+                    className="p-1.5 rounded-lg bg-[#182030] border border-[#252E40] text-white hover:border-[#31C5F4] transition-colors cursor-pointer"
+                    title="+0.1s"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* End Fine-Tuner */}
+            <div className="p-3.5 rounded-xl bg-[#121622] border border-[#1E2536] flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6A7890]">End Time</span>
+                <button
+                  onClick={() => {
+                    setTrimEnd(Math.max(trimStart + 0.1, Math.round(currentTime * 100) / 100));
+                  }}
+                  className="text-[10px] font-semibold text-[#31C5F4] hover:underline cursor-pointer"
+                >
+                  Set to Playhead
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-base font-mono font-bold text-white">{formatTime(trimEnd)}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setTrimEnd((prev) => Math.max(trimStart + 0.1, Math.round((prev - 0.1) * 100) / 100))}
+                    className="p-1.5 rounded-lg bg-[#182030] border border-[#252E40] text-white hover:border-[#31C5F4] transition-colors cursor-pointer"
+                    title="-0.1s"
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <button
+                    onClick={() => setTrimEnd((prev) => Math.min(duration, Math.round((prev + 0.1) * 100) / 100))}
+                    className="p-1.5 rounded-lg bg-[#182030] border border-[#252E40] text-white hover:border-[#31C5F4] transition-colors cursor-pointer"
+                    title="+0.1s"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Playback and action controls */}
-          <div className="flex items-center justify-between pt-3 border-t border-[#1e2030]">
+          {/* Player & Audition Controls Bar */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-[#121622] border border-[#1E2536]">
             <div className="flex items-center gap-2">
+              {/* Play / Pause Selection */}
               <button
-                onClick={handleTogglePlay}
-                className="px-4 py-2 rounded-[10px] font-bold text-[12px] flex items-center gap-2 transition-all cursor-pointer"
-                style={{
-                  backgroundColor: isPlaying ? '#ff3b3020' : `${accent}20`,
-                  color: isPlaying ? '#ff3b30' : accent,
-                  border: `1px solid ${isPlaying ? '#ff3b3030' : `${accent}30`}`,
-                }}
+                onClick={handleTogglePlayTrim}
+                className="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                style={{ backgroundColor: accent, color: '#000000' }}
               >
-                {isPlaying ? (
-                  <>
-                    <Square size={13} className="fill-current" />
-                    <span>Stop</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={13} className="fill-current" />
-                    <span>Preview</span>
-                  </>
-                )}
+                {isPlaying ? <Pause size={15} /> : <Play size={15} className="fill-black" />}
+                <span>{isPlaying ? 'Pause' : 'Play Selection'}</span>
+              </button>
+
+              {/* Loop Toggle */}
+              <button
+                onClick={() => setIsLooping(!isLooping)}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                  isLooping
+                    ? 'bg-[#183648] text-[#31C5F4] border-[#31C5F4]/60'
+                    : 'bg-[#182030] border-[#252E40] text-[#7E8DA5] hover:text-white'
+                }`}
+                title={isLooping ? 'Looping enabled' : 'Enable loop'}
+              >
+                <Repeat size={15} />
+              </button>
+
+              {/* Stop Playback */}
+              <button
+                onClick={handleStop}
+                className="p-2 rounded-xl bg-[#182030] border border-[#252E40] text-[#7E8DA5] hover:text-white transition-colors cursor-pointer"
+                title="Stop playback"
+              >
+                <Square size={15} />
+              </button>
+
+              {/* Play Full Audio */}
+              <button
+                onClick={handleTogglePlayFull}
+                className={`px-3 py-2 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isPlayingFull
+                    ? 'bg-[#253245] border-white/40 text-white'
+                    : 'bg-[#182030] border-[#252E40] text-[#7E8DA5] hover:text-white'
+                }`}
+                title="Listen to full un-trimmed audio"
+              >
+                <Volume2 size={14} />
+                <span>Play Full</span>
               </button>
             </div>
 
+            {/* Reset Button */}
             <button
-              onClick={() => {
-                setTrimStart(0);
-                setTrimEnd(duration);
-                setZoomLevel(1);
-                setScrollOffset(0);
-                if (audioRef.current) {
-                  audioRef.current.currentTime = 0;
-                  setCurrentTime(0);
-                }
-              }}
-              className="text-[#6b7280] hover:text-white text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              onClick={handleReset}
+              className="px-3 py-2 rounded-xl text-xs text-[#7E8DA5] hover:text-white hover:bg-white/5 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <RotateCcw size={12} />
-              <span>Reset</span>
+              <RotateCcw size={13} />
+              <span>Reset Range</span>
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3 bg-[#0f1117] border-t border-[#1e2030] flex items-center justify-end gap-3">
+        {/* Modal Footer / Save Options */}
+        <div className="px-6 py-4 border-t border-[#1A2230] flex items-center justify-between bg-[#121722]">
           <button
             onClick={() => {
               if (audioRef.current) audioRef.current.pause();
               onClose();
             }}
-            className="px-4 py-2 rounded-[10px] text-[12px] font-semibold text-[#6b7280] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-[#7E8DA5] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
           >
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            className="px-5 py-2 rounded-[10px] text-[12px] font-bold text-black flex items-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
-            style={{ backgroundColor: accent }}
-          >
-            <Check size={14} className="stroke-[3]" />
-            <span>Apply Trim</span>
-          </button>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleSaveAsNew}
+              className="px-4 py-2.5 rounded-xl bg-[#162030] border border-[#26354D] text-white hover:border-[#31C5F4]/60 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <CopyPlus size={15} style={{ color: accent }} />
+              <span>Save as New Sound</span>
+            </button>
+
+            <button
+              onClick={handleSave}
+              className="px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
+              style={{ backgroundColor: accent, color: '#000000' }}
+            >
+              <Check size={16} />
+              <span>Save Trim</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

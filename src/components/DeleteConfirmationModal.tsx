@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Undo2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { SoundItem } from '../types';
 
 interface DeleteConfirmationModalProps {
@@ -18,32 +18,32 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
   if (!isOpen || !sound) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-md bg-[#161822] border border-[#2a3040] rounded-[16px] shadow-2xl overflow-hidden">
-        <div className="p-5 flex items-start gap-3.5">
-          <div className="w-10 h-10 rounded-full bg-[#ff3b30]/15 text-[#ff3b30] flex items-center justify-center flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none">
+      <div className="w-full max-w-md bg-[#0E121A] border border-[#1B222E] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-6 flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0">
             <Trash2 size={20} />
           </div>
 
           <div className="flex-1 min-w-0">
             <h3 className="text-[15px] font-bold text-white leading-tight">Move Sound to 'deleted'?</h3>
-            <p className="text-[12px] font-semibold mt-1 truncate" style={{ color: 'var(--accent-color, #8b5cf6)' }}>{sound.title}</p>
-            <p className="text-[11.5px] text-[#8a92a6] mt-2 leading-relaxed">
-              The sound file will be moved into a dedicated <code className="bg-black/40 px-1 py-0.5 rounded font-mono" style={{ color: 'var(--accent-color, #8b5cf6)' }}>deleted</code> folder. You can browse and restore it anytime from the <strong className="text-white">Deleted</strong> tab or File Explorer.
+            <p className="text-[12.5px] font-semibold text-[#31C5F4] mt-1 truncate">{sound.title}</p>
+            <p className="text-[11.5px] text-[#8e95a5] mt-2.5 leading-relaxed">
+              The sound file will be preserved in your dedicated <code className="bg-[#151B25] px-1.5 py-0.5 rounded text-[#31C5F4] font-mono border border-[#1B222E]">deleted</code> folder. You can browse and restore it anytime from the <strong className="text-white">Deleted</strong> archive.
             </p>
           </div>
         </div>
 
-        <div className="px-5 py-3 bg-[#111319] border-t border-[#222736] flex items-center justify-end gap-2">
+        <div className="px-6 py-4 bg-[#0A0D14] border-t border-[#151B25] flex items-center justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-[8px] text-[12px] font-semibold text-[#8a92a6] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-[12px] font-bold text-[#8e95a5] hover:text-white hover:bg-[#151B25] transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-[8px] text-[12px] font-bold text-white bg-[#ff3b30] hover:bg-[#e03126] shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-5 py-2 rounded-xl text-[12px] font-bold text-white bg-red-500 hover:bg-red-600 shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
           >
             <Trash2 size={13} />
             <span>Move to Deleted</span>
@@ -53,4 +53,3 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     </div>
   );
 };
-

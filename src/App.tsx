@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS: AudioSettings = {
   recordHotkey: 'F9',
   recordDuration: 5,
   recordSource: 'all',
+  videoClipDuration: 30,
   theme: 'dark',
   accentColor: '#38bdf8',
   minimizeToTray: true,
@@ -51,6 +52,7 @@ export const App: React.FC = () => {
   const isStandaloneOverlay = useMemo(() => {
     return new URLSearchParams(window.location.search).get('overlay') === 'true';
   }, []);
+  const isDataLoadedRef = useRef(false);
   const [sounds, setSounds] = useState<SoundItem[]>([]);
   const [deletedSounds, setDeletedSounds] = useState<SoundItem[]>([]);
   const [settings, setSettings] = useState<AudioSettings>(DEFAULT_SETTINGS);
@@ -64,12 +66,6 @@ export const App: React.FC = () => {
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [micLevel, setMicLevel] = useState<number>(0);
   const [listeningSoundId, setListeningSoundId] = useState<string | null>(null);
-  const [draggedSoundId, setDraggedSoundId] = useState<string | null>(null);
-  const [isPointerDragging, setIsPointerDragging] = useState(false);
-  const [pointerDragSound, setPointerDragSound] = useState<SoundItem | null>(null);
-  const [pointerDragRect, setPointerDragRect] = useState<{ width: number; height: number } | null>(null);
-  const [pointerDragOffset, setPointerDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [pointerCurrentPos, setPointerCurrentPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [stopAllFlash, setStopAllFlash] = useState(false);
   const flashTimerRef = useRef<any>(null);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
@@ -83,15 +79,6 @@ export const App: React.FC = () => {
     most_played: 'Most Played',
     duration: 'Duration',
   };
-
-  // Pointer drag refs for fluid real-time drag-to-rearrange
-  const isPointerDraggingRef = useRef(false);
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
-  const activePointerSoundRef = useRef<SoundItem | null>(null);
-  const dragRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
-  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const lastTargetSwapRef = useRef<string | null>(null);
-  const justFinishedDragRef = useRef(false);
 
   // Modals state
   const [isYouTubeModalOpen, setIsYouTubeModalOpen] = useState(false);
@@ -224,7 +211,10 @@ export const App: React.FC = () => {
         // In standalone overlay, only load settings and sounds for UI display; audio runs in main window
         if (isStandaloneOverlay) {
           try {
-            const savedSettings = await window.soundboardAPI.loadSettings();
+            const [savedSettings, savedSounds] = await Promise.all([
+              window.soundboardAPI.loadSettings(),
+              window.soundboardAPI.loadSounds(),
+            ]);
             if (savedSettings) {
               const themeDef = getTheme(savedSettings.theme, savedSettings.accentColor);
               setSettings({
@@ -236,20 +226,25 @@ export const App: React.FC = () => {
               if (savedSettings.sortBy) setSortBy(savedSettings.sortBy);
               if (savedSettings.activeFilter) setActiveFilter(savedSettings.activeFilter);
             }
-            const savedSounds = await window.soundboardAPI.loadSounds();
             if (savedSounds && savedSounds.length > 0) {
               setSounds(savedSounds.filter((s) => s.audioData || s.audioPath));
             }
+            isDataLoadedRef.current = true;
             // Request latest live playback status and active sounds from main window
             window.soundboardAPI?.sendIpcCommand?.('request-sync-from-main');
           } catch (e) {}
           return;
         }
 
-        // Load Settings
-        const savedSettings = await window.soundboardAPI.loadSettings();
-        let effectiveSettings = savedSettings ? { ...DEFAULT_SETTINGS, ...savedSettings } : DEFAULT_SETTINGS;
+        // 1. First thing on app launch: Always read the 4 JSON files directly
+        const [savedSettings, rawSounds, savedDeleted, savedClips] = await Promise.all([
+          window.soundboardAPI.loadSettings(),
+          window.soundboardAPI.loadSounds(),
+          window.soundboardAPI.loadDeletedSounds ? window.soundboardAPI.loadDeletedSounds() : Promise.resolve([]),
+          window.soundboardAPI.loadVideoClips ? window.soundboardAPI.loadVideoClips() : Promise.resolve([]),
+        ]);
 
+        let effectiveSettings = savedSettings ? { ...DEFAULT_SETTINGS, ...savedSettings } : DEFAULT_SETTINGS;
         const themeDef = getTheme(savedSettings?.theme, savedSettings?.accentColor);
         effectiveSettings = {
           ...effectiveSettings,
@@ -289,44 +284,37 @@ export const App: React.FC = () => {
           };
         }
 
-        window.soundboardAPI.saveSettings(effectiveSettings);
-
         setSettings(effectiveSettings);
         (window as any).__prismSettings = effectiveSettings;
         if (effectiveSettings.sortBy) setSortBy(effectiveSettings.sortBy);
         if (effectiveSettings.activeFilter) setActiveFilter(effectiveSettings.activeFilter);
         await audioEngine.updateSettings(effectiveSettings);
 
-        // Load Sounds
-        let savedSounds = await window.soundboardAPI.loadSounds();
-        if (savedSounds && savedSounds.length > 0) {
-          savedSounds = savedSounds.filter((s) => s.audioData || s.audioPath);
-          setSounds(savedSounds);
-          setSelectedSoundId(savedSounds[0].id);
+        // Populate active Sounds
+        if (rawSounds && rawSounds.length > 0) {
+          const validSounds = rawSounds.filter((s) => s.audioData || s.audioPath);
+          setSounds(validSounds);
+          setSelectedSoundId(validSounds[0].id);
 
-          // Register hotkeys
-          savedSounds.forEach((s) => {
+          // Register global hotkeys
+          validSounds.forEach((s) => {
             if (s.hotkey) {
               window.soundboardAPI?.registerGlobalHotkey(s.hotkey, s.id);
             }
           });
         }
 
-        // Load Deleted Sounds
-        if (window.soundboardAPI?.loadDeletedSounds) {
-          const savedDeleted = await window.soundboardAPI.loadDeletedSounds();
-          if (savedDeleted && Array.isArray(savedDeleted)) {
-            setDeletedSounds(savedDeleted);
-          }
+        // Populate Deleted Sounds
+        if (savedDeleted && Array.isArray(savedDeleted)) {
+          setDeletedSounds(savedDeleted);
         }
 
-        // Load Video Clips
-        if (window.soundboardAPI?.loadVideoClips) {
-          const savedClips = await window.soundboardAPI.loadVideoClips();
-          if (savedClips && Array.isArray(savedClips)) {
-            setVideoClips(savedClips);
-          }
+        // Populate Video Clips
+        if (savedClips && Array.isArray(savedClips)) {
+          setVideoClips(savedClips);
         }
+
+        isDataLoadedRef.current = true;
 
         // Mandatory First-Time / Startup Check for VB-CABLE Driver
         if (window.soundboardAPI?.checkVirtualDriverInstalled) {
@@ -341,10 +329,11 @@ export const App: React.FC = () => {
         // This ensures the buffer is always full when the user presses the clip hotkey
         setTimeout(async () => {
           try {
-            const dur = (window as any).__prismSettings?.videoClipDuration || 15;
+            const dur = effectiveSettings.videoClipDuration || (window as any).__prismSettings?.videoClipDuration || 30;
+            videoClipper.setDuration(dur);
             const started = await videoClipper.startBuffer(dur);
             if (started) {
-              console.log('[App] Video clip buffer auto-started on launch');
+              console.log(`[App] Video clip buffer auto-started on launch with duration: ${dur}s`);
             }
           } catch (e) {
             console.warn('[App] Video buffer auto-start deferred (needs user interaction):', e);
@@ -467,6 +456,13 @@ export const App: React.FC = () => {
     const cleanupSoundsSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('sounds-updated', (newSounds: SoundItem[]) => {
           setSounds(newSounds);
+          if (Array.isArray(newSounds)) {
+            newSounds.forEach((s) => {
+              if (s.hotkey) {
+                window.soundboardAPI?.registerGlobalHotkey(s.hotkey, s.id);
+              }
+            });
+          }
         })
       : () => {};
 
@@ -515,7 +511,7 @@ export const App: React.FC = () => {
 
     const cleanupRequestOverlaySync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('request-overlay-sync', () => {
-          if (!isStandaloneOverlay) {
+          if (!isStandaloneOverlay && isDataLoadedRef.current && soundsRef.current.length > 0) {
             const activeIds = audioEngine.getActiveSoundIds();
             const pausedIds = audioEngine.getPausedSoundIds();
             const progress = audioEngine.getAllPlaybackProgress();
@@ -536,6 +532,14 @@ export const App: React.FC = () => {
         })
       : () => {};
 
+    const cleanupTriggerVideoClip = window.soundboardAPI.onIpcCommand
+      ? window.soundboardAPI.onIpcCommand('trigger-video-clip', () => {
+          if (!isStandaloneOverlay) {
+            handleTriggerVideoClip();
+          }
+        })
+      : () => {};
+
     const cleanupVideoClipsSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('video-clips-updated', (clips: VideoClipItem[]) => {
           setVideoClips(clips);
@@ -544,6 +548,8 @@ export const App: React.FC = () => {
 
     return () => {
       cleanupVideoClipsSync();
+      cleanupTriggerClip();
+      cleanupTriggerVideoClip();
       cleanupHotkeys();
       cleanupPanic();
       cleanupRepeatLast();
@@ -565,124 +571,6 @@ export const App: React.FC = () => {
       cleanupRequestOverlaySync();
     };
   }, [isStandaloneOverlay]);
-
-  // Fluid Real-Time Drag-To-Rearrange Pointer Listeners
-  const dragRafIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!pointerStartRef.current || !activePointerSoundRef.current) return;
-
-      const clientX = e.clientX;
-      const clientY = e.clientY;
-
-      const dist = Math.hypot(
-        clientX - pointerStartRef.current.x,
-        clientY - pointerStartRef.current.y
-      );
-
-      // Distance Threshold: 4px
-      if (!isPointerDraggingRef.current && dist > 4) {
-        isPointerDraggingRef.current = true;
-        setIsPointerDragging(true);
-        setPointerDragSound(activePointerSoundRef.current);
-        setPointerDragRect(dragRectRef.current);
-        setPointerDragOffset(dragOffsetRef.current);
-        setDraggedSoundId(activePointerSoundRef.current.id);
-        lastTargetSwapRef.current = activePointerSoundRef.current.id;
-
-        document.body.style.cursor = 'grabbing';
-      }
-
-      if (isPointerDraggingRef.current) {
-        if (dragRafIdRef.current) {
-          cancelAnimationFrame(dragRafIdRef.current);
-        }
-
-        dragRafIdRef.current = requestAnimationFrame(() => {
-          dragRafIdRef.current = null;
-          setPointerCurrentPos({ x: clientX, y: clientY });
-
-          // Piercing Hit-Testing
-          const elements = document.elementsFromPoint(clientX, clientY);
-          let targetId: string | null = null;
-          for (const el of elements) {
-            const card = el.closest('[data-sound-id]');
-            if (card) {
-              targetId = card.getAttribute('data-sound-id');
-              break;
-            }
-          }
-
-          // Live Array Splice
-          if (targetId && activePointerSoundRef.current) {
-            const currentDraggedId = activePointerSoundRef.current.id;
-
-            if (targetId !== currentDraggedId && lastTargetSwapRef.current !== targetId) {
-              lastTargetSwapRef.current = targetId;
-
-              setSounds((prevSounds) => {
-                const srcIdx = prevSounds.findIndex((s) => s.id === currentDraggedId);
-                const tgtIdx = prevSounds.findIndex((s) => s.id === targetId);
-                if (srcIdx === -1 || tgtIdx === -1 || srcIdx === tgtIdx) return prevSounds;
-
-                const next = [...prevSounds];
-                const [movedItem] = next.splice(srcIdx, 1);
-                next.splice(tgtIdx, 0, movedItem);
-                return next;
-              });
-            }
-          }
-        });
-      }
-    };
-
-    const handlePointerUp = () => {
-      if (dragRafIdRef.current) {
-        cancelAnimationFrame(dragRafIdRef.current);
-        dragRafIdRef.current = null;
-      }
-
-      if (isPointerDraggingRef.current && activePointerSoundRef.current) {
-        justFinishedDragRef.current = true;
-        setTimeout(() => {
-          justFinishedDragRef.current = false;
-        }, 250);
-
-        setSounds((currentSounds) => {
-          updateAndSaveSounds(currentSounds);
-          return currentSounds;
-        });
-      }
-
-      // Cleanup
-      pointerStartRef.current = null;
-      activePointerSoundRef.current = null;
-      dragRectRef.current = null;
-      lastTargetSwapRef.current = null;
-      isPointerDraggingRef.current = false;
-      document.body.style.cursor = '';
-      setIsPointerDragging(false);
-      setPointerDragSound(null);
-      setPointerDragRect(null);
-      setDraggedSoundId(null);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove, { passive: true, capture: true });
-    window.addEventListener('pointerup', handlePointerUp, { capture: true });
-    window.addEventListener('pointercancel', handlePointerUp, { capture: true });
-    window.addEventListener('mouseup', handlePointerUp, { capture: true });
-    return () => {
-      if (dragRafIdRef.current) {
-        cancelAnimationFrame(dragRafIdRef.current);
-        dragRafIdRef.current = null;
-      }
-      window.removeEventListener('pointermove', handlePointerMove, { capture: true });
-      window.removeEventListener('pointerup', handlePointerUp, { capture: true });
-      window.removeEventListener('pointercancel', handlePointerUp, { capture: true });
-      window.removeEventListener('mouseup', handlePointerUp, { capture: true });
-    };
-  }, []);
 
   // Inline Hotkey Recorder Listener (Changes 'Add shortcut' to 'Listening...')
   useEffect(() => {
@@ -723,7 +611,14 @@ export const App: React.FC = () => {
       let key = e.key;
       if (e.code.startsWith('Numpad')) {
         const num = e.code.replace('Numpad', '');
-        key = `Num ${num}`;
+        if (num === 'Multiply') key = 'NumMult';
+        else if (num === 'Add') key = 'NumAdd';
+        else if (num === 'Subtract') key = 'NumSub';
+        else if (num === 'Decimal') key = 'NumDec';
+        else if (num === 'Divide') key = 'NumDiv';
+        else key = `Num ${num}`;
+      } else if (key === 'Escape') {
+        key = 'Escape';
       } else if (key === ' ') {
         key = 'Space';
       } else if (key.length === 1) {
@@ -794,6 +689,11 @@ export const App: React.FC = () => {
     setSounds(updated);
     pendingSoundsToPersistRef.current = updated;
 
+    // Immediately broadcast to overlay and other windows with 0ms delay
+    if (window.soundboardAPI?.sendIpcCommand) {
+      window.soundboardAPI.sendIpcCommand('sync-sounds-updated', updated);
+    }
+
     if (immediate) {
       if (soundsDebounceTimerRef.current) {
         clearTimeout(soundsDebounceTimerRef.current);
@@ -801,9 +701,6 @@ export const App: React.FC = () => {
       }
       if (window.soundboardAPI) {
         window.soundboardAPI.saveSounds(updated);
-        if (window.soundboardAPI.sendIpcCommand) {
-          window.soundboardAPI.sendIpcCommand('sync-sounds-updated', updated);
-        }
       }
       return;
     }
@@ -816,9 +713,6 @@ export const App: React.FC = () => {
       const toSave = pendingSoundsToPersistRef.current;
       if (toSave && window.soundboardAPI) {
         window.soundboardAPI.saveSounds(toSave);
-        if (window.soundboardAPI.sendIpcCommand) {
-          window.soundboardAPI.sendIpcCommand('sync-sounds-updated', toSave);
-        }
       }
     }, 250);
   };
@@ -838,16 +732,6 @@ export const App: React.FC = () => {
       if (old.hotkey) window.soundboardAPI.unregisterGlobalHotkey(old.hotkey);
       if (updatedItem.hotkey) window.soundboardAPI.registerGlobalHotkey(updatedItem.hotkey, updatedItem.id);
     }
-  };
-
-  // Handle card pointer down
-  const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>, sound: SoundItem) => {
-    if (listeningSoundId) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    pointerStartRef.current = { x: e.clientX, y: e.clientY };
-    activePointerSoundRef.current = sound;
-    dragRectRef.current = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-    dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
   // Play a sound
@@ -974,7 +858,7 @@ export const App: React.FC = () => {
   // Medal-like Screen/Game Video Clip Trigger
   const handleTriggerVideoClip = async () => {
     try {
-      const dur = settings.videoClipDuration || 15;
+      const dur = settings.videoClipDuration || 30;
       videoClipper.setDuration(dur);
       const res = await videoClipper.clipLastSeconds();
       if (res.success && res.clip) {
@@ -1124,7 +1008,7 @@ export const App: React.FC = () => {
     setDeletedSounds((prev) => prev.filter((s) => s.id !== soundId));
   };
 
-  // Trimmer Save
+  // Trimmer Save (Non-destructive)
   const handleSaveTrim = (soundId: string, trimStart: number, trimEnd: number) => {
     const target = sounds.find((s) => s.id === soundId);
     if (target) {
@@ -1132,18 +1016,41 @@ export const App: React.FC = () => {
         ...target,
         trimStart,
         trimEnd,
+        duration: Math.max(0.1, trimEnd - trimStart),
       });
     }
   };
 
-  // Settings Save
+  // Trimmer Save as New Sound
+  const handleSaveAsNewTrim = (soundId: string, trimStart: number, trimEnd: number) => {
+    const target = sounds.find((s) => s.id === soundId);
+    if (!target) return;
+    const newSound: SoundItem = {
+      ...target,
+      id: `sound_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      title: `${target.title} (Trimmed)`,
+      trimStart,
+      trimEnd,
+      duration: Math.max(0.1, trimEnd - trimStart),
+      hotkey: '', // Avoid hotkey collision with original
+      dateAdded: Date.now(),
+      playCount: 0,
+    };
+    setSounds((prev) => [newSound, ...prev]);
+    setSelectedSoundId(newSound.id);
+  };
+
   // Settings Save with debounced persistence to avoid slider lag
   const settingsDebounceTimerRef = useRef<any>(null);
   const pendingSettingsToPersistRef = useRef<AudioSettings | null>(null);
 
   const handleSaveSettings = (newSettings: AudioSettings, immediate = false) => {
     setSettings(newSettings);
+    (window as any).__prismSettings = newSettings;
     audioEngine.updateSettings(newSettings);
+    if (newSettings.videoClipDuration) {
+      videoClipper.setDuration(newSettings.videoClipDuration);
+    }
     pendingSettingsToPersistRef.current = newSettings;
 
     if (immediate) {
@@ -1265,22 +1172,24 @@ export const App: React.FC = () => {
           isStandaloneOverlay={true}
           sounds={sounds}
           activeSoundIds={activeSoundIds}
+          pausedSoundIds={pausedSoundIds}
           playbackProgressMap={playbackProgressMap}
           speakerVolume={settings.masterSpeakerVolume}
           micProjectionVolume={settings.micInputVolume}
           hearMyself={settings.hearMyself}
-          recordDuration={settings.recordDuration || 5}
+          recordDuration={settings.videoClipDuration || settings.recordDuration || 30}
           recordSource={settings.recordSource || 'screen'}
           onToggleHearMyself={handleToggleHearMyself}
           onStartRecordClip={() => {
             if (window.soundboardAPI?.sendIpcCommand) {
-              window.soundboardAPI.sendIpcCommand('sync-trigger-clip');
+              window.soundboardAPI.sendIpcCommand('sync-trigger-video-clip');
             } else {
-              handleStartRecordClip();
+              handleTriggerVideoClip();
             }
           }}
           onChangeRecordDuration={(dur) => {
-            handleSaveSettings({ ...settings, recordDuration: dur });
+            videoClipper.setDuration(dur);
+            handleSaveSettings({ ...settings, recordDuration: dur, videoClipDuration: dur });
           }}
           onChangeRecordSource={(src) => {
             handleSaveSettings({ ...settings, recordSource: src });
@@ -1494,7 +1403,7 @@ export const App: React.FC = () => {
             recordingSecondsLeft={recordSecondsLeft}
             recordDuration={
               activeView === 'clips'
-                ? settings.videoClipDuration || 15
+                ? settings.videoClipDuration || 30
                 : settings.recordDuration || 5
             }
             recordSource={settings.recordSource || 'screen'}
@@ -1570,7 +1479,7 @@ export const App: React.FC = () => {
                           Very Experimental
                         </span>
                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ff0000]/15 border border-[#ff0000]/30 text-[#ff0000]">
-                          May not work as meant
+                          May not work as expected
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
@@ -1720,7 +1629,7 @@ export const App: React.FC = () => {
                     </div>
 
                     {/* 5-Column Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 content-start auto-rows-max items-start">
                       {filteredSounds.map((sound) => (
                         <SoundCard
                           key={sound.id}
@@ -1730,14 +1639,10 @@ export const App: React.FC = () => {
                           playbackProgress={playbackProgressMap[sound.id] || 0}
                           accentColor={settings.accentColor}
                           isListeningHotkey={listeningSoundId === sound.id}
-                          isDragging={draggedSoundId === sound.id}
-                          onCardPointerDown={handleCardPointerDown}
                           onSelect={() => {
-                            if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
                             setSelectedSoundId(sound.id);
                           }}
                           onPlay={() => {
-                            if (justFinishedDragRef.current || isPointerDraggingRef.current) return;
                             handlePlaySound(sound);
                           }}
                           onToggleFavorite={(e) => {
@@ -1874,6 +1779,7 @@ export const App: React.FC = () => {
         onClose={() => setIsTrimmerModalOpen(false)}
         accentColor={settings.accentColor}
         onSaveTrim={handleSaveTrim}
+        onSaveAsNewTrim={handleSaveAsNewTrim}
       />
 
       <SettingsModal
@@ -1931,7 +1837,7 @@ export const App: React.FC = () => {
         onConfirmClear={handleClearAllSounds}
         onExportBackup={async () => {
           if (window.soundboardAPI?.exportSoundboardBackup) {
-            return await window.soundboardAPI.exportSoundboardBackup(sounds);
+            return await window.soundboardAPI.exportSoundboardBackup(sounds, videoClips);
           }
         }}
       />
@@ -1954,12 +1860,13 @@ export const App: React.FC = () => {
         speakerVolume={settings.masterSpeakerVolume}
         micProjectionVolume={settings.micInputVolume}
         hearMyself={settings.hearMyself}
-        recordDuration={settings.recordDuration || 5}
+        recordDuration={settings.videoClipDuration || settings.recordDuration || 30}
         recordSource={settings.recordSource || 'screen'}
         onToggleHearMyself={handleToggleHearMyself}
-        onStartRecordClip={handleStartRecordClip}
+        onStartRecordClip={handleTriggerVideoClip}
         onChangeRecordDuration={(dur) => {
-          handleSaveSettings({ ...settings, recordDuration: dur });
+          videoClipper.setDuration(dur);
+          handleSaveSettings({ ...settings, recordDuration: dur, videoClipDuration: dur });
         }}
         onChangeRecordSource={(src) => {
           handleSaveSettings({ ...settings, recordSource: src });
@@ -2181,37 +2088,6 @@ export const App: React.FC = () => {
         }}
         accentColor={settings.accentColor}
       />
-
-      {/* GPU Accelerated Floating Drag Clone Card */}
-      {isPointerDragging && pointerDragSound && pointerDragRect && (
-        <div
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            transform: `translate3d(${pointerCurrentPos.x - pointerDragOffset.x}px, ${pointerCurrentPos.y - pointerDragOffset.y}px, 0) scale(1.05) rotate(1.5deg)`,
-            width: pointerDragRect.width,
-            height: pointerDragRect.height,
-            zIndex: 99999,
-            pointerEvents: 'none',
-            willChange: 'transform',
-          }}
-          className="shadow-2xl ring-2 ring-[#00d2ff] rounded-[14px] overflow-hidden opacity-95 pointer-events-none select-none"
-        >
-          <SoundCard
-            sound={pointerDragSound}
-            isSelected={true}
-            isPlaying={activeSoundIds.includes(pointerDragSound.id)}
-            accentColor={settings.accentColor}
-            onSelect={() => {}}
-            onPlay={() => {}}
-            onToggleFavorite={() => {}}
-            onDelete={() => {}}
-            onStartListeningHotkey={() => {}}
-            onClearHotkey={() => {}}
-          />
-        </div>
-      )}
     </div>
   );
 };

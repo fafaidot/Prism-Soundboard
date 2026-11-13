@@ -37,6 +37,8 @@ interface ControlPanelProps {
 
 const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   sound,
+  isPlaying,
+  accentColor,
   isListeningHotkey = false,
   onUpdateSound,
   onPlaySound,
@@ -98,13 +100,10 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
   const handleModeChange = (mode: ReproductionMode) => {
     setLocalMode(mode);
-    if (optionsDebounceRef.current) clearTimeout(optionsDebounceRef.current);
-    optionsDebounceRef.current = setTimeout(() => {
-      onUpdateSound({
-        ...sound,
-        reproductionMode: mode,
-      });
-    }, 150);
+    onUpdateSound({
+      ...sound,
+      reproductionMode: mode,
+    });
   };
 
   const handleOptionToggle = (key: keyof typeof options) => {
@@ -113,18 +112,18 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
       [key]: !localOptions[key],
     };
     setLocalOptions(updatedOptions);
-    if (optionsDebounceRef.current) clearTimeout(optionsDebounceRef.current);
-    optionsDebounceRef.current = setTimeout(() => {
-      onUpdateSound({
-        ...sound,
-        reproductionOptions: updatedOptions,
-      });
-    }, 150);
+    onUpdateSound({
+      ...sound,
+      reproductionOptions: updatedOptions,
+    });
   };
 
   const handleVolumeChange = (newVol: number) => {
     setLocalVolume(newVol);
     audioEngine.setSoundVolume(sound.id, newVol);
+    if (window.soundboardAPI?.sendIpcCommand) {
+      window.soundboardAPI.sendIpcCommand('sync-sound-volume-live', { soundId: sound.id, volume: newVol });
+    }
 
     if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current);
     volumeDebounceRef.current = setTimeout(() => {
@@ -132,12 +131,15 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         ...sound,
         volume: newVol,
       });
-    }, 250);
+    }, 150);
   };
 
   const handleSpeedChange = (newSpeed: number) => {
     setLocalSpeed(newSpeed);
     audioEngine.setSoundSpeed(sound.id, newSpeed);
+    if (window.soundboardAPI?.sendIpcCommand) {
+      window.soundboardAPI.sendIpcCommand('sync-sound-speed-live', { soundId: sound.id, speed: newSpeed });
+    }
 
     if (speedDebounceRef.current) clearTimeout(speedDebounceRef.current);
     speedDebounceRef.current = setTimeout(() => {
@@ -145,7 +147,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         ...sound,
         speed: newSpeed,
       });
-    }, 250);
+    }, 150);
   };
 
   return (
@@ -207,7 +209,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-bold text-white truncate">{sound.title}</h3>
           <p className="text-[11px] text-[#5a687c] truncate">
-            {sound.source === 'clip' ? 'from Game Clip' : sound.source === 'youtube' ? 'from YouTube' : 'by @soundcreator'}
+            {sound.author
+              ? (sound.author.startsWith('@') ? `by ${sound.author}` : `by @${sound.author}`)
+              : sound.source === 'clip'
+              ? 'from Game Clip'
+              : sound.source === 'youtube'
+              ? 'from YouTube'
+              : 'Sound effect'}
           </p>
         </div>
       </div>
@@ -307,61 +315,112 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         </span>
 
         <div className="flex items-center justify-between gap-1.5">
-          {/* Play */}
+          {/* 1. Play & Overlap */}
           <button
-            onClick={onPlaySound}
-            title="Play Sound"
-            className="w-10 h-10 rounded-full bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-all cursor-pointer"
-          >
-            <Play size={14} className="fill-current ml-0.5" />
-          </button>
-
-          {/* Pause */}
-          <button
-            onClick={() => audioEngine.pauseSound(sound.id)}
-            title="Pause Sound"
-            className="w-10 h-10 rounded-full bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-all cursor-pointer"
-          >
-            <Pause size={14} />
-          </button>
-
-          {/* Restart / Overlap Mode */}
-          <button
-            onClick={() => handleModeChange('restart')}
-            title="Overlap / Restart Mode"
+            onClick={() => handleModeChange('overlap')}
+            title="Play & Overlap"
+            style={
+              currentMode === 'overlap'
+                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                : undefined
+            }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              currentMode === 'restart'
-                ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5]'
+              currentMode === 'overlap'
+                ? 'shadow-lg scale-105'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
             }`}
           >
-            <RotateCcw size={14} />
+            <svg width="15" height="15" viewBox="0 0 24 24">
+              <path d="M7 5C4.5 7.5 4.5 16.5 7 19" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M10 5l10 7-10 7V5z" fill="currentColor" />
+            </svg>
           </button>
 
-          {/* Next / Stop */}
+          {/* 2. Play & Pause */}
+          <button
+            onClick={() => handleModeChange('pause')}
+            title="Play & Pause"
+            style={
+              currentMode === 'pause'
+                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                : undefined
+            }
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+              currentMode === 'pause'
+                ? 'shadow-lg scale-105'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+            }`}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4 5l8 7-8 7V5z" />
+              <rect x="14" y="5" width="3" height="14" rx="1" />
+              <rect x="19" y="5" width="3" height="14" rx="1" />
+            </svg>
+          </button>
+
+          {/* 3. Play & Stop */}
           <button
             onClick={() => handleModeChange('stop')}
-            title="Stop Mode"
+            title="Play & Stop"
+            style={
+              currentMode === 'stop'
+                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                : undefined
+            }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'stop'
-                ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5]'
+                ? 'shadow-lg scale-105'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
             }`}
           >
-            <SkipForward size={14} />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 5l7 7-7 7V5z" />
+              <rect x="14" y="6" width="7" height="12" rx="1.5" />
+            </svg>
           </button>
 
-          {/* Loop Mode */}
+          {/* 4. Play & Restart */}
           <button
-            onClick={() => handleOptionToggle('loop')}
-            title="Toggle Loop"
+            onClick={() => handleModeChange('restart')}
+            title="Play & Restart"
+            style={
+              currentMode === 'restart'
+                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                : undefined
+            }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              options.loop
-                ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5]'
+              currentMode === 'restart'
+                ? 'shadow-lg scale-105'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
             }`}
           >
-            <Repeat size={14} />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4.5" y="5" width="2.5" height="14" rx="1" />
+              <path d="M9.5 5l10 7-10 7V5z" />
+            </svg>
+          </button>
+
+          {/* 5. Play & Loop */}
+          <button
+            onClick={() => handleModeChange('push_loop')}
+            title="Play & Loop"
+            style={
+              currentMode === 'push_loop'
+                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                : undefined
+            }
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+              currentMode === 'push_loop'
+                ? 'shadow-lg scale-105'
+                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+            }`}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+              <path d="M16 21h5v-5" />
+            </svg>
           </button>
         </div>
       </div>

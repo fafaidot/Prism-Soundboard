@@ -823,21 +823,31 @@ class AudioEngine {
     return ids;
   }
 
+  private disposePlayback(p: ActivePlayback) {
+    try {
+      p.audioEl.pause();
+      p.audioEl.currentTime = 0;
+      p.audioEl.src = '';
+      p.audioEl.load();
+    } catch (e) {}
+    try {
+      p.sourceNode.disconnect();
+    } catch (e) {}
+    try {
+      p.soundGainNode.disconnect();
+    } catch (e) {}
+    try {
+      p.toHeadphonesGain.disconnect();
+    } catch (e) {}
+    try {
+      p.toCableGain.disconnect();
+    } catch (e) {}
+  }
+
   public stopAll() {
     this.activePlaybacks.forEach((playbacks) => {
       playbacks.forEach((p) => {
-        try {
-          p.audioEl.pause();
-          p.audioEl.currentTime = 0;
-          p.audioEl.src = '';
-          p.audioEl.load();
-        } catch (e) {}
-        try {
-          p.sourceNode.disconnect();
-          p.soundGainNode.disconnect();
-          p.toHeadphonesGain.disconnect();
-          p.toCableGain.disconnect();
-        } catch (e) {}
+        this.disposePlayback(p);
       });
     });
     this.activePlaybacks.clear();
@@ -902,10 +912,7 @@ class AudioEngine {
     const list = this.activePlaybacks.get(soundId);
     if (list) {
       list.forEach((p) => {
-        try {
-          p.audioEl.pause();
-          p.audioEl.currentTime = 0;
-        } catch (e) {}
+        this.disposePlayback(p);
       });
       this.activePlaybacks.delete(soundId);
       this.checkVoiceMuteState();
@@ -1057,13 +1064,13 @@ class AudioEngine {
     }
 
     const options = sound.reproductionOptions || {
-      stopOtherSounds: true,
+      stopOtherSounds: false,
       muteOtherSounds: false,
       muteVoice: false,
       loop: false,
     };
 
-    if (options.stopOtherSounds) {
+    if (options.stopOtherSounds && sound.reproductionMode !== 'overlap') {
       allSounds.forEach((other) => {
         if (other.id !== sound.id) {
           this.stopSound(other.id);
@@ -1071,7 +1078,7 @@ class AudioEngine {
       });
     }
 
-    let audioSrc = sound.audioData || sound.audioPath;
+    let audioSrc = sound.audioPath || sound.audioData;
     if (!audioSrc) {
       console.warn('Cannot play sound: No audio data or audio path for', sound.title);
       return;
@@ -1197,6 +1204,10 @@ class AudioEngine {
   private removePlayback(soundId: string, audioEl: HTMLAudioElement) {
     const list = this.activePlaybacks.get(soundId);
     if (!list) return;
+    const target = list.find((p) => p.audioEl === audioEl);
+    if (target) {
+      this.disposePlayback(target);
+    }
     const remaining = list.filter((p) => p.audioEl !== audioEl);
     if (remaining.length === 0) {
       this.activePlaybacks.delete(soundId);

@@ -113,6 +113,16 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
     ipcRenderer.on('update-download-progress', handler);
     return () => ipcRenderer.removeListener('update-download-progress', handler);
   },
+  onBackupProgress: (callback) => {
+    const handler = (_event, progress) => callback(progress);
+    ipcRenderer.on('backup-progress', handler);
+    return () => ipcRenderer.removeListener('backup-progress', handler);
+  },
+  onStorageRelocationProgress: (callback) => {
+    const handler = (_event, progress) => callback(progress);
+    ipcRenderer.on('storage-relocation-progress', handler);
+    return () => ipcRenderer.removeListener('storage-relocation-progress', handler);
+  },
 
   // Inter-Window IPC Events (Overlay <-> Main sync)
   sendIpcCommand: (channel, data) => ipcRenderer.send(channel, data),

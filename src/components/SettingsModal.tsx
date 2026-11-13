@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { AudioSettings } from '../types';
 import { audioEngine } from '../services/audioEngine';
+import { videoClipper } from '../services/videoClipper';
 import { getTheme } from '../themes';
 import prismLogo from '../assets/Prism.png';
 
@@ -149,6 +150,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, []);
 
   useEffect(() => {
+    const unsubBackup = window.soundboardAPI?.onBackupProgress?.((progress) => {
+      setBackupMsg({ text: `[${progress.percent}%] ${progress.detail}` });
+    });
+    const unsubRelocate = window.soundboardAPI?.onStorageRelocationProgress?.((progress) => {
+      setStorageRelocateMsg({ text: `[${progress.percent}%] ${progress.detail}` });
+    });
+    return () => {
+      if (unsubBackup) unsubBackup();
+      if (unsubRelocate) unsubRelocate();
+    };
+  }, []);
+
+  useEffect(() => {
     setLocalSettings(settings);
   }, [settings, isOpen]);
 
@@ -225,10 +239,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (e.shiftKey) parts.push('Shift');
       if (e.metaKey) parts.push('Win');
 
+      // If user presses standalone Escape, assign it if recording Panic, or cancel recording for other fields
+      if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        if (recordingPanic) {
+          setLocalSettings((prev) => ({ ...prev, panicHotkey: 'Escape' }));
+          setRecordingPanic(false);
+          return;
+        } else {
+          setRecordingRepeatLast(false);
+          setRecordingOverlay(false);
+          setRecordingRecordClip(false);
+          setRecordingVideoClip(false);
+          return;
+        }
+      }
+
       let key = e.key;
-      if (key === 'Escape') key = 'Esc';
-      else if (key === ' ') key = 'Space';
-      else if (key.length === 1) key = key.toUpperCase();
+      if (e.code.startsWith('Numpad')) {
+        const num = e.code.replace('Numpad', '');
+        if (num === 'Multiply') key = 'NumMult';
+        else if (num === 'Add') key = 'NumAdd';
+        else if (num === 'Subtract') key = 'NumSub';
+        else if (num === 'Decimal') key = 'NumDec';
+        else if (num === 'Divide') key = 'NumDiv';
+        else key = `Num ${num}`;
+      } else if (key === 'Escape') {
+        key = 'Escape';
+      } else if (key === ' ') {
+        key = 'Space';
+      } else if (key.length === 1) {
+        key = key.toUpperCase();
+      }
 
       if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
         if (!parts.includes(key)) {
@@ -336,7 +377,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.1',
+        currentVersion: '1.5.2',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -345,6 +386,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSave = () => {
+    if (localSettings.videoClipDuration) {
+      videoClipper.setDuration(localSettings.videoClipDuration);
+    }
     onSaveSettings(localSettings);
     onClose();
   };
@@ -827,7 +871,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
                 <p className="text-[11.5px] text-[#7e8697]">
-                  Captures the last {localSettings.videoClipDuration || 15} seconds of game/screen video and saves to your Videos folder.
+                  Captures the last {localSettings.videoClipDuration || 30} seconds of game/screen video and saves to your Videos folder.
                 </p>
 
                 <div className="w-1/2">
@@ -835,13 +879,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Video Clip Length
                   </label>
                   <select
-                    value={localSettings.videoClipDuration || 15}
-                    onChange={(e) =>
+                    value={localSettings.videoClipDuration || 30}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10) || 30;
                       setLocalSettings((prev) => ({
                         ...prev,
-                        videoClipDuration: parseInt(e.target.value) || 15,
-                      }))
-                    }
+                        videoClipDuration: val,
+                      }));
+                      videoClipper.setDuration(val);
+                    }}
                     className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white focus:outline-none transition-colors"
                   >
                     <option value={15}>Last 15 Seconds</option>
@@ -1245,7 +1291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
                         <span>Prism Soundboard</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.1</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.2</span>
                       </h4>
                       <p className="text-[11.5px] text-[#7e8697]">
                         Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -1430,7 +1476,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Clean Footer */}
         <div className="px-7 py-4.5 border-t border-[var(--theme-border,#222436)] flex items-center justify-between bg-[var(--theme-bg-header,#090a0f)]">
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.1</span>
+            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.2</span>
             <span className="text-[#3b4152]">•</span>
             <button
               onClick={() => {
