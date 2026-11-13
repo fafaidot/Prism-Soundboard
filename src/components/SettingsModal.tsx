@@ -18,7 +18,6 @@ import {
   Volume2,
   RefreshCw,
   Power,
-  AppWindow,
   RotateCcw,
   ExternalLink,
   Sparkles,
@@ -30,6 +29,7 @@ import { audioEngine } from '../services/audioEngine';
 import { videoClipper } from '../services/videoClipper';
 import { getTheme } from '../themes';
 import prismLogo from '../assets/Prism.png';
+import { Slider } from './Slider';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -43,6 +43,32 @@ interface SettingsModalProps {
   videoClips?: any[];
   onOpenClearAllModal?: () => void;
 }
+
+// Sleek iOS/macOS-style pill switch toggle
+const ToggleSwitch: React.FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  accent?: string;
+  disabled?: boolean;
+}> = ({ checked, onChange, accent = '#31C5F4', disabled = false }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => !disabled && onChange(!checked)}
+    style={checked ? { backgroundColor: accent } : undefined}
+    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0 disabled:opacity-40 select-none ${
+      checked ? '' : 'bg-[#1E2532]'
+    }`}
+  >
+    <span
+      className={`block w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+        checked ? 'translate-x-6' : 'translate-x-1'
+      }`}
+    />
+  </button>
+);
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -98,13 +124,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (window.soundboardAPI?.resetAllAppData) {
         await window.soundboardAPI.resetAllAppData();
       }
-      // Reload window to initiate clean fresh startup
       window.location.reload();
     } catch (err) {
       console.error('Reset error:', err);
       setIsResettingApp(false);
     }
   };
+
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [downloadProgressPercent, setDownloadProgressPercent] = useState<number>(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -167,7 +193,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [settings, isOpen]);
 
   const currentTheme = getTheme(localSettings.theme, localSettings.accentColor);
-  const accent = currentTheme.accent;
+  const accent = currentTheme.accent || '#31C5F4';
 
   const refreshDevices = async () => {
     try {
@@ -239,7 +265,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (e.shiftKey) parts.push('Shift');
       if (e.metaKey) parts.push('Win');
 
-      // If user presses standalone Escape, assign it if recording Panic, or cancel recording for other fields
       if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
         if (recordingPanic) {
           setLocalSettings((prev) => ({ ...prev, panicHotkey: 'Escape' }));
@@ -377,7 +402,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.3',
+        currentVersion: '1.5.4',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -401,1113 +426,1253 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-150 select-none">
-      <div className="w-full max-w-3xl bg-[var(--theme-bg-surface,#111317)] border border-[var(--theme-border,#20232d)] rounded-[22px] flex flex-col overflow-hidden h-[640px] max-h-[90vh] transition-colors duration-150">
-        {/* Header with Switcher Button */}
-        <div className="px-7 py-4.5 border-b border-[var(--theme-border,#20232d)] flex items-center justify-between bg-[var(--theme-bg-header,#08080b)]">
-          <div className="flex items-center gap-3">
-            <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
-            <h2 className="text-[15px] font-bold text-white tracking-wide">
-              Prism Settings
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[#7e8697] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* Navigation Tabs (4 Tabs) */}
-        <div className="px-7 border-b border-[var(--theme-border,#20232d)] flex gap-6 bg-[var(--theme-bg-surface,#111317)] overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setActiveTab('devices')}
-            style={activeTab === 'devices' ? { borderBottomColor: accent, color: '#ffffff' } : undefined}
-            className={`py-3.5 text-[12.5px] font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'devices'
-                ? 'text-white'
-                : 'border-transparent text-[#7e8697] hover:text-[#c4cad7]'
-            }`}
-          >
-            <Radio size={15} style={activeTab === 'devices' ? { color: accent } : undefined} />
-            <span>Audio Devices</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('voice')}
-            style={activeTab === 'voice' ? { borderBottomColor: accent, color: '#ffffff' } : undefined}
-            className={`py-3.5 text-[12.5px] font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'voice'
-                ? 'text-white'
-                : 'border-transparent text-[#7e8697] hover:text-[#c4cad7]'
-            }`}
-          >
-            <Mic size={15} style={activeTab === 'voice' ? { color: accent } : undefined} />
-            <span>Voice & Noise Gate</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('hotkeys')}
-            style={activeTab === 'hotkeys' ? { borderBottomColor: accent, color: '#ffffff' } : undefined}
-            className={`py-3.5 text-[12.5px] font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'hotkeys'
-                ? 'text-white'
-                : 'border-transparent text-[#7e8697] hover:text-[#c4cad7]'
-            }`}
-          >
-            <Sliders size={15} style={activeTab === 'hotkeys' ? { color: accent } : undefined} />
-            <span>Shortcuts</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('backup')}
-            style={activeTab === 'backup' ? { borderBottomColor: accent, color: '#ffffff' } : undefined}
-            className={`py-3.5 text-[12.5px] font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'backup'
-                ? 'text-white'
-                : 'border-transparent text-[#7e8697] hover:text-[#c4cad7]'
-            }`}
-          >
-            <FolderOpen size={15} style={activeTab === 'backup' ? { color: accent } : undefined} />
-            <span>Backup & Storage</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('updates')}
-            style={activeTab === 'updates' ? { borderBottomColor: accent, color: '#ffffff' } : undefined}
-            className={`py-3.5 text-[12.5px] font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'updates'
-                ? 'text-white'
-                : 'border-transparent text-[#7e8697] hover:text-[#c4cad7]'
-            }`}
-          >
-            <RefreshCw size={15} style={activeTab === 'updates' ? { color: accent } : undefined} className={isCheckingUpdate ? 'animate-spin' : ''} />
-            <span>Updates</span>
-            {updateResult?.hasUpdate && (
-              <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
-            )}
-          </button>
-        </div>
-
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-7 space-y-6 bg-[var(--theme-bg-surface,#12131d)]">
-          {/* TAB 1: AUDIO DEVICES */}
-          {activeTab === 'devices' && (
-            <div className="space-y-5">
-              {/* Virtual Microphone Status Banner */}
-              {virtualOutput ? (
-                <div className="p-4 bg-[#00ff88]/10 rounded-[14px] border border-[#00ff88]/30 flex items-center justify-between">
-                  <div className="flex items-center gap-3.5">
-                    <CheckCircle2 size={22} className="text-[#00ff88] flex-shrink-0" />
-                    <div>
-                      <h4 className="text-[13px] font-bold text-white flex items-center gap-2">
-                        <span>Virtual Microphone Ready</span>
-                        <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-[#00ff88] text-black font-extrabold uppercase">
-                          Connected
-                        </span>
-                      </h4>
-                      <p className="text-[11.5px] text-[#a4abbd] mt-1 leading-relaxed">
-                        Routing through <strong className="text-white">{virtualOutput.label}</strong>. In Discord, Steam, or games, set your microphone device to <strong>CABLE Output</strong>.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={refreshDevices}
-                    title="Refresh audio devices"
-                    className="p-2 rounded-[8px] bg-white/5 hover:bg-white/10 text-[#a4abbd] hover:text-white transition-colors cursor-pointer"
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div className="p-4.5 bg-[#ff8c00]/15 rounded-[14px] border border-[#ff8c00]/40 flex flex-col gap-3">
-                  <div className="flex items-start gap-3.5">
-                    <AlertTriangle size={22} className="text-[#ff8c00] flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <h4 className="text-[13.5px] font-bold text-white">
-                        Virtual Audio Cable Driver Required
-                      </h4>
-                      <p className="text-[11.5px] text-[#c4cad7] leading-relaxed mt-1">
-                        Windows requires the virtual audio cable pipe so Discord, TeamSpeak, and games can hear your soundboard audio as a microphone.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-1">
-                    <button
-                      onClick={handleInstallDriver}
-                      disabled={installingDriver}
-                      className="px-4 py-2 rounded-[9px] text-[12px] font-bold text-white bg-[#0067c0] hover:bg-[#187ad2] flex items-center gap-2 transition-all shadow-md cursor-pointer"
-                    >
-                      <Download size={14} />
-                      <span>{installingDriver ? 'Installing Driver...' : '1-Click Install Virtual Microphone'}</span>
-                    </button>
-                    <button
-                      onClick={refreshDevices}
-                      className="px-3 py-2 rounded-[9px] text-[11.5px] font-semibold text-[#a4abbd] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 1. PHYSICAL MICROPHONE */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Mic size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">1. Physical Microphone (Voice Input)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 text-[11px] text-[#00ff88] font-bold bg-[#00ff88]/10 px-2.5 py-0.5 rounded-full border border-[#00ff88]/20">
-                      <ShieldCheck size={12} /> Anti-Loop Active
-                    </span>
-                    <div
-                      onClick={() =>
-                        setLocalSettings((prev) => ({
-                          ...prev,
-                          isMicPassThroughEnabled: !prev.isMicPassThroughEnabled,
-                        }))
-                      }
-                      className="flex items-center gap-1.5 cursor-pointer ml-1 select-none group"
-                    >
-                      <div
-                        style={
-                          localSettings.isMicPassThroughEnabled
-                            ? {
-                                backgroundColor: accent,
-                                borderColor: accent,
-                              }
-                            : undefined
-                        }
-                        className={`w-4 h-4 rounded-[4px] flex items-center justify-center transition-all duration-150 border ${
-                          localSettings.isMicPassThroughEnabled
-                            ? ''
-                            : 'bg-[#101217] border-[#2c3140] group-hover:border-[#42495d]'
-                        }`}
-                      >
-                        {localSettings.isMicPassThroughEnabled && (
-                          <Check size={11} className="text-white stroke-[3.5]" />
-                        )}
-                      </div>
-                      <span className="text-[11.5px] font-semibold text-[#a4abbd] group-hover:text-white transition-colors">
-                        Pass-Through
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Your real headset or desktop microphone. Pass-through feeds your real voice directly into the virtual cable alongside soundboard sounds.
-                </p>
-
-                <select
-                  value={localSettings.inputDeviceId}
-                  onChange={(e) =>
-                    setLocalSettings((prev) => ({ ...prev, inputDeviceId: e.target.value }))
-                  }
-                  className="w-full p-3 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12.5px] text-white focus:outline-none transition-colors"
-                >
-                  <option value="">Default Microphone (Windows System Default)</option>
-                  {inputDevices.map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || `Microphone (${d.deviceId.slice(0, 8)})`}
-                    </option>
-                  ))}
-                </select>
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-4xl bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
+      >
+        {/* Left Navigation Sidebar */}
+        <aside className="w-64 min-w-[256px] bg-[#0E121A] border-r border-[#1B222E] flex flex-col justify-between p-5 select-none">
+          <div className="space-y-6">
+            {/* Header: Logo and App Title */}
+            <div className="flex items-center gap-3 px-2 py-1">
+              <div className="w-8 h-8 rounded-xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center shadow-sm">
+                <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
               </div>
-
-              {/* 2. HEADPHONES / MONITOR */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Headphones size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">2. Your Headphones (Personal Monitor)</span>
-                  </div>
-                  <button
-                    onClick={() => handleTestAudio(localSettings.primaryDeviceId)}
-                    className="px-3 py-1.5 rounded-[8px] text-[11.5px] font-semibold bg-white/10 hover:bg-white/20 text-white flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <Play size={11} className="fill-current" /> Test Audio
-                  </button>
-                </div>
-
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Where YOU hear the sounds playing. Usually your main headset or speakers.
-                </p>
-
-                <select
-                  value={localSettings.primaryDeviceId}
-                  onChange={(e) =>
-                    setLocalSettings((prev) => ({ ...prev, primaryDeviceId: e.target.value }))
-                  }
-                  className="w-full p-3 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12.5px] text-white focus:outline-none transition-colors"
-                >
-                  <option value="default">Default Device (Windows System Default)</option>
-                  {outputDevices.map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || `Audio Output (${d.deviceId.slice(0, 8)})`}
-                    </option>
-                  ))}
-                </select>
+              <div>
+                <h2 className="text-[14px] font-black tracking-wide text-white flex items-center gap-1.5">
+                  PRISM <span style={{ color: accent }}>SETTINGS</span>
+                </h2>
+                <span className="text-[10px] font-mono font-bold text-[#5A687C]">v1.5.4</span>
               </div>
             </div>
-          )}
 
-          {/* TAB 2: VOICE & NOISE GATE */}
-          {activeTab === 'voice' && (
-            <div className="space-y-5">
-              {/* Live Microphone Meter */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-white font-bold text-[13px]">
-                    <Mic size={17} style={{ color: accent }} />
-                    <span>Real-Time Voice Volume & VU Meter</span>
-                  </div>
-                  <span className="font-mono text-[12px] font-bold text-white">
-                    {Math.round(rawDb)} dB
-                  </span>
-                </div>
-
-                <div className="h-4 bg-[#111319] rounded-[6px] border border-[#2a2f3f] overflow-hidden p-0.5 relative">
-                  <div
-                    className="h-full rounded-[4px] transition-all duration-75"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, micLevel * 100))}%`,
-                      backgroundColor: accent,
-                    }}
+            {/* Navigation Category Groups */}
+            <nav className="space-y-5">
+              {/* Group 1: Audio & Voice */}
+              <div className="space-y-1">
+                <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-[#5A687C]">
+                  Audio & Voice
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('devices')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                    activeTab === 'devices'
+                      ? 'bg-[#151B25] text-white border border-[#1B222E] shadow-sm'
+                      : 'text-[#8E95A5] hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <Radio
+                    size={16}
+                    style={activeTab === 'devices' ? { color: accent } : undefined}
+                    className="flex-shrink-0"
                   />
-                </div>
+                  <span>Audio Devices</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('voice')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                    activeTab === 'voice'
+                      ? 'bg-[#151B25] text-white border border-[#1B222E] shadow-sm'
+                      : 'text-[#8E95A5] hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <Mic
+                    size={16}
+                    style={activeTab === 'voice' ? { color: accent } : undefined}
+                    className="flex-shrink-0"
+                  />
+                  <span>Voice & Noise Gate</span>
+                </button>
               </div>
 
-              {/* Voice Volume Boost */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-white font-bold text-[13px]">
-                    <Volume2 size={17} style={{ color: localSettings.micInputVolume > 100 ? '#f59e0b' : accent }} />
-                    <span>Mic Gain & Projection</span>
-                  </div>
-                  <span
-                    className={`font-mono text-[12px] font-bold px-2 py-0.5 rounded border ${
-                      localSettings.micInputVolume > 100 ? 'border-[#f59e0b]/50 text-[#f59e0b]' : 'border-white/10 text-white'
-                    }`}
-                  >
-                    {localSettings.micInputVolume}%
-                  </span>
-                </div>
-
-                <input
-                  type="range"
-                  min={0}
-                  max={200}
-                  value={localSettings.micInputVolume}
-                  onChange={(e) => {
-                    const vol = parseInt(e.target.value) || 0;
-                    setLocalSettings((prev) => ({ ...prev, micInputVolume: vol }));
-                    audioEngine.setMicInputVolume(vol);
-                  }}
-                  className="w-full h-2 bg-[#2d3242] rounded cursor-pointer"
-                  style={{ accentColor: localSettings.micInputVolume > 100 ? '#f59e0b' : accent }}
-                />
+              {/* Group 2: Controls */}
+              <div className="space-y-1">
+                <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-[#5A687C]">
+                  Controls & Keys
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('hotkeys')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                    activeTab === 'hotkeys'
+                      ? 'bg-[#151B25] text-white border border-[#1B222E] shadow-sm'
+                      : 'text-[#8E95A5] hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <Sliders
+                    size={16}
+                    style={activeTab === 'hotkeys' ? { color: accent } : undefined}
+                    className="flex-shrink-0"
+                  />
+                  <span>Global Hotkeys</span>
+                </button>
               </div>
 
-              {/* Noise Gate */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-[13px] font-bold text-white">Microphone Noise Gate</h4>
-                    <p className="text-[11.5px] text-[#7e8697]">
-                      Silences background keyboard clicks and fan hum below threshold
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setLocalSettings((prev) => ({
-                        ...prev,
-                        isNoiseGateEnabled: !prev.isNoiseGateEnabled,
-                      }));
-                      audioEngine.setNoiseGateEnabled(!localSettings.isNoiseGateEnabled);
-                    }}
-                    style={localSettings.isNoiseGateEnabled ? { backgroundColor: accent } : undefined}
-                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                      localSettings.isNoiseGateEnabled ? '' : 'bg-[#2a2f3d]'
-                    }`}
-                  >
-                    <span
-                      className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                        localSettings.isNoiseGateEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+              {/* Group 3: Data & Updates */}
+              <div className="space-y-1">
+                <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-[#5A687C]">
+                  System & Storage
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('backup')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                    activeTab === 'backup'
+                      ? 'bg-[#151B25] text-white border border-[#1B222E] shadow-sm'
+                      : 'text-[#8E95A5] hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <FolderOpen
+                    size={16}
+                    style={activeTab === 'backup' ? { color: accent } : undefined}
+                    className="flex-shrink-0"
+                  />
+                  <span>Backup & Storage</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('updates')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center justify-between transition-all cursor-pointer ${
+                    activeTab === 'updates'
+                      ? 'bg-[#151B25] text-white border border-[#1B222E] shadow-sm'
+                      : 'text-[#8E95A5] hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <RefreshCw
+                      size={16}
+                      style={activeTab === 'updates' ? { color: accent } : undefined}
+                      className={`flex-shrink-0 ${isCheckingUpdate ? 'animate-spin' : ''}`}
                     />
-                  </button>
-                </div>
+                    <span>Updates</span>
+                  </div>
+                  {updateResult?.hasUpdate && (
+                    <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
+                  )}
+                </button>
+              </div>
+            </nav>
+          </div>
 
-                {localSettings.isNoiseGateEnabled && (
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between text-[11.5px] text-[#8e97aa] mb-1">
-                      <span>Gate Threshold</span>
-                      <span className="font-mono font-bold text-white">{localSettings.noiseGateThreshold || -39} dB</span>
+          {/* Sidebar Footer Info */}
+          <div className="px-3 pt-4 border-t border-[#1B222E] flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-[#5A687C]">Prism Soundboard</span>
+            <span className="text-[10px] text-[#424d5d]">Production Release</span>
+          </div>
+        </aside>
+
+        {/* Right Content Area */}
+        <main className="flex-1 flex flex-col bg-[#0B0E14] overflow-hidden">
+          {/* Main Top Header */}
+          <header className="h-16 px-8 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/70 backdrop-blur-md shrink-0">
+            <div>
+              <h3 className="text-[15px] font-bold text-white tracking-wide">
+                {activeTab === 'devices' && 'Audio Devices & Routing'}
+                {activeTab === 'voice' && 'Microphone & Noise Gate'}
+                {activeTab === 'hotkeys' && 'Global Shortcuts & Keybindings'}
+                {activeTab === 'backup' && 'Backup, Storage & Maintenance'}
+                {activeTab === 'updates' && 'Application Updates'}
+              </h3>
+              <p className="text-[11px] text-[#5A687C]">
+                {activeTab === 'devices' && 'Configure physical microphones, headsets, and virtual cables'}
+                {activeTab === 'voice' && 'Real-time VU meter, sensitivity threshold, and voice projection'}
+                {activeTab === 'hotkeys' && 'Set global hotkeys for instant replay, overlay HUD, and panic stop'}
+                {activeTab === 'backup' && 'Manage your sounds directory, export backups, and recycle bin'}
+                {activeTab === 'updates' && 'Check for updates and automatically install the latest release'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="Close Settings (Esc)"
+            >
+              <X size={15} />
+            </button>
+          </header>
+
+          {/* Scrollable Settings Panel */}
+          <div className="flex-1 overflow-y-auto p-8 space-y-5 bg-[#0B0E14]">
+            {/* TAB 1: AUDIO DEVICES */}
+            {activeTab === 'devices' && (
+              <div className="space-y-5 animate-in fade-in duration-100">
+                {/* Virtual Microphone Status Banner */}
+                {virtualOutput ? (
+                  <div className="p-4 rounded-2xl bg-[#10141C] border border-[#1B222E] flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                        <CheckCircle2 size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-[13px] font-bold text-white flex items-center gap-2">
+                          <span>Virtual Microphone Ready</span>
+                          <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-bold uppercase tracking-wider">
+                            Connected
+                          </span>
+                        </h4>
+                        <p className="text-[11.5px] text-[#5A687C] mt-0.5">
+                          Routing through <span className="text-[#8E95A5] font-semibold">{virtualOutput.label}</span>. In Discord or games, choose <span className="text-white font-medium">CABLE Output</span> as your microphone.
+                        </p>
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min={-70}
-                      max={-10}
-                      value={localSettings.noiseGateThreshold || -39}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        setLocalSettings((prev) => ({ ...prev, noiseGateThreshold: val }));
-                        audioEngine.setNoiseGateThreshold(val);
-                      }}
-                      className="w-full h-2 bg-[#2d3242] rounded cursor-pointer"
-                      style={{ accentColor: accent }}
-                    />
+                    <button
+                      type="button"
+                      onClick={refreshDevices}
+                      title="Refresh audio devices"
+                      className="p-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white transition-colors cursor-pointer"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-[#2a1d0f] border border-[#f59e0b]/30 flex flex-col gap-3 shadow-sm">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#f59e0b]/20 flex items-center justify-center text-[#f59e0b] flex-shrink-0 mt-0.5">
+                        <AlertTriangle size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-[13.5px] font-bold text-white">
+                          Virtual Audio Cable Driver Required
+                        </h4>
+                        <p className="text-[11.5px] text-[#8E95A5] leading-relaxed mt-0.5">
+                          Windows requires the virtual audio pipe so Discord, Steam, TeamSpeak, and games can hear your soundboard audio as a microphone.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleInstallDriver}
+                        disabled={installingDriver}
+                        className="px-4 py-2 rounded-xl text-[12px] font-bold text-[#090C12] bg-[#31C5F4] hover:brightness-110 active:scale-95 flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                      >
+                        <Download size={14} />
+                        <span>{installingDriver ? 'Installing Driver...' : '1-Click Install Virtual Microphone'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={refreshDevices}
+                        className="px-3.5 py-2 rounded-xl text-[11.5px] font-semibold text-[#8E95A5] hover:text-white bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] transition-colors cursor-pointer"
+                      >
+                        Refresh
+                      </button>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
 
-          {/* TAB 3: SHORTCUTS & HOTKEYS */}
-          {activeTab === 'hotkeys' && (
-            <div className="space-y-5">
-              {/* Quick Instant Replay Audio Clip Recording */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Clapperboard size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">Audio Clip Shortcut</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setRecordingRecordClip(true);
-                      setRecordingVideoClip(false);
-                      setRecordingPanic(false);
-                      setRecordingOverlay(false);
-                    }}
-                    style={
-                      recordingRecordClip
-                        ? { backgroundColor: accent, color: '#000000', borderColor: accent }
-                        : undefined
-                    }
-                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-mono border transition-all cursor-pointer ${
-                      recordingRecordClip
-                        ? 'animate-pulse font-extrabold'
-                        : 'bg-[#111319] text-white border-[#2a2f3f] hover:border-white/40'
-                    }`}
-                  >
-                    {recordingRecordClip ? 'Press any Key...' : localSettings.recordHotkey || 'F9'}
-                  </button>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Instantly snips the last {localSettings.recordDuration || 5} seconds of audio into your soundboard.
-                </p>
-
-                {/* Duration & Recording Source Selector */}
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#8e97aa] mb-1.5">
-                      Clip Buffer Length
-                    </label>
-                    <select
-                      value={localSettings.recordDuration || 5}
-                      onChange={(e) =>
-                        setLocalSettings((prev) => ({
-                          ...prev,
-                          recordDuration: parseInt(e.target.value) || 5,
-                        }))
-                      }
-                      className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white focus:outline-none transition-colors"
-                    >
-                      <option value={3}>Last 3 Seconds</option>
-                      <option value={5}>Last 5 Seconds</option>
-                      <option value={10}>Last 10 Seconds</option>
-                      <option value={15}>Last 15 Seconds</option>
-                      <option value={30}>Last 30 Seconds</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#8e97aa] mb-1.5">
-                      Recording Source
-                    </label>
-                    <div className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white flex items-center justify-between">
-                      <span className="font-semibold text-white">Screen + Mic Combined</span>
-                      <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-[#31C5F4]/15 text-[#31C5F4] font-medium border border-[#31C5F4]/30">Active</span>
+                {/* 1. PHYSICAL MICROPHONE */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Mic size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">1. Physical Microphone (Voice Input)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1 text-[10.5px] text-[#10b981] font-bold bg-[#10b981]/10 px-2.5 py-0.5 rounded-full border border-[#10b981]/25">
+                        <ShieldCheck size={12} /> Anti-Loop Active
+                      </span>
+                      <div className="flex items-center gap-2 select-none">
+                        <span className="text-[11.5px] font-semibold text-[#8E95A5]">
+                          Pass-Through
+                        </span>
+                        <ToggleSwitch
+                          checked={localSettings.isMicPassThroughEnabled !== false}
+                          onChange={(checked) =>
+                            setLocalSettings((prev) => ({ ...prev, isMicPassThroughEnabled: checked }))
+                          }
+                          accent={accent}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Medal-like Game/Screen Video Clipping Shortcut */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Video size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">Screen Video Clip Shortcut (Medal-like)</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setRecordingVideoClip(true);
-                      setRecordingRecordClip(false);
-                      setRecordingPanic(false);
-                      setRecordingOverlay(false);
-                    }}
-                    style={
-                      recordingVideoClip
-                        ? { backgroundColor: accent, color: '#000000', borderColor: accent }
-                        : undefined
-                    }
-                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-mono border transition-all cursor-pointer ${
-                      recordingVideoClip
-                        ? 'animate-pulse font-extrabold'
-                        : 'bg-[#111319] text-white border-[#2a2f3f] hover:border-white/40'
-                    }`}
-                  >
-                    {recordingVideoClip ? 'Press any Key...' : localSettings.videoClipHotkey || 'F10'}
-                  </button>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Captures the last {localSettings.videoClipDuration || 30} seconds of game/screen video and saves to your Videos folder.
-                </p>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Your real headset or desktop microphone. Pass-through feeds your real voice directly into the virtual cable alongside soundboard sounds.
+                  </p>
 
-                <div className="w-1/2">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#8e97aa] mb-1.5">
-                    Video Clip Length
-                  </label>
                   <select
-                    value={localSettings.videoClipDuration || 30}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10) || 30;
-                      setLocalSettings((prev) => ({
-                        ...prev,
-                        videoClipDuration: val,
-                      }));
-                      videoClipper.setDuration(val);
-                    }}
-                    className="w-full p-2.5 bg-[#111319] border border-[#2a2f3f] rounded-[10px] text-[12px] text-white focus:outline-none transition-colors"
+                    value={localSettings.inputDeviceId}
+                    onChange={(e) =>
+                      setLocalSettings((prev) => ({ ...prev, inputDeviceId: e.target.value }))
+                    }
+                    className="w-full p-3 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12.5px] text-white focus:outline-none focus:border-[#31C5F4]/50 transition-colors cursor-pointer"
                   >
-                    <option value={15}>Last 15 Seconds</option>
-                    <option value={30}>Last 30 Seconds</option>
-                    <option value={45}>Last 45 Seconds</option>
-                    <option value={60}>Last 60 Seconds</option>
+                    <option value="">Default Microphone (Windows System Default)</option>
+                    {inputDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Microphone (${d.deviceId.slice(0, 8)})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. HEADPHONES / MONITOR */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Headphones size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">2. Your Headphones (Personal Monitor)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTestAudio(localSettings.primaryDeviceId)}
+                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <Play size={11} className="fill-current text-[#31C5F4]" /> Test Audio
+                    </button>
+                  </div>
+
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Where YOU hear the sounds playing. Usually your main headset or speakers.
+                  </p>
+
+                  <select
+                    value={localSettings.primaryDeviceId}
+                    onChange={(e) =>
+                      setLocalSettings((prev) => ({ ...prev, primaryDeviceId: e.target.value }))
+                    }
+                    className="w-full p-3 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12.5px] text-white focus:outline-none focus:border-[#31C5F4]/50 transition-colors cursor-pointer"
+                  >
+                    <option value="">Default Speakers (Windows System Default)</option>
+                    {outputDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Speakers (${d.deviceId.slice(0, 8)})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. VIRTUAL CABLE (MICROPHONE PROJECTION) */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Radio size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">3. Virtual Cable (Microphone Projection)</span>
+                    </div>
+                    <div className="flex items-center gap-2 select-none">
+                      <span className="text-[11.5px] font-semibold text-[#8E95A5]">
+                        Enable Projection
+                      </span>
+                      <ToggleSwitch
+                        checked={localSettings.isSecondaryEnabled}
+                        onChange={(checked) =>
+                          setLocalSettings((prev) => ({ ...prev, isSecondaryEnabled: checked }))
+                        }
+                        accent={accent}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Where OTHERS hear the sounds. Directs audio into games, Discord, and streaming apps.
+                  </p>
+
+                  <select
+                    value={localSettings.secondaryDeviceId}
+                    onChange={(e) =>
+                      setLocalSettings((prev) => ({ ...prev, secondaryDeviceId: e.target.value }))
+                    }
+                    className="w-full p-3 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12.5px] text-white focus:outline-none focus:border-[#31C5F4]/50 transition-colors cursor-pointer"
+                  >
+                    <option value="">Select Virtual Output Cable...</option>
+                    {outputDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Output Device (${d.deviceId.slice(0, 8)})`}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
+            )}
 
-              {/* Stop All Panic Hotkey */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Sliders size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">Stop All Sounds (Panic Key)</span>
+            {/* TAB 2: VOICE & NOISE GATE */}
+            {activeTab === 'voice' && (
+              <div className="space-y-5 animate-in fade-in duration-100">
+                {/* Real-Time Microphone VU Meter Card */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white font-bold text-[13.5px]">
+                      <Mic size={17} style={{ color: accent }} />
+                      <span>Live Microphone Input Meter</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                          isGateOpen
+                            ? 'bg-[#10b981]/15 border-[#10b981]/40 text-[#10b981]'
+                            : 'bg-[#f59e0b]/15 border-[#f59e0b]/40 text-[#f59e0b]'
+                        }`}
+                      >
+                        {isGateOpen ? 'GATE OPEN' : 'MUTED (GATE)'}
+                      </span>
+                      <span className="font-mono text-[11px] font-bold text-[#8E95A5]">
+                        {rawDb > -99 ? `${Math.round(rawDb)} dB` : '-∞ dB'}
+                      </span>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setRecordingPanic(true);
-                      setRecordingOverlay(false);
-                      setRecordingRecordClip(false);
-                    }}
-                    style={
-                      recordingPanic
-                        ? { backgroundColor: accent, color: '#000000', borderColor: accent }
-                        : undefined
-                    }
-                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-mono border transition-all cursor-pointer ${
-                      recordingPanic
-                        ? 'animate-pulse font-extrabold'
-                        : 'bg-[#111319] text-white border-[#2a2f3f] hover:border-white/40'
-                    }`}
-                  >
-                    {recordingPanic ? 'Press any Key...' : localSettings.panicHotkey || 'Esc'}
-                  </button>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Instantly terminates all active sound playback and clears queue.
-                </p>
-              </div>
 
-              {/* Repeat Last Sound Hotkey */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <RotateCcw size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">Repeat Last Sound Hotkey</span>
+                  {/* VU Level Bar */}
+                  <div className="w-full h-3 bg-[#0E131A] rounded-full overflow-hidden border border-[#1B222E] relative p-0.5">
+                    <div
+                      className="h-full rounded-full transition-all duration-75"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, micLevel * 100))}%`,
+                        backgroundColor: accent,
+                      }}
+                    />
                   </div>
-                  <button
-                    onClick={() => {
-                      setRecordingRepeatLast(true);
-                      setRecordingPanic(false);
-                      setRecordingOverlay(false);
-                      setRecordingRecordClip(false);
-                    }}
-                    style={
-                      recordingRepeatLast
-                        ? { backgroundColor: accent, color: '#000000', borderColor: accent }
-                        : undefined
-                    }
-                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-mono border transition-all cursor-pointer ${
-                      recordingRepeatLast
-                        ? 'animate-pulse font-extrabold'
-                        : 'bg-[#111319] text-white border-[#2a2f3f] hover:border-white/40'
-                    }`}
-                  >
-                    {recordingRepeatLast ? 'Press any Key...' : localSettings.repeatLastHotkey || 'F7'}
-                  </button>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Instantly replays the most recently played sound with a single keypress.
-                </p>
-              </div>
-
-              {/* In-Game Overlay HUD Hotkey */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Sliders size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">In-Game Overlay Hotkey</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setRecordingOverlay(true);
-                      setRecordingPanic(false);
-                      setRecordingRecordClip(false);
-                    }}
-                    style={
-                      recordingOverlay
-                        ? { backgroundColor: accent, color: '#000000', borderColor: accent }
-                        : undefined
-                    }
-                    className={`px-3 py-1.5 rounded-[8px] text-[12px] font-mono border transition-all cursor-pointer ${
-                      recordingOverlay
-                        ? 'animate-pulse font-extrabold'
-                        : 'bg-[#111319] text-white border-[#2a2f3f] hover:border-white/40'
-                    }`}
-                  >
-                    {recordingOverlay ? 'Press any Key...' : localSettings.overlayHotkey || 'F8'}
-                  </button>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Pops up the interactive soundboard HUD directly over full-screen games without alt-tabbing.
-                </p>
-              </div>
-
-              {/* Startup & System Tray Behavior */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-4">
-                <div className="flex items-center gap-2.5 text-white">
-                  <Power size={17} style={{ color: accent }} />
-                  <span className="text-[13.5px] font-bold">Startup & System Tray</span>
+                  <p className="text-[11px] text-[#5A687C]">
+                    Speak into your microphone to verify level detection and noise threshold calibration.
+                  </p>
                 </div>
 
-                {/* Option: Start on Boot */}
-                <label className="flex items-center justify-between cursor-pointer group select-none">
-                  <div className="space-y-0.5">
-                    <span className="text-[13px] font-semibold text-white/90 group-hover:text-white transition-colors">
-                      Start on Windows Boot
+                {/* Voice Volume Boost */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-white font-bold text-[13.5px]">
+                      <Volume2 size={17} style={{ color: localSettings.micInputVolume > 100 ? '#f59e0b' : accent }} />
+                      <span>Mic Gain & Projection</span>
+                    </div>
+                    <span
+                      className={`font-mono text-[11.5px] font-bold px-2 py-0.5 rounded-lg border ${
+                        localSettings.micInputVolume > 100 ? 'border-[#f59e0b]/40 text-[#f59e0b] bg-[#f59e0b]/10' : 'border-[#31C5F4]/40 text-[#31C5F4] bg-[#31C5F4]/10'
+                      }`}
+                    >
+                      {localSettings.micInputVolume}%
                     </span>
-                    <p className="text-[11.5px] text-[#7e8697]">
-                      Automatically launch Prism Soundboard when Windows starts up.
-                    </p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={localSettings.startOnBoot || false}
-                    onChange={(e) =>
-                      setLocalSettings({ ...localSettings, startOnBoot: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded cursor-pointer transition-all"
-                    style={{ accentColor: accent }}
-                  />
-                </label>
 
-                {/* Option: Start in Tray (Minimized) */}
-                <label className="flex items-center justify-between cursor-pointer group select-none pt-2 border-t border-[var(--theme-border,#222436)]">
-                  <div className="space-y-0.5">
-                    <span className="text-[13px] font-semibold text-white/90 group-hover:text-white transition-colors">
-                      Start Minimized to System Tray
-                    </span>
-                    <p className="text-[11.5px] text-[#7e8697]">
-                      Keep the main window hidden on launch and run silently in the taskbar notification tray.
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={localSettings.startInTray || false}
-                    onChange={(e) =>
-                      setLocalSettings({ ...localSettings, startInTray: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded cursor-pointer transition-all"
-                    style={{ accentColor: accent }}
+                  <Slider
+                    min={0}
+                    max={200}
+                    step={1}
+                    value={localSettings.micInputVolume}
+                    onChange={(vol) => {
+                      setLocalSettings((prev) => ({ ...prev, micInputVolume: vol }));
+                      audioEngine.setMicInputVolume(vol);
+                    }}
+                    fillColor={localSettings.micInputVolume > 100 ? '#f59e0b' : accent}
                   />
-                </label>
+                  <p className="text-[11px] text-[#5A687C]">
+                    Controls how loud your voice is projected to other players through the virtual microphone cable.
+                  </p>
+                </div>
 
-                {/* Option: Minimize to Tray on Close */}
-                <label className="flex items-center justify-between cursor-pointer group select-none pt-2 border-t border-[var(--theme-border,#222436)]">
-                  <div className="space-y-0.5">
-                    <span className="text-[13px] font-semibold text-white/90 group-hover:text-white transition-colors">
-                      Minimize to System Tray on Close (X)
-                    </span>
-                    <p className="text-[11.5px] text-[#7e8697]">
-                      Closing the window keeps the soundboard running in the background for global hotkeys.
-                    </p>
+                {/* Noise Gate */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-[13.5px] font-bold text-white">Microphone Noise Gate</h4>
+                      <p className="text-[11.5px] text-[#5A687C]">
+                        Silences background keyboard clicks and fan hum below the selected threshold
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={localSettings.isNoiseGateEnabled || false}
+                      onChange={(checked) => {
+                        setLocalSettings((prev) => ({ ...prev, isNoiseGateEnabled: checked }));
+                        audioEngine.setNoiseGateEnabled(checked);
+                      }}
+                      accent={accent}
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={localSettings.minimizeToTray !== false}
-                    onChange={(e) =>
-                      setLocalSettings({ ...localSettings, minimizeToTray: e.target.checked })
-                    }
-                    className="w-4 h-4 rounded cursor-pointer transition-all"
-                    style={{ accentColor: accent }}
-                  />
-                </label>
+
+                  {localSettings.isNoiseGateEnabled && (
+                    <div className="pt-2 border-t border-[#1B222E] space-y-2.5">
+                      <div className="flex items-center justify-between text-[11.5px]">
+                        <span className="text-[#8E95A5] font-semibold">Gate Threshold</span>
+                        <span className="font-mono font-bold text-[#31C5F4]">{localSettings.noiseGateThreshold || -39} dB</span>
+                      </div>
+                      <Slider
+                        min={-70}
+                        max={-10}
+                        step={1}
+                        value={localSettings.noiseGateThreshold || -39}
+                        onChange={(val) => {
+                          setLocalSettings((prev) => ({ ...prev, noiseGateThreshold: val }));
+                          audioEngine.setNoiseGateThreshold(val);
+                        }}
+                        fillColor={accent}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB 4: BACKUP & STORAGE */}
-          {activeTab === 'backup' && (
-            <div className="space-y-5">
-              {/* Unified Media Storage Location (Sounds & Videos) */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
-                <div className="flex items-center justify-between">
+            {/* TAB 3: SHORTCUTS & HOTKEYS */}
+            {activeTab === 'hotkeys' && (
+              <div className="space-y-5 animate-in fade-in duration-100">
+                {/* Quick Instant Replay Audio Clip Recording */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Clapperboard size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">Audio Clip Shortcut (Instant Replay)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recordingRecordClip) {
+                          setRecordingRecordClip(false);
+                        } else {
+                          setRecordingRecordClip(true);
+                          setRecordingVideoClip(false);
+                          setRecordingPanic(false);
+                          setRecordingOverlay(false);
+                          setRecordingRepeatLast(false);
+                        }
+                      }}
+                      style={
+                        recordingRecordClip
+                          ? { backgroundColor: accent, color: '#090C12', borderColor: accent }
+                          : undefined
+                      }
+                      className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
+                        recordingRecordClip
+                          ? 'animate-pulse font-extrabold shadow-md'
+                          : 'bg-[#151B25] text-white border-[#1B222E] hover:border-[#31C5F4]/50'
+                      }`}
+                    >
+                      {recordingRecordClip ? 'Press any Key...' : localSettings.recordHotkey || 'F9'}
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Instantly snips the last {localSettings.recordDuration || 5} seconds of audio directly into your soundboard.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#5A687C] mb-1.5">
+                        Clip Buffer Length
+                      </label>
+                      <select
+                        value={localSettings.recordDuration || 5}
+                        onChange={(e) =>
+                          setLocalSettings((prev) => ({
+                            ...prev,
+                            recordDuration: parseInt(e.target.value) || 5,
+                          }))
+                        }
+                        className="w-full p-2.5 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12px] text-white focus:outline-none focus:border-[#31C5F4]/50 cursor-pointer transition-colors"
+                      >
+                        <option value={3}>Last 3 Seconds</option>
+                        <option value={5}>Last 5 Seconds</option>
+                        <option value={10}>Last 10 Seconds</option>
+                        <option value={15}>Last 15 Seconds</option>
+                        <option value={30}>Last 30 Seconds</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#5A687C] mb-1.5">
+                        Recording Source
+                      </label>
+                      <div className="w-full p-2.5 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12px] text-white flex items-center justify-between">
+                        <span className="font-semibold text-white">Screen + Mic Combined</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#31C5F4]/15 text-[#31C5F4] font-medium border border-[#31C5F4]/30">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Screen Video Clipping Shortcut */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Video size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">Screen Video Clip Shortcut (Medal-like)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recordingVideoClip) {
+                          setRecordingVideoClip(false);
+                        } else {
+                          setRecordingVideoClip(true);
+                          setRecordingRecordClip(false);
+                          setRecordingPanic(false);
+                          setRecordingOverlay(false);
+                          setRecordingRepeatLast(false);
+                        }
+                      }}
+                      style={
+                        recordingVideoClip
+                          ? { backgroundColor: accent, color: '#090C12', borderColor: accent }
+                          : undefined
+                      }
+                      className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
+                        recordingVideoClip
+                          ? 'animate-pulse font-extrabold shadow-md'
+                          : 'bg-[#151B25] text-white border-[#1B222E] hover:border-[#31C5F4]/50'
+                      }`}
+                    >
+                      {recordingVideoClip ? 'Press any Key...' : localSettings.videoClipHotkey || 'F10'}
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Captures the last {localSettings.videoClipDuration || 30} seconds of screen and game video into your Videos library.
+                  </p>
+
+                  <div className="w-1/2">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#5A687C] mb-1.5">
+                      Video Clip Duration
+                    </label>
+                    <select
+                      value={localSettings.videoClipDuration || 30}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10) || 30;
+                        setLocalSettings((prev) => ({
+                          ...prev,
+                          videoClipDuration: val,
+                        }));
+                        videoClipper.setDuration(val);
+                      }}
+                      className="w-full p-2.5 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12px] text-white focus:outline-none focus:border-[#31C5F4]/50 cursor-pointer transition-colors"
+                    >
+                      <option value={15}>Last 15 Seconds</option>
+                      <option value={30}>Last 30 Seconds</option>
+                      <option value={45}>Last 45 Seconds</option>
+                      <option value={60}>Last 60 Seconds</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Stop All Panic Hotkey */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Sliders size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">Stop All Sounds (Panic Key)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recordingPanic) {
+                          setRecordingPanic(false);
+                        } else {
+                          setRecordingPanic(true);
+                          setRecordingOverlay(false);
+                          setRecordingRecordClip(false);
+                          setRecordingVideoClip(false);
+                          setRecordingRepeatLast(false);
+                        }
+                      }}
+                      style={
+                        recordingPanic
+                          ? { backgroundColor: accent, color: '#090C12', borderColor: accent }
+                          : undefined
+                      }
+                      className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
+                        recordingPanic
+                          ? 'animate-pulse font-extrabold shadow-md'
+                          : 'bg-[#151B25] text-white border-[#1B222E] hover:border-[#31C5F4]/50'
+                      }`}
+                    >
+                      {recordingPanic ? 'Press any Key...' : localSettings.panicHotkey || 'Esc'}
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Instantly terminates all active sound playback and clears queue.
+                  </p>
+                </div>
+
+                {/* Repeat Last Sound Hotkey */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <RotateCcw size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">Repeat Last Sound Hotkey</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recordingRepeatLast) {
+                          setRecordingRepeatLast(false);
+                        } else {
+                          setRecordingRepeatLast(true);
+                          setRecordingPanic(false);
+                          setRecordingOverlay(false);
+                          setRecordingRecordClip(false);
+                          setRecordingVideoClip(false);
+                        }
+                      }}
+                      style={
+                        recordingRepeatLast
+                          ? { backgroundColor: accent, color: '#090C12', borderColor: accent }
+                          : undefined
+                      }
+                      className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
+                        recordingRepeatLast
+                          ? 'animate-pulse font-extrabold shadow-md'
+                          : 'bg-[#151B25] text-white border-[#1B222E] hover:border-[#31C5F4]/50'
+                      }`}
+                    >
+                      {recordingRepeatLast ? 'Press any Key...' : localSettings.repeatLastHotkey || 'F7'}
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Instantly replays the most recently triggered sound with a single keypress.
+                  </p>
+                </div>
+
+                {/* In-Game Overlay HUD Hotkey */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Sliders size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">In-Game Overlay Hotkey</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recordingOverlay) {
+                          setRecordingOverlay(false);
+                        } else {
+                          setRecordingOverlay(true);
+                          setRecordingPanic(false);
+                          setRecordingRecordClip(false);
+                          setRecordingVideoClip(false);
+                          setRecordingRepeatLast(false);
+                        }
+                      }}
+                      style={
+                        recordingOverlay
+                          ? { backgroundColor: accent, color: '#090C12', borderColor: accent }
+                          : undefined
+                      }
+                      className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
+                        recordingOverlay
+                          ? 'animate-pulse font-extrabold shadow-md'
+                          : 'bg-[#151B25] text-white border-[#1B222E] hover:border-[#31C5F4]/50'
+                      }`}
+                    >
+                      {recordingOverlay ? 'Press any Key...' : localSettings.overlayHotkey || 'F8'}
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Pops up the interactive soundboard HUD directly over full-screen games without alt-tabbing.
+                  </p>
+                </div>
+
+                {/* Startup & System Tray Behavior */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-4">
+                  <div className="flex items-center gap-2.5 text-white">
+                    <Power size={17} style={{ color: accent }} />
+                    <span className="text-[13.5px] font-bold">Startup & Background Behavior</span>
+                  </div>
+
+                  {/* Option: Start on Boot */}
+                  <div className="flex items-center justify-between select-none">
+                    <div className="space-y-0.5">
+                      <span className="text-[13px] font-semibold text-white">
+                        Start on Windows Boot
+                      </span>
+                      <p className="text-[11.5px] text-[#5A687C]">
+                        Automatically launch Prism Soundboard when Windows starts up.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={localSettings.startOnBoot || false}
+                      onChange={(checked) => setLocalSettings({ ...localSettings, startOnBoot: checked })}
+                      accent={accent}
+                    />
+                  </div>
+
+                  {/* Option: Start in Tray */}
+                  <div className="flex items-center justify-between select-none pt-3 border-t border-[#1B222E]">
+                    <div className="space-y-0.5">
+                      <span className="text-[13px] font-semibold text-white">
+                        Start Minimized to System Tray
+                      </span>
+                      <p className="text-[11.5px] text-[#5A687C]">
+                        Keep the main window hidden on launch and run silently in the taskbar notification tray.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={localSettings.startInTray || false}
+                      onChange={(checked) => setLocalSettings({ ...localSettings, startInTray: checked })}
+                      accent={accent}
+                    />
+                  </div>
+
+                  {/* Option: Minimize to Tray on Close */}
+                  <div className="flex items-center justify-between select-none pt-3 border-t border-[#1B222E]">
+                    <div className="space-y-0.5">
+                      <span className="text-[13px] font-semibold text-white">
+                        Minimize to System Tray on Close (X)
+                      </span>
+                      <p className="text-[11.5px] text-[#5A687C]">
+                        Closing the window keeps the soundboard running in the background for global hotkeys.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      checked={localSettings.minimizeToTray !== false}
+                      onChange={(checked) => setLocalSettings({ ...localSettings, minimizeToTray: checked })}
+                      accent={accent}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: BACKUP & STORAGE */}
+            {activeTab === 'backup' && (
+              <div className="space-y-5 animate-in fade-in duration-100">
+                {/* Unified Media Storage Location */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <FolderOpen size={17} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold">Media & Clips Storage Location</span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isRelocatingStorage}
+                      onClick={handleChangeStorageFolder}
+                      className="px-3.5 py-1.5 rounded-xl border border-[#31C5F4]/40 bg-[#31C5F4]/15 text-[#31C5F4] text-[11.5px] font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isRelocatingStorage ? 'Relocating...' : 'Change Location'}
+                    </button>
+                  </div>
+
+                  <p className="text-[11.5px] text-[#5A687C] leading-relaxed">
+                    Choose a root folder on your PC. Prism automatically manages <span className="font-mono text-white">/Sounds</span> and <span className="font-mono text-white">/Videos</span> inside it. Changing this location automatically relocates all files!
+                  </p>
+
+                  {storagePaths && (
+                    <div className="p-3 bg-[#151B25] rounded-xl border border-[#1B222E] space-y-1 font-mono text-[11.5px]">
+                      <div className="text-white truncate">
+                        <span className="text-[#5A687C]">Root: </span>{storagePaths.root}
+                      </div>
+                      <div className="text-[#8E95A5] text-[10.5px] flex items-center gap-4">
+                        <span>• {storagePaths.sounds}</span>
+                        <span>• {storagePaths.videos}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {storageRelocateMsg && (
+                    <div
+                      className={`p-3 rounded-xl text-[12px] font-semibold border ${
+                        storageRelocateMsg.error
+                          ? 'bg-[#e81123]/15 border-[#e81123]/30 text-[#ff4d5e]'
+                          : 'bg-[#10b981]/15 border-[#10b981]/30 text-[#10b981]'
+                      }`}
+                    >
+                      {storageRelocateMsg.text}
+                    </div>
+                  )}
+                </div>
+
+                {/* Soundboard Backup */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center gap-2.5 text-white">
+                    <DownloadCloud size={17} style={{ color: accent }} />
+                    <span className="text-[13.5px] font-bold">Soundboard Full Library Backup (.prism)</span>
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C] leading-relaxed">
+                    Export all your sounds, audio files, game video clips, and keybind settings into a single bundled <span className="font-mono font-bold" style={{ color: accent }}>.prism</span> archive or restore one on any PC.
+                  </p>
+
+                  {backupMsg && (
+                    <div
+                      className={`p-3 rounded-xl text-[12px] font-semibold border ${
+                        backupMsg.error
+                          ? 'bg-[#e81123]/15 border-[#e81123]/30 text-[#ff4d5e]'
+                          : 'bg-[#10b981]/15 border-[#10b981]/30 text-[#10b981]'
+                      }`}
+                    >
+                      {backupMsg.text}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleBackupExport}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-white text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <DownloadCloud size={15} style={{ color: accent }} />
+                      <span>Export Backup Archive</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleBackupImport}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-white text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <UploadCloud size={15} style={{ color: accent }} />
+                      <span>Import Backup Archive</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Deleted Sounds Archive */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
                   <div className="flex items-center gap-2.5 text-white">
                     <FolderOpen size={17} style={{ color: accent }} />
-                    <span className="text-[13.5px] font-bold">Unified Media & Clips Storage Location</span>
+                    <span className="text-[13.5px] font-bold">Recycle Bin & Archive Folder</span>
                   </div>
-                  <button
-                    disabled={isRelocatingStorage}
-                    onClick={handleChangeStorageFolder}
-                    style={{ backgroundColor: `${accent}20`, color: accent, borderColor: `${accent}40` }}
-                    className="px-3.5 py-1.5 rounded-[8px] border text-[11.5px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {isRelocatingStorage ? 'Relocating...' : 'Change Location'}
-                  </button>
-                </div>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Deleted sounds are safely moved to the archive directory so you can restore them anytime without losing files.
+                  </p>
 
-                <p className="text-[11.5px] text-[#7e8697] leading-relaxed">
-                  Choose a root folder on your PC. Prism will automatically manage <span className="font-mono text-white font-semibold">/Sounds</span> and <span className="font-mono text-white font-semibold">/Videos</span> inside it. Changing this location automatically moves all your existing audio and video files!
-                </p>
-
-                {storagePaths && (
-                  <div className="p-3 bg-[#111319] rounded-[10px] border border-[#2a2f3f] space-y-1.5 font-mono text-[11.5px]">
-                    <div className="text-white truncate">
-                      <span className="text-[#7e8697]">Root: </span>{storagePaths.root}
-                    </div>
-                    <div className="text-[#8e97aa] text-[10.5px] flex items-center gap-4">
-                      <span>• {storagePaths.sounds}</span>
-                      <span>• {storagePaths.videos}</span>
-                    </div>
-                  </div>
-                )}
-
-                {storageRelocateMsg && (
-                  <div
-                    className={`p-3 rounded-[10px] text-[12px] font-semibold border ${
-                      storageRelocateMsg.error
-                        ? 'bg-[#e81123]/15 border-[#e81123]/30 text-[#ff4d5e]'
-                        : 'bg-[#00ff88]/15 border-[#00ff88]/30 text-[#00ff88]'
-                    }`}
-                  >
-                    {storageRelocateMsg.text}
-                  </div>
-                )}
-              </div>
-
-              {/* Soundboard Backup */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
-                <div className="flex items-center gap-2.5 text-white">
-                  <DownloadCloud size={17} style={{ color: accent }} />
-                  <span className="text-[13.5px] font-bold">Soundboard Full Library Backup (.prism)</span>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697] leading-relaxed">
-                  Export all your added sounds, audio files, game video clips, and keybind settings into a single bundled <span className="font-mono font-bold" style={{ color: accent }}>.prism</span> backup archive or restore one on any PC.
-                </p>
-
-                {backupMsg && (
-                  <div
-                    className={`p-3 rounded-[10px] text-[12px] font-semibold border ${
-                      backupMsg.error
-                        ? 'bg-[#e81123]/15 border-[#e81123]/30 text-[#ff4d5e]'
-                        : 'bg-[#00ff88]/15 border-[#00ff88]/30 text-[#00ff88]'
-                    }`}
-                  >
-                    {backupMsg.text}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3 pt-1">
-                  <button
-                    onClick={handleBackupExport}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-white/30"
-                  >
-                    <DownloadCloud size={15} style={{ color: accent }} />
-                    <span>Export Backup Archive</span>
-                  </button>
-
-                  <button
-                    onClick={handleBackupImport}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-white/30"
-                  >
-                    <UploadCloud size={15} style={{ color: accent }} />
-                    <span>Import Backup Archive</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Deleted Sounds Archive */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
-                <div className="flex items-center gap-2.5 text-white">
-                  <FolderOpen size={17} style={{ color: accent }} />
-                  <span className="text-[13.5px] font-bold">Recycle Bin & Deleted Sounds</span>
-                </div>
-                <p className="text-[11.5px] text-[#7e8697]">
-                  Deleted sounds are stored in the archive folder so you can restore them at any time without losing audio files.
-                </p>
-
-                <div className="flex items-center gap-3 pt-1">
-                  <button
-                    onClick={() => {
-                      if (window.soundboardAPI?.openSoundsDirectory) {
-                        window.soundboardAPI.openSoundsDirectory();
-                      }
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-white/5 hover:bg-white/10 border border-white/10 text-[#c4cad7] hover:text-white text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-white/30"
-                  >
-                    <FolderOpen size={14} style={{ color: accent }} />
-                    <span>Open Sounds Folder in Explorer</span>
-                  </button>
-
-                  {deletedCount > 0 && onOpenDeletedArchive && (
+                  <div className="flex items-center gap-3 pt-1">
                     <button
+                      type="button"
                       onClick={() => {
-                        onClose();
-                        onOpenDeletedArchive();
+                        if (window.soundboardAPI?.openSoundsDirectory) {
+                          window.soundboardAPI.openSoundsDirectory();
+                        }
                       }}
-                      style={{
-                        backgroundColor: `${accent}15`,
-                        borderColor: `${accent}40`,
-                        color: accent,
-                      }}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] border text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:brightness-125"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-white text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
                     >
-                      <span>Restore Deleted ({deletedCount})</span>
+                      <FolderOpen size={14} style={{ color: accent }} />
+                      <span>Open Sounds Folder in Explorer</span>
+                    </button>
+
+                    {deletedCount > 0 && onOpenDeletedArchive && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenDeletedArchive();
+                        }}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#31C5F4]/15 border border-[#31C5F4]/40 text-[#31C5F4] text-[12px] font-bold transition-all cursor-pointer shadow-sm hover:brightness-110 active:scale-95"
+                      >
+                        <span>Restore Deleted ({deletedCount})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Library Clear */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-white">
+                      <Trash2 size={17} className="text-red-400" />
+                      <span className="text-[13.5px] font-bold">Sound Library Management</span>
+                    </div>
+                    {sounds && sounds.length > 0 && (
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#151B25] border border-[#1B222E] text-[#8E95A5]">
+                        {sounds.length} {sounds.length === 1 ? 'sound' : 'sounds'} loaded
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11.5px] text-[#5A687C] leading-relaxed">
+                    Clear all sounds from your active library. You will have the option to save a full backup before clearing.
+                  </p>
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenClearAllModal) {
+                          onClose();
+                          onOpenClearAllModal();
+                        }
+                      }}
+                      disabled={!sounds || sounds.length === 0}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 size={14} />
+                      <span>Clear All Sounds ({sounds?.length || 0})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Danger Zone: Factory Reset */}
+                <div className="p-5 bg-red-500/5 rounded-2xl border border-red-500/20 space-y-3.5">
+                  <div className="flex items-center gap-2.5 text-red-400">
+                    <AlertTriangle size={17} />
+                    <span className="text-[13.5px] font-bold">Danger Zone: Full Factory Reset</span>
+                  </div>
+                  <p className="text-[11.5px] text-[#8E95A5] leading-relaxed">
+                    Permanently deletes all saved sounds, audio files, video clips, and configuration settings, restoring Prism to an absolute fresh state.
+                  </p>
+
+                  {showResetConfirm ? (
+                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3">
+                      <p className="text-[12px] font-bold text-red-400">
+                        Are you completely sure? This will delete EVERYTHING and restart the app!
+                      </p>
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={handleFactoryReset}
+                          disabled={isResettingApp}
+                          className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-[12px] transition-all cursor-pointer shadow-lg disabled:opacity-50"
+                        >
+                          {isResettingApp ? 'Resetting Everything...' : 'Yes, Delete Everything'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowResetConfirm(false)}
+                          disabled={isResettingApp}
+                          className="px-3.5 py-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-white text-[12px] font-medium transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirm(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <Trash2 size={14} />
+                      <span>Reset All App Data & Files</span>
                     </button>
                   )}
                 </div>
               </div>
+            )}
 
-              {/* Soundboard Library Management / Clear Sounds */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white">
-                    <Trash2 size={17} className="text-red-400" />
-                    <span className="text-[13.5px] font-bold">Sound Library Management</span>
-                  </div>
-                  {sounds && sounds.length > 0 && (
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-[#8e95a5]">
-                      {sounds.length} {sounds.length === 1 ? 'sound' : 'sounds'} loaded
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11.5px] text-[#7e8697] leading-relaxed">
-                  Clear all sounds from your active library. You will have the option to save a full backup before clearing.
-                </p>
-
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onOpenClearAllModal) {
-                        onClose();
-                        onOpenClearAllModal();
-                      }
-                    }}
-                    disabled={!sounds || sounds.length === 0}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Trash2 size={14} />
-                    <span>Clear All Sounds ({sounds?.length || 0})</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Danger Zone: Factory Reset */}
-              <div className="p-5 bg-red-500/5 rounded-[16px] border border-red-500/20 space-y-3.5">
-                <div className="flex items-center gap-2.5 text-red-400">
-                  <AlertTriangle size={17} />
-                  <span className="text-[13.5px] font-bold">Danger Zone: Full Factory Reset</span>
-                </div>
-                <p className="text-[11.5px] text-[#8e95a5] leading-relaxed">
-                  Permanently deletes all saved sounds, audio files, video clips, and configuration settings from your PC, restoring Prism Soundboard to an absolute fresh state.
-                </p>
-
-                {showResetConfirm ? (
-                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3">
-                    <p className="text-[12px] font-bold text-red-400">
-                      Are you completely sure? This will delete EVERYTHING and restart the app!
-                    </p>
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        onClick={handleFactoryReset}
-                        disabled={isResettingApp}
-                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[12px] transition-all cursor-pointer shadow-lg disabled:opacity-50"
-                      >
-                        {isResettingApp ? 'Resetting Everything...' : 'Yes, Delete Everything'}
-                      </button>
-                      <button
-                        onClick={() => setShowResetConfirm(false)}
-                        disabled={isResettingApp}
-                        className="px-3.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-[12px] font-medium transition-all cursor-pointer"
-                      >
-                        Cancel
-                      </button>
+            {/* TAB 5: UPDATES */}
+            {activeTab === 'updates' && (
+              <div className="space-y-5 animate-in fade-in duration-100">
+                {/* App Version & Checker Card */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center shadow-sm">
+                        <img src={prismLogo} alt="Prism" className="w-6 h-6 object-contain drop-shadow" />
+                      </div>
+                      <div>
+                        <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
+                          <span>Prism Soundboard</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#151B25] border border-[#1B222E] text-[#31C5F4] font-mono font-bold">v1.5.4</span>
+                        </h4>
+                        <p className="text-[11.5px] text-[#5A687C]">
+                          Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowResetConfirm(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-all cursor-pointer shadow-sm"
-                  >
-                    <Trash2 size={14} />
-                    <span>Reset All App Data & Files</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* TAB 5: UPDATES */}
-          {activeTab === 'updates' && (
-            <div className="space-y-5">
-              {/* App Version & Checker Card */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={prismLogo} alt="Prism" className="w-8 h-8 object-contain drop-shadow" />
-                    <div>
-                      <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
-                        <span>Prism Soundboard</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.3</span>
-                      </h4>
-                      <p className="text-[11.5px] text-[#7e8697]">
-                        Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
-                      </p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCheckUpdates}
+                      disabled={isCheckingUpdate}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-bold text-[#090C12] bg-[#31C5F4] hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-50"
+                    >
+                      <RefreshCw size={14} className={isCheckingUpdate ? 'animate-spin' : ''} />
+                      <span>{isCheckingUpdate ? 'Checking GitHub...' : 'Check for Updates'}</span>
+                    </button>
                   </div>
 
-                  <button
-                    onClick={handleCheckUpdates}
-                    disabled={isCheckingUpdate}
-                    style={{
-                      backgroundColor: accent,
-                      color: '#000000',
-                    }}
-                    className="flex items-center gap-2 px-4.5 py-2.5 rounded-[10px] text-[12px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-md disabled:opacity-50"
-                  >
-                    <RefreshCw size={14} className={isCheckingUpdate ? 'animate-spin' : ''} />
-                    <span>{isCheckingUpdate ? 'Checking GitHub...' : 'Check for Updates'}</span>
-                  </button>
-                </div>
+                  {/* Results Section */}
+                  {updateResult && (
+                    <div className="pt-2">
+                      {updateResult.hasUpdate ? (
+                        <div className="p-4 bg-[#10b981]/10 rounded-2xl border border-[#10b981]/30 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <Sparkles size={18} className="text-[#10b981]" />
+                              <span className="text-[13px] font-bold text-white">
+                                New Update Available: {updateResult.latestVersion}
+                              </span>
+                            </div>
+                            {updateResult.downloadUrl && (
+                              <button
+                                type="button"
+                                disabled={isDownloadingUpdate}
+                                onClick={async () => {
+                                  const downloadUrl = updateResult.downloadUrl;
+                                  if (!downloadUrl) return;
 
-                {/* Results Section */}
-                {updateResult && (
-                  <div className="pt-2">
-                    {updateResult.hasUpdate ? (
-                      <div className="p-4 bg-[#00ff88]/10 rounded-[14px] border border-[#00ff88]/30 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <Sparkles size={18} className="text-[#00ff88]" />
-                            <span className="text-[13px] font-bold text-white">
-                              New Update Available: {updateResult.latestVersion}
-                            </span>
-                          </div>
-                          {updateResult.downloadUrl && (
-                            <button
-                              disabled={isDownloadingUpdate}
-                              onClick={async () => {
-                                const downloadUrl = updateResult.downloadUrl;
-                                if (!downloadUrl) return;
+                                  setIsDownloadingUpdate(true);
+                                  setDownloadError(null);
+                                  setDownloadProgressPercent(0);
 
-                                setIsDownloadingUpdate(true);
-                                setDownloadError(null);
-                                setDownloadProgressPercent(0);
-
-                                if (window.soundboardAPI?.downloadAndInstallUpdate) {
-                                  const res = await window.soundboardAPI.downloadAndInstallUpdate(downloadUrl);
-                                  if (!res.success) {
+                                  if (window.soundboardAPI?.downloadAndInstallUpdate) {
+                                    const res = await window.soundboardAPI.downloadAndInstallUpdate(downloadUrl);
+                                    if (!res.success) {
+                                      setIsDownloadingUpdate(false);
+                                      setDownloadError(res.error || 'Failed to download or install update.');
+                                    }
+                                  } else if (window.soundboardAPI?.openExternal) {
+                                    window.soundboardAPI.openExternal(downloadUrl);
                                     setIsDownloadingUpdate(false);
-                                    setDownloadError(res.error || 'Failed to download or install update.');
                                   }
-                                } else if (window.soundboardAPI?.openExternal) {
-                                  window.soundboardAPI.openExternal(downloadUrl);
-                                  setIsDownloadingUpdate(false);
+                                }}
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#10b981] text-black text-[11.5px] font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                              >
+                                <Download size={13} />
+                                <span>{isDownloadingUpdate ? 'Downloading...' : 'Update & Restart'}</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* In-app download progress bar */}
+                          {isDownloadingUpdate && (
+                            <div className="p-3 bg-black/40 rounded-xl border border-white/10 space-y-2">
+                              <div className="flex items-center justify-between text-[11.5px]">
+                                <span className="text-white font-medium flex items-center gap-1.5">
+                                  <RefreshCw size={12} className="animate-spin text-[#10b981]" />
+                                  <span>Downloading update...</span>
+                                </span>
+                                <span className="text-[#10b981] font-mono font-bold">
+                                  {downloadProgressPercent}%
+                                </span>
+                              </div>
+                              <div className="w-full h-2 bg-black/60 rounded-full overflow-hidden border border-white/10">
+                                <div
+                                  className="h-full bg-[#10b981] rounded-full transition-all duration-150"
+                                  style={{ width: `${downloadProgressPercent}%` }}
+                                />
+                              </div>
+                              <p className="text-[11px] text-[#5A687C]">
+                                {downloadProgressPercent >= 100
+                                  ? 'Launching installer and updating Prism Soundboard...'
+                                  : 'Downloading directly in background — the installer will launch automatically.'}
+                              </p>
+                            </div>
+                          )}
+
+                          {downloadError && (
+                            <div className="p-2.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl text-[11.5px]">
+                              {downloadError}
+                            </div>
+                          )}
+
+                          {updateResult.releaseNotes && (
+                            <div className="p-3 bg-black/30 rounded-xl text-[11.5px] text-[#8E95A5] max-h-36 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed border border-white/5">
+                              {updateResult.releaseNotes}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-3 text-[11px] text-[#5A687C]">
+                            <span>Current: v{updateResult.currentVersion}</span>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.soundboardAPI?.openExternal && updateResult.releaseUrl) {
+                                  window.soundboardAPI.openExternal(updateResult.releaseUrl);
                                 }
                               }}
-                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[8px] bg-[#00ff88] text-black text-[11.5px] font-bold hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
+                              className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer underline"
                             >
-                              <Download size={13} />
-                              <span>{isDownloadingUpdate ? 'Downloading...' : 'Update & Restart'}</span>
+                              <span>View Release on GitHub</span>
+                              <ExternalLink size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-[#151B25] rounded-2xl border border-[#1B222E] flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2 size={18} className="text-[#10b981]" />
+                            <div>
+                              <span className="text-[12.5px] font-bold text-white">
+                                {updateResult.error ? 'Could not reach GitHub' : "You're up to date!"}
+                              </span>
+                              <p className="text-[11px] text-[#5A687C] mt-0.5">
+                                {updateResult.error
+                                  ? updateResult.error
+                                  : updateResult.message
+                                  ? updateResult.message
+                                  : `Prism Soundboard v${updateResult.currentVersion} is currently the latest release.`}
+                              </p>
+                            </div>
+                          </div>
+
+                          {updateResult.owner && updateResult.repo && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.soundboardAPI?.openExternal) {
+                                  window.soundboardAPI.openExternal(`https://github.com/${updateResult.owner}/${updateResult.repo}/releases`);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 text-[11px] text-[#8E95A5] hover:text-white transition-colors cursor-pointer"
+                            >
+                              <span>Releases</span>
+                              <ExternalLink size={12} />
                             </button>
                           )}
                         </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                        {/* In-app download progress bar */}
-                        {isDownloadingUpdate && (
-                          <div className="p-3 bg-black/40 rounded-[10px] border border-white/10 space-y-2">
-                            <div className="flex items-center justify-between text-[11.5px]">
-                              <span className="text-white font-medium flex items-center gap-1.5">
-                                <RefreshCw size={12} className="animate-spin text-[#00ff88]" />
-                                <span>Downloading update...</span>
-                              </span>
-                              <span className="text-[#00ff88] font-mono font-bold">
-                                {downloadProgressPercent}%
-                              </span>
-                            </div>
-                            <div className="w-full h-2 bg-black/60 rounded-full overflow-hidden border border-white/10">
-                              <div
-                                className="h-full bg-[#00ff88] rounded-full transition-all duration-150"
-                                style={{ width: `${downloadProgressPercent}%` }}
-                              />
-                            </div>
-                            <p className="text-[11px] text-[#7e8697]">
-                              {downloadProgressPercent >= 100
-                                ? 'Launching installer and updating Prism Soundboard...'
-                                : 'Downloading directly in background — the installer will launch automatically.'}
-                            </p>
-                          </div>
-                        )}
+                {/* GitHub Repository Settings Card */}
+                <div className="p-5 bg-[#10141C] rounded-2xl border border-[#1B222E] space-y-3">
+                  <h4 className="text-[13px] font-bold text-white">GitHub Repository Source</h4>
+                  <p className="text-[11.5px] text-[#5A687C]">
+                    Target repository used to query GitHub Releases for new updates
+                  </p>
 
-                        {downloadError && (
-                          <div className="p-2.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-[8px] text-[11.5px]">
-                            {downloadError}
-                          </div>
-                        )}
-
-                        {updateResult.releaseNotes && (
-                          <div className="p-3 bg-black/30 rounded-[10px] text-[11.5px] text-[#c4cad7] max-h-36 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed border border-white/5">
-                            {updateResult.releaseNotes}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-3 text-[11px] text-[#7e8697]">
-                          <span>Current: v{updateResult.currentVersion}</span>
-                          <span>•</span>
-                          <button
-                            onClick={() => {
-                              if (window.soundboardAPI?.openExternal && updateResult.releaseUrl) {
-                                window.soundboardAPI.openExternal(updateResult.releaseUrl);
-                              }
-                            }}
-                            className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer underline"
-                          >
-                            <span>View Release on GitHub</span>
-                            <ExternalLink size={11} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-white/5 rounded-[14px] border border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle2 size={18} className="text-[#00ff88]" />
-                          <div>
-                            <span className="text-[12.5px] font-bold text-white">
-                              {updateResult.error ? 'Could not reach GitHub' : "You're up to date!"}
-                            </span>
-                            <p className="text-[11px] text-[#7e8697] mt-0.5">
-                              {updateResult.error
-                                ? updateResult.error
-                                : updateResult.message
-                                ? updateResult.message
-                                : `Prism Soundboard v${updateResult.currentVersion} is currently the latest release.`}
-                            </p>
-                          </div>
-                        </div>
-
-                        {updateResult.owner && updateResult.repo && (
-                          <button
-                            onClick={() => {
-                              if (window.soundboardAPI?.openExternal) {
-                                window.soundboardAPI.openExternal(`https://github.com/${updateResult.owner}/${updateResult.repo}/releases`);
-                              }
-                            }}
-                            className="flex items-center gap-1.5 text-[11px] text-[#7e8697] hover:text-white transition-colors cursor-pointer"
-                          >
-                            <span>Releases</span>
-                            <ExternalLink size={12} />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* GitHub Repository Settings Card */}
-              <div className="p-5 bg-[var(--theme-bg-card,#171826)] rounded-[16px] border border-[var(--theme-border,#222436)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-[13px] font-bold text-white">GitHub Repository Source</h4>
-                    <p className="text-[11.5px] text-[#7e8697] mt-0.5">
-                      Target repository used to query GitHub Releases for new updates
+                  <div className="pt-1">
+                    <input
+                      type="text"
+                      disabled
+                      value="fafaidot/Prism-Soundboard"
+                      className="w-full max-w-md px-3.5 py-2.5 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12.5px] text-[#31C5F4] font-mono focus:outline-none cursor-default"
+                    />
+                    <p className="text-[10.5px] text-[#5A687C] mt-1.5">
+                      Target repository: <code className="text-white/80">fafaidot/Prism-Soundboard</code>.
                     </p>
                   </div>
                 </div>
-
-                <div className="pt-1">
-                  <input
-                    type="text"
-                    disabled
-                    value="fafaidot/Prism-Soundboard"
-                    className="w-full max-w-md px-3.5 py-2.5 bg-[#111319]/60 border border-[#262a38] rounded-[10px] text-[12.5px] text-[#00ff88] font-mono focus:outline-none cursor-default"
-                  />
-                  <p className="text-[10.5px] text-[#606778] mt-1.5">
-                    Hardcoded repository source: <code className="text-[#a4abbd]">fafaidot/Prism-Soundboard</code>. Clicking "Check for Updates" directly queries this repository's releases.
-                  </p>
-                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Clean Footer */}
-        <div className="px-7 py-4.5 border-t border-[var(--theme-border,#222436)] flex items-center justify-between bg-[var(--theme-bg-header,#090a0f)]">
-          <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.3</span>
-            <span className="text-[#3b4152]">•</span>
-            <button
-              onClick={() => {
-                setActiveTab('updates');
-                handleCheckUpdates();
-              }}
-              className="text-[11px] text-[#7e8697] hover:text-[var(--accent-color,#38bdf8)] transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <RefreshCw size={11} className={isCheckingUpdate ? 'animate-spin' : ''} />
-              <span>Check for Updates</span>
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-4.5 py-2 rounded-[10px] text-[12px] font-semibold text-[#a4abbd] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              style={{
-                backgroundColor: accent,
-                color: '#000000',
-              }}
-              className="px-6 py-2 rounded-[10px] text-[12px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer"
-            >
-              Save Settings
-            </button>
-          </div>
-        </div>
+          {/* Clean Footer Bar */}
+          <footer className="h-16 px-8 border-t border-[#1B222E] flex items-center justify-between bg-[#0E121A] shrink-0">
+            <div className="flex items-center gap-2 text-[11.5px] text-[#5A687C]">
+              <span>Prism Soundboard v1.5.4</span>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('updates');
+                  handleCheckUpdates();
+                }}
+                className="hover:text-[#31C5F4] transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <RefreshCw size={11} className={isCheckingUpdate ? 'animate-spin text-[#31C5F4]' : ''} />
+                <span>Check for Updates</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-[12px] font-semibold text-[#8E95A5] hover:text-white bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                style={{
+                  backgroundColor: accent,
+                  color: '#090C12',
+                }}
+                className="px-6 py-2 rounded-xl text-[12px] font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+              >
+                Save Settings
+              </button>
+            </div>
+          </footer>
+        </main>
       </div>
     </div>
   );

@@ -31,7 +31,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
   onDownloadSound,
   isHUD = false,
 }) => {
-  const accent = accentColor || 'var(--accent-color, #38bdf8)';
+  const accent = accentColor || '#31C5F4';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -128,6 +128,11 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    if (previewAudio) previewAudio.pause();
+    onClose();
+  };
+
   // Simultaneous download single sound
   const handleDownload = async (item: YouTubeSearchResult, openTrimmer = false) => {
     if (previewAudio) {
@@ -155,8 +160,6 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
   const handleDownloadSelected = async () => {
     if (selectedIds.length === 0) return;
     const itemsToDownload = results.filter((r) => selectedIds.includes(r.id));
-
-    // Launch all downloads concurrently
     await Promise.all(itemsToDownload.map((item) => handleDownload(item, false)));
   };
 
@@ -166,60 +169,61 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
     <div
       data-hud-modal="true"
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          if (previewAudio) previewAudio.pause();
-          onClose();
-        }
+        if (e.target === e.currentTarget) handleClose();
       }}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none ${
-        isHUD ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-md'
+        isHUD ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-md'
       }`}
     >
       <div
         data-hud-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-[#0E121A] border border-[#1B222E] rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        className="w-full max-w-4xl bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
       >
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-[#151B25] flex items-center justify-between bg-[#0A0D14]">
+        {/* Top Header */}
+        <header className="h-16 px-6 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/70 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-3">
-            <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
+            <div className="w-8 h-8 rounded-xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center shadow-sm">
+              <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
+            </div>
             <div>
-              <h2 className="text-[14px] font-bold text-white tracking-wide flex items-center gap-2">
+              <h3 className="text-[14px] font-bold text-white tracking-wide flex items-center gap-2">
                 <span>YouTube Music & Downloader</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#123244] text-[#31C5F4] font-bold border border-[#31C5F4]/30">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#151B25] text-[#31C5F4] border border-[#1B222E]">
                   Lossless Audio
                 </span>
-              </h2>
-              <p className="text-[11px] text-[#5a687c] mt-0.5">
-                Browse trending music or paste any YouTube URL to add to your soundboard
+              </h3>
+              <p className="text-[11px] text-[#5A687C]">
+                Search tracks, browse trending music hits, or paste direct YouTube URLs
               </p>
             </div>
           </div>
 
           <button
-            onClick={() => {
-              if (previewAudio) previewAudio.pause();
-              onClose();
-            }}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8e95a5] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            type="button"
+            onClick={handleClose}
+            className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Close YouTube Downloader (Esc)"
           >
-            <X size={14} />
+            <X size={15} />
           </button>
-        </div>
+        </header>
 
-        {/* Search Bar Input */}
-        <form onSubmit={handleSearch} className="p-4 border-b border-[#151B25] bg-[#0E121A]">
-          <div className="flex items-center gap-2.5">
+        {/* Search & URL Bar Header */}
+        <form onSubmit={handleSearch} className="px-6 py-3.5 bg-[#0E121A] border-b border-[#1B222E] shrink-0 space-y-3">
+          <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5a687c]" />
+              <Search
+                size={14}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A687C]"
+              />
               <input
                 type="text"
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search song, artist, video or paste YouTube URL (https://...)"
-                className="w-full pl-10 pr-9 py-2.5 bg-[#121722] border border-[#1B222E] rounded-xl text-[13px] text-white placeholder-[#5a687c] focus:outline-none focus:border-[#31C5F4] transition-colors"
+                placeholder="Search song, artist, video or paste URL (https://...)"
+                className="w-full pl-9 pr-8 py-2 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12px] text-white placeholder-[#5A687C] focus:outline-none focus:border-[#31C5F4]/50 transition-colors"
               />
               {query && (
                 <button
@@ -228,9 +232,9 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                     setQuery('');
                     loadTrendingMusic();
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a687c] hover:text-white cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A687C] hover:text-white cursor-pointer"
                 >
-                  <X size={14} />
+                  <X size={13} />
                 </button>
               )}
             </div>
@@ -240,39 +244,19 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
               disabled={isSearching}
               style={{
                 backgroundColor: accent,
-                color: '#000',
+                color: '#090C12',
               }}
-              className="px-5 py-2.5 rounded-xl text-[13px] font-bold flex items-center gap-2 disabled:opacity-40 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-sm"
+              className="px-4 py-2 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-40"
             >
               {isSearching ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2 size={14} className="animate-spin" />
               ) : isDirectUrl ? (
-                <Download size={15} />
+                <Download size={14} />
               ) : (
-                <Search size={15} />
+                <Search size={14} />
               )}
               <span>{isDirectUrl ? 'Download URL' : 'Search'}</span>
             </button>
-          </div>
-
-          {/* Section banner: Trending vs Search Results */}
-          <div className="mt-3 flex items-center justify-between text-[11px] px-1">
-            <div className="flex items-center gap-1.5 text-white/90 font-bold">
-              {isTrendingMode ? (
-                <>
-                  <TrendingUp size={13} className="text-[#31C5F4]" />
-                  <span>Trending on YouTube</span>
-                  <span className="text-[10px] text-[#60677c] font-normal ml-1">
-                    (Official Top Charts)
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Search size={13} className="text-[#38bdf8]" />
-                  <span>Search Results for "{query}"</span>
-                </>
-              )}
-            </div>
 
             <button
               type="button"
@@ -280,82 +264,94 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                 setQuery('');
                 loadTrendingMusic();
               }}
-              className="flex items-center gap-1 text-[11px] text-[#71788e] hover:text-[#38bdf8] transition-colors cursor-pointer"
-              title="Refresh trending music"
+              title="Refresh trending hits"
+              className="p-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white transition-colors cursor-pointer"
             >
-              <RefreshCw size={11} className={isSearching && isTrendingMode ? 'animate-spin' : ''} />
-              <span>Refresh Trending</span>
+              <RefreshCw size={14} className={isSearching && isTrendingMode ? 'animate-spin' : ''} />
             </button>
           </div>
-        </form>
 
-        {/* Search Results List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-[#0d0f14]">
-          {/* Multi-Download Bar when items are selected */}
-          {selectedIds.length > 0 && (
-            <div
-              style={{
-                borderColor: `${accent}60`,
-                backgroundColor: 'rgba(23, 25, 32, 0.98)',
-              }}
-              className="sticky top-0 z-20 p-2.5 rounded-[16px] border shadow-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2"
-            >
-              <div className="flex items-center gap-2 pl-2 text-[12px] font-bold text-white">
-                <Layers size={15} style={{ color: accent }} />
-                <span>
-                  {selectedIds.length} song{selectedIds.length > 1 ? 's' : ''} selected
+          {/* Sub-toolbar: Trending Indicator & Selection Toolbar */}
+          <div className="flex items-center justify-between text-[11px] px-0.5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  loadTrendingMusic();
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isTrendingMode && !query
+                    ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40'
+                    : 'text-[#8E95A5] hover:text-white bg-[#151B25] border border-[#1B222E]'
+                }`}
+              >
+                <TrendingUp size={12} />
+                <span>Trending Hits</span>
+              </button>
+
+              {!isTrendingMode && query && (
+                <span className="text-[#8E95A5] flex items-center gap-1">
+                  <span>Results for</span>
+                  <strong className="text-white font-semibold">"{query}"</strong>
                 </span>
-              </div>
+              )}
+            </div>
+
+            {selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
+                <span className="text-[#31C5F4] font-bold flex items-center gap-1">
+                  <Layers size={12} />
+                  <span>{selectedIds.length} selected</span>
+                </span>
                 <button
                   type="button"
                   onClick={() => setSelectedIds([])}
-                  className="px-2.5 py-1 text-[11px] font-semibold text-[#8a92a6] hover:text-white transition-colors cursor-pointer"
+                  className="text-[#8E95A5] hover:text-white cursor-pointer underline text-[10.5px]"
                 >
                   Deselect all
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadSelected}
-                  style={{
-                    backgroundColor: accent,
-                    color: '#000',
-                  }}
-                  className="px-4 py-1.5 rounded-[10px] hover:brightness-110 text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  style={{ backgroundColor: accent, color: '#090C12' }}
+                  className="px-3 py-1 rounded-lg font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1"
                 >
-                  <Download size={13} className="stroke-[2.5]" />
-                  <span>Download {selectedIds.length} simultaneously</span>
+                  <Download size={12} />
+                  <span>Download ({selectedIds.length})</span>
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </form>
 
-          {isSearching && (
-            <div className="py-16 flex flex-col items-center justify-center text-center">
-              <Loader2 size={32} className="animate-spin mb-3" style={{ color: accent }} />
-              <p className="text-[13px] font-bold text-white">
-                {isTrendingMode ? 'Fetching trending music hits...' : 'Searching YouTube...'}
-              </p>
-              <p className="text-[11px] text-[#71788e] mt-1">Retrieving direct audio streams without ads</p>
+        {/* Scrollable Tracks List */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 bg-[#0B0E14]">
+          {isSearching ? (
+            <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
+              <Loader2 size={32} className="animate-spin" style={{ color: accent }} />
+              <div className="space-y-1">
+                <h4 className="text-[14px] font-bold text-white">
+                  {isTrendingMode ? 'Loading Trending Charts...' : 'Searching YouTube...'}
+                </h4>
+                <p className="text-[11.5px] text-[#5A687C]">
+                  Extracting audio streams directly from source
+                </p>
+              </div>
             </div>
-          )}
-
-          {!isSearching && results.length === 0 && (
-            <div className="py-16 flex flex-col items-center justify-center text-center text-[#71788e]">
-              <div
-                className="w-14 h-14 rounded-2xl bg-[#171920] border border-[#20232d] flex items-center justify-center mb-3"
-                style={{ color: accent }}
-              >
+          ) : results.length === 0 ? (
+            <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center text-[#5A687C]">
                 <Music2 size={26} />
               </div>
-              <p className="text-[13px] font-bold text-white">No songs found</p>
-              <p className="text-[11px] text-[#60677c] mt-1 max-w-[320px]">
-                Try typing a song title or artist name, or paste a direct YouTube link to download it.
-              </p>
+              <div className="space-y-1">
+                <h4 className="text-[14px] font-bold text-white">No Songs Found</h4>
+                <p className="text-[12px] text-[#5A687C] max-w-sm">
+                  Try searching for an artist, song title, or paste a YouTube URL to download.
+                </p>
+              </div>
             </div>
-          )}
-
-          {!isSearching &&
+          ) : (
             results.map((item) => {
               const isDownloading = downloadingIds.includes(item.id);
               const isSelected = selectedIds.includes(item.id);
@@ -367,139 +363,147 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                   onClick={() => handleToggleSelect(item)}
                   style={{
                     borderColor: isSelected ? accent : undefined,
-                    backgroundColor: isSelected ? `${accent}15` : undefined,
                   }}
-                  className={`p-2.5 border rounded-xl flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-4 cursor-pointer group shadow-sm ${
                     isSelected
-                      ? 'bg-[#123244]/40 border-[#31C5F4] ring-1 ring-[#31C5F4]/30 shadow-sm'
-                      : 'bg-[#121722] hover:bg-[#151B25] border-[#1B222E] hover:border-[#31C5F4]/40'
+                      ? 'bg-[#151B25] border-[#31C5F4] shadow-[0_0_15px_rgba(49,197,244,0.15)]'
+                      : 'bg-[#10141C] hover:bg-[#151B25]/80 border-[#1B222E] hover:border-[#31C5F4]/40'
                   }`}
                 >
-                  {/* Select Checkbox */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleSelect(item);
-                    }}
-                    style={{
-                      backgroundColor: isSelected ? accent : undefined,
-                      borderColor: isSelected ? accent : undefined,
-                    }}
-                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
-                      isSelected ? 'text-[#090C12]' : 'bg-[#0E121A] border-[#1B222E] hover:border-[#31C5F4]/50'
-                    }`}
-                  >
-                    {isSelected && <Check size={12} className="stroke-[3.5]" />}
-                  </div>
-
-                  {/* Thumbnail & Play Preview Trigger */}
-                  <div
-                    className="relative w-16 h-12 rounded-xl overflow-hidden bg-black flex-shrink-0 group cursor-pointer shadow"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTogglePreview(item);
-                    }}
-                  >
-                    <img
-                      src={item.thumbnail}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
+                  {/* Left: Checkbox + Thumbnail & Play Preview */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Checkbox */}
                     <div
-                      style={isPreviewing ? { color: accent } : undefined}
-                      className={`absolute inset-0 flex items-center justify-center transition-all ${
-                        isPreviewing
-                          ? 'bg-black/60'
-                          : 'bg-black/40 text-white opacity-0 group-hover:opacity-100'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSelect(item);
+                      }}
+                      style={{
+                        backgroundColor: isSelected ? accent : undefined,
+                        borderColor: isSelected ? accent : undefined,
+                      }}
+                      className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
+                        isSelected
+                          ? 'text-[#090C12]'
+                          : 'bg-[#151B25] border-[#1B222E] group-hover:border-[#31C5F4]/50'
                       }`}
                     >
-                      {isPreviewing ? (
-                        <Square size={15} className="fill-current" />
-                      ) : (
-                        <Play size={16} className="fill-current ml-0.5" />
-                      )}
+                      {isSelected && <Check size={12} className="stroke-[3.5]" />}
                     </div>
-                  </div>
 
-                  {/* Center: Title & Channel Info */}
-                  <div className="flex-1 min-w-0">
-                    <h4
-                      className="text-[12.5px] font-bold text-white truncate leading-tight"
-                      title={item.title}
+                    {/* Thumbnail with Preview Play Button */}
+                    <div
+                      className="relative w-14 h-11 rounded-xl overflow-hidden bg-[#151B25] border border-[#1B222E] flex-shrink-0 group/thumb cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTogglePreview(item);
+                      }}
                     >
-                      {item.title}
-                    </h4>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-[#5a687c]">
-                      <span className="truncate text-[#8e95a5]">@{item.channel || 'YouTube'}</span>
-                      {item.duration && (
-                        <>
-                          <span>•</span>
-                          <span className="font-mono text-white/70 text-[10.5px]">{item.duration}</span>
-                        </>
-                      )}
+                      <img
+                        src={item.thumbnail}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform"
+                      />
+                      <div
+                        style={isPreviewing ? { color: accent } : undefined}
+                        className={`absolute inset-0 flex items-center justify-center transition-all ${
+                          isPreviewing
+                            ? 'bg-black/60'
+                            : 'bg-black/40 text-white opacity-0 group-hover/thumb:opacity-100'
+                        }`}
+                      >
+                        {isPreviewing ? (
+                          <Square size={14} className="fill-current" />
+                        ) : (
+                          <Play size={14} className="fill-current ml-0.5" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Title & Channel */}
+                    <div className="min-w-0">
+                      <h4
+                        className="text-[12.5px] font-bold text-white truncate leading-snug"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5A687C]">
+                        <span className="truncate text-[#8E95A5]">@{item.channel || 'YouTube'}</span>
+                        {item.duration && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-white/70 text-[10.5px]">
+                              {item.duration}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Right: Actions */}
                   <div
-                    className="flex items-center gap-1.5 flex-shrink-0"
+                    className="flex items-center gap-2 flex-shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Preview Button */}
+                    {/* Play Preview button */}
                     <button
+                      type="button"
                       onClick={() => handleTogglePreview(item)}
                       title={isPreviewing ? 'Stop Preview' : 'Listen Preview'}
                       style={
                         isPreviewing
                           ? {
-                              backgroundColor: `${accent}25`,
+                              backgroundColor: `${accent}20`,
                               borderColor: accent,
                               color: accent,
                             }
                           : undefined
                       }
-                      className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                      className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
                         isPreviewing
                           ? ''
-                          : 'bg-[#151B25] border-[#1B222E] text-[#8e95a5] hover:text-white'
+                          : 'bg-[#151B25] border-[#1B222E] text-[#8E95A5] hover:text-white'
                       }`}
                     >
                       {isPreviewing ? (
-                        <Square size={13} className="fill-current" />
+                        <Square size={12} className="fill-current" />
                       ) : (
-                        <Play size={13} className="fill-current" />
+                        <Play size={12} className="fill-current" />
                       )}
                     </button>
 
-                    {/* Trim and Add */}
+                    {/* Trim & Add */}
                     <button
+                      type="button"
                       disabled={isDownloading}
                       onClick={() => handleDownload(item, true)}
-                      title="Download & Open Trimmer"
-                      className="px-2.5 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[11px] font-bold text-white flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                      className="px-2.5 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-[11px] font-bold text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                     >
-                      <Scissors size={12} style={{ color: accent }} />
+                      <Scissors size={11} style={{ color: accent }} />
                       <span>Trim</span>
                     </button>
 
-                    {/* Direct Add */}
+                    {/* Direct Add to Board */}
                     <button
+                      type="button"
                       disabled={isDownloading}
                       onClick={() => handleDownload(item, false)}
                       style={{
                         backgroundColor: accent,
-                        color: '#000',
+                        color: '#090C12',
                       }}
-                      className="px-3 py-1.5 rounded-xl hover:brightness-110 text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-sm active:scale-95"
+                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-50"
                     >
                       {isDownloading ? (
                         <>
-                          <Loader2 size={12} className="animate-spin" />
+                          <Loader2 size={11} className="animate-spin" />
                           <span>Adding...</span>
                         </>
                       ) : (
                         <>
-                          <Download size={12} className="stroke-[2.5]" />
+                          <Download size={11} className="stroke-[2.5]" />
                           <span>Add</span>
                         </>
                       )}
@@ -507,8 +511,30 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                   </div>
                 </div>
               );
-            })}
+            })
+          )}
         </div>
+
+        {/* Footer */}
+        <footer className="h-16 px-6 border-t border-[#1B222E] flex items-center justify-between bg-[#0E121A] shrink-0">
+          <div className="flex items-center gap-2 text-[11.5px] text-[#5A687C]">
+            <span>{results.length} songs loaded</span>
+            <span>•</span>
+            <span>Direct lossless audio extraction without ads</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleClose}
+            style={{
+              backgroundColor: accent,
+              color: '#090C12',
+            }}
+            className="px-6 py-2 rounded-xl text-[12px] font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+          >
+            Done
+          </button>
+        </footer>
       </div>
     </div>
   );

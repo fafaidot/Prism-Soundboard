@@ -109,13 +109,22 @@ async function run() {
       name: `Prism Soundboard ${version}`,
       body: `### Prism Soundboard ${version} Release Notes
 
-#### 🎮 In-Game HUD & Overlay Overhaul
-- **Custom Sliders:** Replaced all native sliders across the HUD (Speaker, Mic, Sound Volume, Speed, and Scrubber) with custom cyan sliders and hollow circular thumbs matching the main app.
-- **Unified Now Playing Pill:** Integrated the horizontal Now Playing Pill dock directly into the HUD bottom bar with full cover artwork, title/subtitle, scrubber timeline, and quick transport controls.
-- **Duplicate Sound Button:** Added the Duplicate (<kbd>Copy</kbd>) action button to the HUD properties panel and wired cross-window synchronization.
-- **Inline Sound Renaming:** Added pencil (<kbd>✏️</kbd>) rename buttons directly beside sound titles in both the main app Control Panel and HUD.
-- **Audio Trimmer Stability:** Resolved backdrop pointer capture issue where clicking inside the trimmer modal closed the overlay.
-- **Cleaned Navigation:** Removed the redundant HUD clip button and dropdown.`,
+#### 🎮 Mainstream In-Game HUD Overhaul
+- **Unified Main Window:** Transformed the HUD into a single, cohesive, modern desktop overlay dashboard matching Prism's core design system.
+- **Streamlined Top Bar:** Features a unified edge-to-edge header with instant search (\`Search sounds, clips, tags...\`), quick filter tabs (\`All\`, \`Favorites\`, \`Clips\`, \`YouTube\`), Stop All panic key, headphone monitor toggle, and quick YouTube ripper launcher.
+- **Integrated 2-Column Dashboard:** Sound library grid with **SORT BY** options on the left, and an integrated properties panel with volume/speed sliders, playback modes, and playback options on the right.
+- **Dual-Pod Dock:** Volume sliders and interactive Now Playing pill with timeline scrubber and transport controls docked seamlessly at the bottom.
+
+#### ⚙️ Settings Modal & Menu Overhauls
+- **Two-Pane Desktop Settings:** Replaced horizontal tab strip with a structured left navigation sidebar categorized into Audio & Voice, Controls & Keys, and System & Storage.
+- **Sleek Controls:** Built with custom \`<Slider>\` components, iOS/macOS-style \`<ToggleSwitch>\` pills, and subtle Obsidian & Cyan device routing cards.
+- **Subtle VB-Cable Status Card:** Replaced saturated green banner with a clean, low-profile Obsidian indicator card.
+
+#### ✏️ Direct Sound Editing
+- **Pencil Edit Button:** The pencil icon beside sound titles in both the main app Control Panel and in-game HUD now opens \`EditSoundModal\` directly to edit sound title, artist credits, and cover artwork in one click.
+
+#### 🗑️ Clean Single-Pane Modals
+- **Archive & YouTube Menus:** Streamlined Deleted Sounds Archive and YouTube Music Downloader by removing sidebars and creating focused, responsive single-pane interfaces with full audio preview and batch downloads.`,
       draft: false,
       prerelease: false,
     }

@@ -47,6 +47,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   onClearHotkey,
   onOpenTrimmer,
   onDeleteSound,
+  onEditDetails,
   onDuplicateSound,
 }) => {
   const [localVolume, setLocalVolume] = useState<number>(sound?.volume ?? 100);
@@ -227,53 +228,19 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          {isEditingTitle ? (
-            <div className="flex items-center gap-1.5 w-full">
-              <input
-                type="text"
-                autoFocus
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveTitle();
-                  if (e.key === 'Escape') {
-                    setEditedTitle(sound.title);
-                    setIsEditingTitle(false);
-                  }
-                }}
-                onBlur={handleSaveTitle}
-                className="w-full bg-[#151B25] border border-[#31C5F4] rounded-lg px-2 py-0.5 text-[13px] text-white font-bold focus:outline-none"
-              />
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSaveTitle();
-                }}
-                className="w-6 h-6 rounded-md bg-[#31C5F4] text-[#090C12] flex items-center justify-center hover:brightness-110 shrink-0 cursor-pointer"
-                title="Save title"
-              >
-                <Check size={12} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 min-w-0 group/title">
-              <h3 className="text-[14px] font-bold text-white truncate" title={sound.title}>
-                {sound.title}
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingTitle(true);
-                  setEditedTitle(sound.title);
-                }}
-                title="Rename sound"
-                className="p-1 text-[#5a687c] hover:text-[#31C5F4] transition-colors cursor-pointer shrink-0"
-              >
-                <Pencil size={13} />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 min-w-0 group/title">
+            <h3 className="text-[14px] font-bold text-white truncate" title={sound.title}>
+              {sound.title}
+            </h3>
+            <button
+              type="button"
+              onClick={onEditDetails}
+              title="Edit sound details"
+              className="p-1 text-[#5a687c] hover:text-[#31C5F4] transition-colors cursor-pointer shrink-0"
+            >
+              <Pencil size={13} />
+            </button>
+          </div>
           <p className="text-[11px] text-[#5a687c] truncate mt-0.5">
             {sound.author
               ? (sound.author.startsWith('@') ? `by ${sound.author}` : `by @${sound.author}`)
