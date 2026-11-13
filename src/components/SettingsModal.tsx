@@ -377,7 +377,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.2',
+        currentVersion: '1.5.3',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -1291,7 +1291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <h4 className="text-[14px] font-bold text-white flex items-center gap-2">
                         <span>Prism Soundboard</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.2</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white font-mono font-semibold">v1.5.3</span>
                       </h4>
                       <p className="text-[11.5px] text-[#7e8697]">
                         Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -1476,7 +1476,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Clean Footer */}
         <div className="px-7 py-4.5 border-t border-[var(--theme-border,#222436)] flex items-center justify-between bg-[var(--theme-bg-header,#090a0f)]">
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.2</span>
+            <span className="text-[11.5px] text-[#7e8697]">Prism Soundboard v1.5.3</span>
             <span className="text-[#3b4152]">•</span>
             <button
               onClick={() => {

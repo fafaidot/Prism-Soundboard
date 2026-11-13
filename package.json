@@ -2,7 +2,7 @@
   "name": "prism-soundboard",
   "productName": "Prism Soundboard",
   "description": "Professional Windows Gaming & Streaming Soundboard with Virtual Microphone & Global Hotkeys",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",

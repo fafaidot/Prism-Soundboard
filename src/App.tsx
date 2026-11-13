@@ -1224,6 +1224,7 @@ export const App: React.FC = () => {
             updateAndSaveSounds(newSounds);
           }}
           onUpdateSound={handleUpdateSound}
+          onDuplicateSound={(sound) => handleDuplicateSound(sound)}
           onDeleteSound={(soundId) => {
             const target = sounds.find((s) => s.id === soundId);
             if (target && target.hotkey && window.soundboardAPI) {

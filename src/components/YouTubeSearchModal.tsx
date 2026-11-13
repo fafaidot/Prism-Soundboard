@@ -164,16 +164,19 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
 
   return (
     <div
+      data-hud-modal="true"
       onClick={(e) => {
-        e.stopPropagation();
-        if (previewAudio) previewAudio.pause();
-        onClose();
+        if (e.target === e.currentTarget) {
+          if (previewAudio) previewAudio.pause();
+          onClose();
+        }
       }}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none ${
         isHUD ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-md'
       }`}
     >
       <div
+        data-hud-modal="true"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl bg-[#0E121A] border border-[#1B222E] rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
       >

@@ -109,18 +109,13 @@ async function run() {
       name: `Prism Soundboard ${version}`,
       body: `### Prism Soundboard ${version} Release Notes
 
-#### 🎬 Instant Replay & Video Clipper Enhancements
-- **Edge-to-Edge True Fullscreen Video Player:** Removed layout boundary restrictions (\`max-w-5xl\` and \`max-h-[64vh]\`). The player now seamlessly expands to 100% monitor dimensions edge-to-edge.
-- **Fit vs. Fill Screen Toggle:** Added a dedicated toggle in playback controls to switch between Fit (exact aspect ratio) and Fill (zero black bars on ultra-wide or 16:10 monitors).
-- **Auto-Hiding Floating Controls:** Header and scrubber overlay automatically fade out after 2.5 seconds of mouse idle during playback.
-- **Reliable 30s Rolling Replay Buffer:** Resolved slot-wiping on duration checks and extended recorder slot lifespan to guarantee mature slots with full configured footage without 1-second blank clips.
-- **In-Game HUD Video Clipping:** Synchronized durations and wired IPC commands so triggering instant replay from the in-game overlay captures full 30-second clips.
-
-#### 🎛️ Audio Engine & Overlay Modernization
-- **Modern Obsidian & Cyan Palette:** Refined styling across all modal dialogues and submenus to match the core design language.
-- **Waveform Trimmer:** Enhanced progress tracking and trimmer controls for audio precision.
-- **Key Hook Repeat Prevention:** Improved GlobalKeyHook handling so holding a key does not re-trigger sounds repeatedly until released.
-- **JSON Metadata Protection:** Strengthened storage manager checks to preserve soundboard library files upon app startup.`,
+#### 🎮 In-Game HUD & Overlay Overhaul
+- **Custom Sliders:** Replaced all native sliders across the HUD (Speaker, Mic, Sound Volume, Speed, and Scrubber) with custom cyan sliders and hollow circular thumbs matching the main app.
+- **Unified Now Playing Pill:** Integrated the horizontal Now Playing Pill dock directly into the HUD bottom bar with full cover artwork, title/subtitle, scrubber timeline, and quick transport controls.
+- **Duplicate Sound Button:** Added the Duplicate (<kbd>Copy</kbd>) action button to the HUD properties panel and wired cross-window synchronization.
+- **Inline Sound Renaming:** Added pencil (<kbd>✏️</kbd>) rename buttons directly beside sound titles in both the main app Control Panel and HUD.
+- **Audio Trimmer Stability:** Resolved backdrop pointer capture issue where clicking inside the trimmer modal closed the overlay.
+- **Cleaned Navigation:** Removed the redundant HUD clip button and dropdown.`,
       draft: false,
       prerelease: false,
     }

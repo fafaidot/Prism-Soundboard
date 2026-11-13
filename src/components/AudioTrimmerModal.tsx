@@ -372,8 +372,21 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
   const playheadPercent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none">
-      <div className="w-full max-w-3xl bg-[#0E121A] border border-[#1E2636] rounded-2xl shadow-2xl flex flex-col overflow-hidden select-none">
+    <div
+      data-hud-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          if (audioRef.current) audioRef.current.pause();
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none"
+    >
+      <div
+        data-hud-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-3xl bg-[#0E121A] border border-[#1E2636] rounded-2xl shadow-2xl flex flex-col overflow-hidden select-none"
+      >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-[#1A2230] flex items-center justify-between bg-[#121722]">
           <div className="flex items-center gap-3">

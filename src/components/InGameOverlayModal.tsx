@@ -30,11 +30,13 @@ import {
   ChevronLeft,
   Play,
   Pause,
+  Pencil,
 } from 'lucide-react';
 import prismLogo from '../assets/Prism.png';
 import { audioEngine } from '../services/audioEngine';
 import { YouTubeSearchModal } from './YouTubeSearchModal';
 import { AudioTrimmerModal } from './AudioTrimmerModal';
+import { Slider } from './Slider';
 
 interface InGameOverlayModalProps {
   isOpen: boolean;
@@ -109,10 +111,15 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   const [activeFilter, setActiveFilter] = useState<'all' | 'clips' | 'youtube' | 'favorites'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration'>('newest');
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [showClipMenu, setShowClipMenu] = useState(false);
-  const [isClipping, setIsClipping] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
   const volumeDebounceRef = useRef<any>(null);
   const speedDebounceRef = useRef<any>(null);
+
+  const isHudTrimmerOpenRef = useRef(isHudTrimmerOpen);
+  isHudTrimmerOpenRef.current = isHudTrimmerOpen;
+  const isHudYouTubeOpenRef = useRef(isHudYouTubeOpen);
+  isHudYouTubeOpenRef.current = isHudYouTubeOpen;
 
   useEffect(() => {
     setSounds(initialSounds);
@@ -227,6 +234,27 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
     return sounds.find((s) => s.id === selectedSoundId) || sounds[0] || null;
   }, [sounds, selectedSoundId]);
 
+  useEffect(() => {
+    setEditedTitle(selectedSound?.title || '');
+    setIsEditingTitle(false);
+  }, [selectedSound?.id, selectedSound?.title]);
+
+  const handleSaveTitle = () => {
+    if (!selectedSound) return;
+    const trimmed = editedTitle.trim();
+    if (trimmed && trimmed !== selectedSound.title) {
+      if (onUpdateSound) {
+        onUpdateSound({
+          ...selectedSound,
+          title: trimmed,
+        });
+      }
+    } else {
+      setEditedTitle(selectedSound.title);
+    }
+    setIsEditingTitle(false);
+  };
+
   // Global Esc key & window blur listener so Escape or clicking off ALWAYS closes overlay reliably
   useEffect(() => {
     if (!isOpen && !isStandaloneOverlay) return;
@@ -235,20 +263,34 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
+        if (isHudTrimmerOpenRef.current) {
+          setIsHudTrimmerOpen(false);
+          return;
+        }
+        if (isHudYouTubeOpenRef.current) {
+          setIsHudYouTubeOpen(false);
+          return;
+        }
         onClose();
       }
     };
 
     const handleWindowBlur = () => {
+      if (isHudTrimmerOpenRef.current || isHudYouTubeOpenRef.current) {
+        return;
+      }
       onClose();
     };
 
     const handleDocumentPointerDown = (e: MouseEvent | PointerEvent) => {
-      // If click originated outside the overlay pods (on transparent background), close immediately
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-hud-pod]')) {
-        onClose();
+      if (isHudTrimmerOpenRef.current || isHudYouTubeOpenRef.current) {
+        return;
       }
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-hud-pod]') || target.closest('[data-hud-modal]')) {
+        return;
+      }
+      onClose();
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
@@ -384,7 +426,11 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
   return (
     <div
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isHudTrimmerOpen && !isHudYouTubeOpen) {
+          onClose();
+        }
+      }}
       className={`fixed inset-0 z-[9999] flex items-center justify-center select-none ${
         isStandaloneOverlay ? 'bg-transparent p-0' : 'bg-black/60 p-4'
       }`}
@@ -444,100 +490,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     <Headphones size={15} />
                   </button>
                 )}
-
-                {/* Instant Replay Clip Last Seconds with Duration & Source Dropdown */}
-                <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (isClipping) return;
-                      setIsClipping(true);
-                      try {
-                        if (onStartRecordClip) {
-                          await onStartRecordClip();
-                        } else if (window.soundboardAPI?.sendIpcCommand) {
-                          window.soundboardAPI.sendIpcCommand('sync-trigger-clip');
-                        }
-                      } finally {
-                        setTimeout(() => setIsClipping(false), 500);
-                      }
-                    }}
-                    disabled={isClipping}
-                    style={
-                      isClipping
-                        ? {
-                            backgroundColor: `${accent}25`,
-                            borderColor: accent,
-                            color: accent,
-                          }
-                        : undefined
-                    }
-                    className={`h-[32px] flex items-center justify-center gap-1.5 px-2.5 rounded-l-xl text-[11px] font-bold border transition-all cursor-pointer box-border ${
-                      isClipping
-                        ? 'animate-pulse cursor-wait'
-                        : 'bg-[#151B25] hover:bg-[#1B222E] border-[#1B222E] text-white'
-                    }`}
-                    title={`Clip last ${recordDuration}s of audio (Instant Replay)`}
-                  >
-                    <Clapperboard
-                      size={13}
-                      style={{ color: accent }}
-                      className={isClipping ? 'animate-spin' : ''}
-                    />
-                    <span className="font-bold" style={{ color: accent }}>
-                      {isClipping ? 'Clipping...' : `${recordDuration}s`}
-                    </span>
-                  </button>
-
-                  {/* Dropdown Selector for Clip Duration & Audio Source */}
-                  <button
-                    type="button"
-                    onClick={() => setShowClipMenu(!showClipMenu)}
-                    className="h-[32px] px-1.5 rounded-r-xl border-y border-r border-[#1B222E] bg-[#151B25] hover:bg-[#1B222E] text-[#8e95a5] hover:text-white transition-all cursor-pointer flex items-center justify-center"
-                    title="Configure Clip Duration and Source"
-                  >
-                    <ChevronDown size={11} />
-                  </button>
-
-                  {/* Clip Settings Dropdown Menu */}
-                  {showClipMenu && (
-                    <div className="absolute left-0 top-full mt-2 w-52 bg-[#10141C] border border-[#1B222E] rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] py-2 z-[100] animate-in fade-in zoom-in-95 duration-100">
-                      {/* Duration header */}
-                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#5a687c]">
-                        Clip Buffer Length
-                      </div>
-                      {[3, 5, 10, 15, 30].map((dur) => (
-                        <button
-                          key={dur}
-                          type="button"
-                          onClick={() => {
-                            if (onChangeRecordDuration) {
-                              onChangeRecordDuration(dur);
-                            }
-                            setShowClipMenu(false);
-                          }}
-                          style={recordDuration === dur ? { color: accent } : undefined}
-                          className={`w-full px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer ${
-                            recordDuration === dur ? 'bg-white/5 font-bold' : 'text-white'
-                          }`}
-                        >
-                          <span>Last {dur} Seconds</span>
-                          {recordDuration === dur && <Check size={12} style={{ color: accent }} />}
-                        </button>
-                      ))}
-
-                      {/* Source indicator */}
-                      <div className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#5a687c] border-t border-[#1B222E] mt-1.5 flex items-center justify-between">
-                        <span>Recording Source</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-white font-mono">LOCKED</span>
-                      </div>
-                      <div className="px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between text-white bg-white/5">
-                        <span className="truncate">Screen + Mic Combined</span>
-                        <Check size={12} style={{ color: accent }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Center-Right: Stop All sounds pill button */}
@@ -818,63 +770,177 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             </div>
           </div>
 
-          {/* Bottom Dock Control Pod (Voice Vol & Sounds Vol) */}
-          <div className="w-full px-5 py-2.5 rounded-xl bg-[#10141C] border border-[#1B222E] flex items-center justify-between shadow-inner">
-            <div className="flex flex-col gap-1.5 min-w-[210px] sm:min-w-[240px]">
-              {/* Voice Vol (Top) */}
+          {/* Bottom Dock Control Pod (Matching Main App: Volume Sliders Pod + Now Playing Pill) */}
+          <div className="w-full flex items-stretch gap-3 select-none">
+            {/* Left Pod: Stacked Speaker & Mic Volume */}
+            <div className="px-4 py-2 rounded-2xl bg-[#10141C] border border-[#1B222E] flex flex-col justify-center gap-2 shadow-xl flex-shrink-0 min-w-[220px] h-[64px]">
+              {/* Speaker Volume */}
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isMuted) {
+                      onSpeakerVolumeChange(100);
+                    } else {
+                      onSpeakerVolumeChange(0);
+                    }
+                  }}
+                  className="flex items-center justify-center focus:outline-none cursor-pointer flex-shrink-0 text-[#31C5F4] hover:brightness-110"
+                  title={isMuted ? 'Unmute Sounds' : 'Mute Sounds'}
+                >
+                  {isMuted ? <VolumeX size={15} className="text-[#ff3b30]" /> : <Volume2 size={15} />}
+                </button>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={speakerVolume}
+                  onChange={(val) => onSpeakerVolumeChange(val)}
+                  className="w-28 sm:w-32"
+                />
+                <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-9 text-right flex-shrink-0">
+                  {speakerVolume}%
+                </span>
+              </div>
+
+              {/* Mic Volume */}
               {onMicProjectionVolumeChange && (
                 <div className="flex items-center gap-2.5">
-                  <Mic
-                    size={15}
-                    className={`flex-shrink-0 ${micProjectionVolume > 100 ? 'text-[#f59e0b]' : ''}`}
-                    style={micProjectionVolume <= 100 ? { color: accent } : undefined}
-                  />
-                  <input
-                    type="range"
+                  <Mic size={15} className="flex-shrink-0 text-[#31C5F4]" />
+                  <Slider
                     min={0}
                     max={200}
+                    step={1}
                     value={micProjectionVolume}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      onMicProjectionVolumeChange(val);
-                    }}
-                    className="w-28 sm:w-36 h-1.5 bg-[#0E131A] rounded cursor-pointer"
-                    style={{ accentColor: micProjectionVolume > 100 ? '#f59e0b' : accent }}
+                    onChange={(val) => onMicProjectionVolumeChange(val)}
+                    className="w-28 sm:w-32"
                   />
-                  <span
-                    style={{ color: micProjectionVolume > 100 ? '#f59e0b' : accent }}
-                    className="font-mono text-[11px] font-bold w-9 text-right flex-shrink-0"
-                  >
+                  <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-9 text-right flex-shrink-0">
                     {micProjectionVolume}%
                   </span>
                 </div>
               )}
+            </div>
 
-              {/* Sounds Vol (Bottom) */}
-              <div className="flex items-center gap-2.5">
-                <Volume2
-                  size={15}
-                  className={`flex-shrink-0 ${isMuted ? 'text-[#e81123]' : ''}`}
-                  style={!isMuted ? { color: accent } : undefined}
-                />
-                <input
-                  type="range"
+            {/* Right Pod: Now Playing Pill (Cover, Title/Subtitle, Scrubber Slider, Transport Controls) */}
+            <div className="flex-1 px-4 py-2 rounded-2xl bg-[#10141C] border border-[#1B222E] flex items-center justify-between gap-4 shadow-xl min-w-0 h-[64px]">
+              {/* Sound Cover & Name */}
+              <div className="flex items-center gap-2.5 min-w-0 max-w-[200px]">
+                <div className="w-10 h-10 rounded-lg bg-[#0E131A] border border-[#1B222E] overflow-hidden flex items-center justify-center text-[#5a687c] flex-shrink-0 shadow-sm">
+                  {activeFloatingSound?.thumbnail ? (
+                    <img
+                      src={activeFloatingSound.thumbnail}
+                      alt={activeFloatingSound.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : activeFloatingSound ? (
+                    <Music size={18} className="text-[#31C5F4]" />
+                  ) : (
+                    <Music size={18} className="text-[#5a687c]" />
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[12px] font-semibold text-white truncate" title={activeFloatingSound?.title || 'No Sound Playing'}>
+                    {activeFloatingSound ? activeFloatingSound.title : 'No Sound Playing'}
+                  </span>
+                  <span className="text-[10px] text-[#5a687c] truncate">
+                    {activeFloatingSound?.author ? (activeFloatingSound.author.startsWith('@') ? activeFloatingSound.author : `@${activeFloatingSound.author}`) : (activeFloatingSound ? 'Ready' : 'Select a sound to play')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Scrubber Timeline */}
+              <div className="flex-1 flex items-center min-w-0 px-1">
+                <Slider
                   min={0}
-                  max={100}
-                  value={speakerVolume}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    onSpeakerVolumeChange(val);
+                  max={1}
+                  step={0.002}
+                  value={activeFloatingProgress}
+                  onChange={(val) => {
+                    if (activeFloatingSound) {
+                      if (window.soundboardAPI?.sendIpcCommand) {
+                        window.soundboardAPI.sendIpcCommand('sync-seek-sound', {
+                          soundId: activeFloatingSound.id,
+                          progress: val,
+                        });
+                      } else {
+                        audioEngine.seekSound(activeFloatingSound.id, val);
+                      }
+                    }
                   }}
-                  className="w-28 sm:w-36 h-1.5 bg-[#0E131A] rounded cursor-pointer"
-                  style={{ accentColor: accent }}
+                  disabled={!activeFloatingSound}
+                  className="w-full"
                 />
-                <span
-                  style={{ color: accent }}
-                  className="font-mono text-[11px] font-bold w-9 text-right flex-shrink-0"
+              </div>
+
+              {/* Transport Controls: Previous, Play/Pause, Next */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!activeFloatingSound) return;
+                    if (window.soundboardAPI?.sendIpcCommand) {
+                      window.soundboardAPI.sendIpcCommand('sync-skip-sound', {
+                        soundId: activeFloatingSound.id,
+                        deltaSeconds: -5,
+                      });
+                    } else {
+                      audioEngine.skipSound(activeFloatingSound.id, -5);
+                    }
+                  }}
+                  disabled={!activeFloatingSound}
+                  title="Rewind 5s"
+                  className="p-1 rounded-lg text-[#5a687c] hover:text-white transition-colors cursor-pointer disabled:opacity-30"
                 >
-                  {speakerVolume}%
-                </span>
+                  <ChevronLeft size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!activeFloatingSound) return;
+                    pauseLockUntilRef.current = Date.now() + 600;
+                    setLocalPausedIds((prev) =>
+                      prev.includes(activeFloatingSound.id)
+                        ? prev.filter((id) => id !== activeFloatingSound.id)
+                        : [...prev, activeFloatingSound.id]
+                    );
+                    if (window.soundboardAPI?.sendIpcCommand) {
+                      window.soundboardAPI.sendIpcCommand('sync-toggle-pause-sound', activeFloatingSound.id);
+                    } else {
+                      audioEngine.togglePlayPauseSound(activeFloatingSound.id);
+                    }
+                  }}
+                  disabled={!activeFloatingSound}
+                  title={activeFloatingSound && localPausedIds.includes(activeFloatingSound.id) ? 'Resume Playback' : 'Pause Playback'}
+                  className="w-8 h-8 rounded-full border border-[#31C5F4] text-[#31C5F4] hover:bg-[#31C5F4] hover:text-[#090B10] flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
+                >
+                  {activeFloatingSound && !localPausedIds.includes(activeFloatingSound.id) ? (
+                    <Pause size={13} className="fill-current" />
+                  ) : (
+                    <Play size={13} className="fill-current ml-0.5" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!activeFloatingSound) return;
+                    if (window.soundboardAPI?.sendIpcCommand) {
+                      window.soundboardAPI.sendIpcCommand('sync-skip-sound', {
+                        soundId: activeFloatingSound.id,
+                        deltaSeconds: 5,
+                      });
+                    } else {
+                      audioEngine.skipSound(activeFloatingSound.id, 5);
+                    }
+                  }}
+                  disabled={!activeFloatingSound}
+                  title="Forward 5s"
+                  className="p-1 rounded-lg text-[#5a687c] hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+                >
+                  <ChevronRight size={16} />
+                </button>
               </div>
             </div>
           </div>
@@ -898,19 +964,19 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                   <Scissors size={15} />
                 </button>
 
-                {onDuplicateSound && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onDuplicateSound) {
                       onDuplicateSound(selectedSound);
-                    }}
-                    title="Duplicate Sound"
-                    className="h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <Copy size={15} />
-                  </button>
-                )}
+                    }
+                  }}
+                  title="Duplicate Sound"
+                  className="h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <Copy size={15} />
+                </button>
 
                 {onUpdateSound && (
                   <button
@@ -980,9 +1046,53 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-[13.5px] font-bold text-white truncate" title={selectedSound.title}>
-                    {selectedSound.title}
-                  </h3>
+                  {isEditingTitle ? (
+                    <div className="flex items-center gap-1.5 w-full">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={editedTitle}
+                        onChange={(e) => setEditedTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTitle();
+                          if (e.key === 'Escape') {
+                            setEditedTitle(selectedSound.title);
+                            setIsEditingTitle(false);
+                          }
+                        }}
+                        onBlur={handleSaveTitle}
+                        className="w-full bg-[#151B25] border border-[#31C5F4] rounded-lg px-2 py-0.5 text-[13px] text-white font-bold focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSaveTitle();
+                        }}
+                        className="w-6 h-6 rounded-md bg-[#31C5F4] text-[#090C12] flex items-center justify-center hover:brightness-110 shrink-0 cursor-pointer"
+                        title="Save title"
+                      >
+                        <Check size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 min-w-0 group/title">
+                      <h3 className="text-[13.5px] font-bold text-white truncate" title={selectedSound.title}>
+                        {selectedSound.title}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingTitle(true);
+                          setEditedTitle(selectedSound.title);
+                        }}
+                        title="Rename sound"
+                        className="p-1 text-[#5a687c] hover:text-[#31C5F4] transition-colors cursor-pointer shrink-0"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                  )}
                   <p className="text-[11px] text-[#5a687c] truncate mt-0.5">
                     {selectedSound.author
                       ? (selectedSound.author.startsWith('@') ? `by ${selectedSound.author}` : `by @${selectedSound.author}`)
@@ -1012,16 +1122,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     style={(selectedSound.volume ?? 100) <= 100 ? { color: accent } : undefined}
                   />
                   <span className="text-[11px] font-semibold text-[#8e95a5] w-7">Vol</span>
-                  <input
-                    type="range"
+                  <Slider
                     min={0}
                     max={200}
+                    step={1}
                     value={selectedSound.volume ?? 100}
-                    onChange={(e) => handleVolumeChange(parseInt(e.target.value) || 0)}
-                    className="flex-1 h-1.5 bg-[#0E131A] rounded-lg cursor-pointer"
-                    style={{
-                      accentColor: (selectedSound.volume ?? 100) > 100 ? '#f59e0b' : accent,
-                    }}
+                    onChange={(val) => handleVolumeChange(val)}
+                    className="flex-1"
                   />
                   <span className={`text-[11px] font-mono font-bold w-10 text-right ${
                     (selectedSound.volume ?? 100) > 100 ? 'text-[#f59e0b]' : 'text-[#31C5F4]'
@@ -1033,18 +1140,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                 <div className="p-2.5 bg-[#151B25] rounded-xl border border-[#1B222E] flex items-center gap-2.5">
                   <SlidersHorizontal size={14} style={{ color: accent }} />
                   <span className="text-[11px] font-semibold text-[#8e95a5] w-9">Speed</span>
-                  <input
-                    type="range"
-                    min={25}
-                    max={200}
-                    step={5}
-                    value={Math.round((selectedSound.speed ?? 1.0) * 100)}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) / 100;
-                      handleSpeedChange(val);
-                    }}
-                    className="flex-1 h-1.5 bg-[#0E131A] rounded-lg cursor-pointer"
-                    style={{ accentColor: accent }}
+                  <Slider
+                    min={0.25}
+                    max={2.0}
+                    step={0.05}
+                    value={selectedSound.speed ?? 1.0}
+                    onChange={(val) => handleSpeedChange(val)}
+                    className="flex-1"
                   />
                   <span className="text-[11px] font-mono font-bold text-[#31C5F4] w-10 text-right">
                     {(selectedSound.speed ?? 1.0).toFixed(2)}x
@@ -1261,127 +1363,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Dedicated Mini-Player Window under Properties Panel */}
-        {activeFloatingSound && (
-          <div className="w-[340px] min-w-[340px] bg-[#10141C] border border-[#1B222E] rounded-2xl p-4 flex flex-col gap-2.5 text-white shadow-2xl">
-            {/* Header: Square artwork and Song title */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-[10px] overflow-hidden bg-black flex-shrink-0 flex items-center justify-center border border-white/10 shadow">
-                {activeFloatingSound.thumbnail ? (
-                  <img src={activeFloatingSound.thumbnail} alt="" className="w-full h-full object-cover" />
-                ) : activeFloatingSound.source === 'clip' || activeFloatingSound.title.toLowerCase().startsWith('clipped') ? (
-                  <Clapperboard size={18} style={{ color: accent }} />
-                ) : (
-                  <Music size={18} style={{ color: accent }} />
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h4 className="text-[12.5px] font-extrabold text-white truncate leading-tight" title={activeFloatingSound.title}>
-                  {activeFloatingSound.title}
-                </h4>
-                <p className="text-[10px] text-[#71788e] truncate mt-0.5">
-                  by <span className="text-white/80 font-medium">{activeFloatingSound.author ? (activeFloatingSound.author.startsWith('@') ? activeFloatingSound.author : `@${activeFloatingSound.author}`) : 'User'}</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Center row: Chevron Left (-5s), Pause/Resume, Stop, Chevron Right (+5s) */}
-            <div className="flex items-center justify-center gap-5 py-0.5">
-              {/* Skip Back 5s Arrow */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.soundboardAPI?.sendIpcCommand) {
-                    window.soundboardAPI.sendIpcCommand('sync-skip-sound', {
-                      soundId: activeFloatingSound.id,
-                      deltaSeconds: -5,
-                    });
-                  } else {
-                    audioEngine.skipSound(activeFloatingSound.id, -5);
-                  }
-                }}
-                title="Rewind 5 seconds"
-                className="w-8 h-8 rounded-lg hover:bg-white/10 text-white/90 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
-              >
-                <ChevronLeft size={20} />
-              </button>
-
-              {/* Pause / Resume Button */}
-              {(() => {
-                const isItemPaused = localPausedIds.includes(activeFloatingSound.id);
-                return (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Lock local paused state for 600ms so stale background syncs cannot flip it back
-                      pauseLockUntilRef.current = Date.now() + 600;
-                      setLocalPausedIds((prev) =>
-                        prev.includes(activeFloatingSound.id)
-                          ? prev.filter((id) => id !== activeFloatingSound.id)
-                          : [...prev, activeFloatingSound.id]
-                      );
-                      if (window.soundboardAPI?.sendIpcCommand) {
-                        window.soundboardAPI.sendIpcCommand('sync-toggle-pause-sound', activeFloatingSound.id);
-                      } else {
-                        audioEngine.togglePlayPauseSound(activeFloatingSound.id);
-                      }
-                    }}
-                    style={{ backgroundColor: accent, color: '#000' }}
-                    title={isItemPaused ? 'Resume Playback' : 'Pause Playback'}
-                    className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 shadow-md"
-                  >
-                    {isItemPaused ? <Play size={15} className="fill-current translate-x-0.5" /> : <Pause size={15} className="fill-current" />}
-                  </button>
-                );
-              })()}
-
-              {/* Skip Forward 5s Arrow */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.soundboardAPI?.sendIpcCommand) {
-                    window.soundboardAPI.sendIpcCommand('sync-skip-sound', {
-                      soundId: activeFloatingSound.id,
-                      deltaSeconds: 5,
-                    });
-                  } else {
-                    audioEngine.skipSound(activeFloatingSound.id, 5);
-                  }
-                }}
-                title="Skip forward 5 seconds"
-                className="w-8 h-8 rounded-lg hover:bg-white/10 text-white/90 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-
-            {/* Bottom row: Interactive Scrubber Slider */}
-            <div className="flex items-center gap-2 pt-0.5">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.001}
-                value={activeFloatingProgress}
-                onChange={(e) => {
-                  const prog = parseFloat(e.target.value);
-                  if (window.soundboardAPI?.sendIpcCommand) {
-                    window.soundboardAPI.sendIpcCommand('sync-seek-sound', {
-                      soundId: activeFloatingSound.id,
-                      progress: prog,
-                    });
-                  } else {
-                    audioEngine.seekSound(activeFloatingSound.id, prog);
-                  }
-                }}
-                className="w-full h-1 bg-[#222634] rounded cursor-pointer"
-                style={{ accentColor: accent }}
-              />
             </div>
           </div>
         )}
