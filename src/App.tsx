@@ -217,6 +217,7 @@ export const App: React.FC = () => {
             ]);
             if (savedSettings) {
               const themeDef = getTheme(savedSettings.theme, savedSettings.accentColor);
+              applyThemeToDom(themeDef);
               setSettings({
                 ...DEFAULT_SETTINGS,
                 ...savedSettings,
@@ -443,6 +444,8 @@ export const App: React.FC = () => {
     const cleanupSettingsSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('settings-sync', (newSettings: AudioSettings) => {
           setSettings(newSettings);
+          const themeDef = getTheme(newSettings.theme, newSettings.accentColor);
+          applyThemeToDom(themeDef);
           audioEngine.updateSettings(newSettings);
         })
       : () => {};
@@ -511,14 +514,16 @@ export const App: React.FC = () => {
 
     const cleanupRequestOverlaySync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('request-overlay-sync', () => {
-          if (!isStandaloneOverlay && isDataLoadedRef.current && soundsRef.current.length > 0) {
+          if (!isStandaloneOverlay && isDataLoadedRef.current) {
             const activeIds = audioEngine.getActiveSoundIds();
             const pausedIds = audioEngine.getPausedSoundIds();
             const progress = audioEngine.getAllPlaybackProgress();
             window.soundboardAPI?.sendIpcCommand?.('sync-active-sounds', activeIds);
             window.soundboardAPI?.sendIpcCommand?.('sync-paused-sounds', pausedIds);
             window.soundboardAPI?.sendIpcCommand?.('sync-progress-map', progress);
-            window.soundboardAPI?.sendIpcCommand?.('sync-sounds-updated', soundsRef.current);
+            if (soundsRef.current.length > 0) {
+              window.soundboardAPI?.sendIpcCommand?.('sync-sounds-updated', soundsRef.current);
+            }
             window.soundboardAPI?.sendIpcCommand?.('sync-settings-changed', settingsRef.current);
           }
         })
@@ -1170,6 +1175,7 @@ export const App: React.FC = () => {
         <InGameOverlayModal
           isOpen={true}
           isStandaloneOverlay={true}
+          accentColor={currentTheme.accent}
           sounds={sounds}
           activeSoundIds={activeSoundIds}
           pausedSoundIds={pausedSoundIds}
@@ -1247,7 +1253,6 @@ export const App: React.FC = () => {
               setIsYouTubeModalOpen(true);
             }
           }}
-          accentColor={settings.accentColor}
         />
       </div>
     );
@@ -1304,7 +1309,7 @@ export const App: React.FC = () => {
       {/* Main Container below TitleBar: Left Navigation Rail + Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Navigation Rail (Dock) */}
-        <div className="w-[68px] min-w-[68px] h-full bg-[#10141C] border-r border-[#1B222E] flex flex-col items-center justify-between py-4 select-none z-40">
+        <div className="w-[68px] min-w-[68px] h-full bg-theme-sidebar border-r border-theme flex flex-col items-center justify-between py-4 select-none z-40">
           <div className="flex flex-col items-center gap-2.5">
             {/* Sound Library Icon */}
             <button
@@ -1312,8 +1317,8 @@ export const App: React.FC = () => {
               title="Sound Library"
               className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeView === 'sounds'
-                  ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
-                  : 'bg-[#151B25] border border-[#1B222E] text-[#5a687c] hover:text-white hover:bg-[#1B2330]'
+                  ? 'bg-theme-card-selected border border-accent text-accent'
+                  : 'bg-theme-card border border-theme text-theme-muted hover:text-white hover:bg-theme-card-hover'
               }`}
             >
               <Music size={18} />
@@ -1325,8 +1330,8 @@ export const App: React.FC = () => {
               title="Video Library"
               className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeView === 'clips'
-                  ? 'bg-[#123244] border border-[#31C5F4] text-[#31C5F4]'
-                  : 'bg-[#151B25] border border-[#1B222E] text-[#5a687c] hover:text-white hover:bg-[#1B2330]'
+                  ? 'bg-theme-card-selected border border-accent text-accent'
+                  : 'bg-theme-card border border-theme text-theme-muted hover:text-white hover:bg-theme-card-hover'
               }`}
             >
               <Video size={18} />
@@ -1339,11 +1344,11 @@ export const App: React.FC = () => {
             <button
               onClick={() => setIsRestoreModalOpen(true)}
               title={deletedSounds.length > 0 ? `Deleted Sounds Archive (${deletedSounds.length})` : 'Deleted Sounds Archive'}
-              className="w-11 h-11 rounded-xl bg-[#151B25] border border-[#1B222E] text-[#8e95a5] hover:text-white hover:bg-[#1B2330] flex items-center justify-center transition-all cursor-pointer relative"
+              className="w-11 h-11 rounded-xl bg-theme-card border border-theme text-theme-secondary hover:text-white hover:bg-theme-card-hover flex items-center justify-center transition-all cursor-pointer relative"
             >
               <Trash2 size={16} />
               {deletedSounds.length > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-[#123244] border border-[#31C5F4]/60 text-[#31C5F4] font-mono text-[9px] font-bold">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-theme-card-selected border border-accent/60 text-accent font-mono text-[9px] font-bold">
                   {deletedSounds.length}
                 </span>
               )}
@@ -1353,7 +1358,7 @@ export const App: React.FC = () => {
             <button
               onClick={() => setIsSettingsModalOpen(true)}
               title="Settings"
-              className="w-11 h-11 rounded-xl bg-[#151B25] border border-[#1B222E] text-[#5a687c] hover:text-white hover:bg-[#1B2330] flex items-center justify-center transition-all cursor-pointer"
+              className="w-11 h-11 rounded-xl bg-theme-card border border-theme text-theme-muted hover:text-white hover:bg-theme-card-hover flex items-center justify-center transition-all cursor-pointer"
             >
               <Settings size={18} />
             </button>
@@ -1476,26 +1481,26 @@ export const App: React.FC = () => {
                     <div className="flex flex-col gap-1 mb-6">
                       <div className="flex items-center gap-2.5">
                         <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ff0000]/15 border border-[#ff0000]/30 text-[#ff0000]">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/15 border border-red-500/30 text-red-400">
                           Very Experimental
                         </span>
-                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ff0000]/15 border border-[#ff0000]/30 text-[#ff0000]">
+                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/15 border border-red-500/30 text-red-400">
                           May not work as expected
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
+                      <div className="flex items-center gap-3 text-[12px] text-theme-muted">
                         <span>{filteredClips.length} Videos</span>
-                        <span className="text-[#3b4758]">SORT BY</span>
+                        <span className="text-theme-muted/60">SORT BY</span>
                         <div className="relative">
                           <button
                             onClick={() => setShowSortMenu(!showSortMenu)}
-                            className="flex items-center gap-1.5 text-white/90 hover:text-[#22d3ee] font-medium cursor-pointer transition-colors"
+                            className="flex items-center gap-1.5 text-white/90 hover:text-accent font-medium cursor-pointer transition-colors"
                           >
                             <span>{sortLabels[sortBy] || 'Recently added'}</span>
                             <ChevronDown size={13} />
                           </button>
                           {showSortMenu && (
-                            <div className="absolute left-0 top-6 w-44 rounded-xl bg-[#0d141d] border border-[#182432] p-1 shadow-2xl z-50 flex flex-col gap-0.5">
+                            <div className="absolute left-0 top-6 w-44 rounded-xl bg-theme-card border border-theme p-1 shadow-2xl z-50 flex flex-col gap-0.5">
                               {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
                                 <button
                                   key={opt}
@@ -1506,12 +1511,12 @@ export const App: React.FC = () => {
                                   }}
                                   className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
                                     sortBy === opt
-                                      ? 'bg-[#0e3b52] text-[#22d3ee] font-medium'
-                                      : 'text-[#8e95a5] hover:bg-white/5 hover:text-white'
+                                      ? 'bg-theme-card-selected text-accent font-medium'
+                                      : 'text-theme-secondary hover:bg-white/5 hover:text-white'
                                   }`}
                                 >
                                   <span>{sortLabels[opt]}</span>
-                                  {sortBy === opt && <Check size={12} className="text-[#22d3ee]" />}
+                                  {sortBy === opt && <Check size={12} className="text-accent" />}
                                 </button>
                               ))}
                             </div>
@@ -1522,13 +1527,13 @@ export const App: React.FC = () => {
 
                     {filteredClips.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
-                        <div className="w-16 h-16 rounded-2xl bg-[#123244] border border-[#31C5F4]/30 text-[#31C5F4] flex items-center justify-center shadow-lg">
+                        <div className="w-16 h-16 rounded-2xl bg-theme-card-selected border border-accent/30 text-accent flex items-center justify-center shadow-lg">
                           <Video size={28} />
                         </div>
                         <div>
-                          <h3 className="text-white font-bold text-[16px]">No Game Clips Yet</h3>
-                          <p className="text-[12px] text-[#8e95a5] max-w-sm mt-1 leading-relaxed">
-                            Press <span className="font-mono font-bold text-[#31C5F4]">[{settings.videoClipHotkey || 'F10'}]</span> anytime in-game or click the <span className="text-[#31C5F4] font-semibold">Video Clip</span> button above to capture gameplay moments!
+                          <h3 className="text-theme-primary font-bold text-[16px]">No Game Clips Yet</h3>
+                          <p className="text-[12px] text-theme-secondary max-w-sm mt-1 leading-relaxed">
+                            Press <span className="font-mono font-bold text-accent">[{settings.videoClipHotkey || 'F10'}]</span> anytime in-game or click the <span className="text-accent font-semibold">Video Clip</span> button above to capture gameplay moments!
                           </p>
                         </div>
                       </div>
@@ -1591,19 +1596,19 @@ export const App: React.FC = () => {
                     <div className="flex items-center justify-between mb-5">
                       <div className="flex flex-col gap-1">
                         <h1 className="text-2xl font-bold text-white tracking-tight">Sound library</h1>
-                        <div className="flex items-center gap-3 text-[12px] text-[#5a687c]">
+                        <div className="flex items-center gap-3 text-[12px] text-theme-muted">
                           <span>{filteredSounds.length} sounds</span>
-                          <span className="text-[#3b4758]">SORT BY</span>
+                          <span className="text-theme-muted/60">SORT BY</span>
                           <div className="relative">
                             <button
                               onClick={() => setShowSortMenu(!showSortMenu)}
-                              className="flex items-center gap-1.5 text-white/90 hover:text-[#22d3ee] font-medium cursor-pointer transition-colors"
+                              className="flex items-center gap-1.5 text-white/90 hover:text-accent font-medium cursor-pointer transition-colors"
                             >
                               <span>{sortLabels[sortBy] || 'Recently added'}</span>
                               <ChevronDown size={13} />
                             </button>
                             {showSortMenu && (
-                              <div className="absolute left-0 top-6 w-44 rounded-xl bg-[#0d141d] border border-[#182432] p-1 shadow-2xl z-50 flex flex-col gap-0.5">
+                              <div className="absolute left-0 top-6 w-44 rounded-xl bg-theme-card border border-theme p-1 shadow-2xl z-50 flex flex-col gap-0.5">
                                 {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
                                   <button
                                     key={opt}
@@ -1614,12 +1619,12 @@ export const App: React.FC = () => {
                                     }}
                                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
                                       sortBy === opt
-                                        ? 'bg-[#0e3b52] text-[#22d3ee] font-medium'
-                                        : 'text-[#8e95a5] hover:bg-white/5 hover:text-white'
+                                        ? 'bg-theme-card-selected text-accent font-medium'
+                                        : 'text-theme-secondary hover:bg-white/5 hover:text-white'
                                     }`}
                                   >
                                     <span>{sortLabels[opt]}</span>
-                                    {sortBy === opt && <Check size={12} className="text-[#22d3ee]" />}
+                                    {sortBy === opt && <Check size={12} className="text-accent" />}
                                   </button>
                                 ))}
                               </div>
@@ -1674,13 +1679,13 @@ export const App: React.FC = () => {
                       {/* "+ Add" Square Tile */}
                       <div
                         onClick={() => setIsYouTubeModalOpen(true)}
-                        className="group aspect-[4/3] rounded-xl border border-dashed border-[#1B222E] hover:border-[#31C5F4]/60 bg-[#151B25]/40 hover:bg-[#151B25] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
+                        className="group aspect-[4/3] rounded-xl border border-dashed border-theme hover:border-accent/60 bg-theme-card/40 hover:bg-theme-card flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
                         title="Add new sound"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-[#31C5F4] text-[#090B10] flex items-center justify-center transition-all group-hover:scale-110 shadow-md">
+                        <div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center transition-all group-hover:scale-110 shadow-md">
                           <Plus size={20} className="stroke-[2.75]" />
                         </div>
-                        <span className="text-[12px] font-semibold text-[#8e95a5] group-hover:text-white transition-colors">
+                        <span className="text-[12px] font-semibold text-theme-secondary group-hover:text-white transition-colors">
                           Add Sound
                         </span>
                       </div>
@@ -1905,40 +1910,40 @@ export const App: React.FC = () => {
           }
           setIsYouTubeModalOpen(true);
         }}
-        accentColor={settings.accentColor}
+        accentColor={currentTheme.accent}
       />
 
       {/* Startup Update Alert Modal */}
       {startupUpdate && (
         <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-[#11131a] border border-[#232736] rounded-[20px] shadow-2xl p-6 text-white space-y-4">
+          <div className="w-full max-w-md bg-theme-surface border border-theme rounded-[20px] shadow-2xl p-6 text-theme-primary space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-[12px] bg-[var(--accent-color,#38bdf8)]/15 border border-[var(--accent-color,#38bdf8)]/30 flex items-center justify-center">
-                  <Sparkles size={20} className="text-[var(--accent-color,#38bdf8)]" />
+                <div className="w-10 h-10 rounded-[12px] bg-accent-soft border border-accent/30 flex items-center justify-center">
+                  <Sparkles size={20} className="text-accent" />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-bold text-white flex items-center gap-2">
+                  <h3 className="text-[15px] font-bold text-theme-primary flex items-center gap-2">
                     <span>New Version Available</span>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--accent-color,#38bdf8)] text-black font-extrabold">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent text-black font-extrabold">
                       {startupUpdate.latestVersion || startupUpdate.releaseName}
                     </span>
                   </h3>
-                  <p className="text-[11px] text-[#7e8697]">
+                  <p className="text-[11px] text-theme-muted">
                     An update for Prism Soundboard is ready to download
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setStartupUpdate(null)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[#7e8697] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-theme-muted hover:text-theme-primary bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={14} />
               </button>
             </div>
 
             {startupUpdate.releaseNotes && (
-              <div className="p-3 bg-black/40 rounded-[12px] border border-white/5 text-[11.5px] text-[#c4cad7] max-h-40 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
+              <div className="p-3 bg-black/40 rounded-[12px] border border-white/5 text-[11.5px] text-theme-secondary max-h-40 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
                 {startupUpdate.releaseNotes}
               </div>
             )}
@@ -1952,21 +1957,21 @@ export const App: React.FC = () => {
             {isUpdatingApp ? (
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-white font-semibold flex items-center gap-2">
-                    <RefreshCw size={13} className="animate-spin text-[var(--accent-color,#38bdf8)]" />
+                  <span className="text-theme-primary font-semibold flex items-center gap-2">
+                    <RefreshCw size={13} className="animate-spin text-accent" />
                     <span>Downloading update installer...</span>
                   </span>
-                  <span className="text-[var(--accent-color,#38bdf8)] font-mono font-bold">
+                  <span className="text-accent font-mono font-bold">
                     {updateProgressPercent}%
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-black/50 rounded-full overflow-hidden border border-white/10">
                   <div
-                    className="h-full bg-[var(--accent-color,#38bdf8)] rounded-full transition-all duration-150"
+                    className="h-full bg-accent rounded-full transition-all duration-150"
                     style={{ width: `${updateProgressPercent}%` }}
                   />
                 </div>
-                <p className="text-[11px] text-[#7e8697]">
+                <p className="text-[11px] text-theme-muted">
                   {updateProgressPercent >= 100
                     ? 'Launching setup and restarting Prism Soundboard...'
                     : 'The app will close and update automatically when finished.'}
@@ -1980,7 +1985,7 @@ export const App: React.FC = () => {
                       window.soundboardAPI.openExternal(startupUpdate.releaseUrl);
                     }
                   }}
-                  className="text-[11.5px] text-[#7e8697] hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="text-[11.5px] text-theme-muted hover:text-theme-primary transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <span>View Release Notes</span>
                   <ExternalLink size={12} />
@@ -1989,7 +1994,7 @@ export const App: React.FC = () => {
                 <div className="flex items-center gap-2.5">
                   <button
                     onClick={() => setStartupUpdate(null)}
-                    className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-[#8e96a8] hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                    className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-theme-secondary hover:text-theme-primary bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     Later
                   </button>
@@ -2020,10 +2025,9 @@ export const App: React.FC = () => {
                       }
                     }}
                     style={{
-                      backgroundColor: 'var(--accent-color, #38bdf8)',
-                      color: '#000000',
+                      backgroundColor: 'var(--accent-color)',
                     }}
-                    className="flex items-center gap-2 px-5 py-2 rounded-[10px] text-[12px] font-bold hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-lg"
+                    className="flex items-center gap-2 px-5 py-2 rounded-[10px] text-[12px] font-bold text-black hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-lg"
                   >
                     <Download size={14} />
                     <span>Update Now</span>

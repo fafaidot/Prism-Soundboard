@@ -31,7 +31,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
   onDownloadSound,
   isHUD = false,
 }) => {
-  const accent = accentColor || '#31C5F4';
+  const accent = accentColor || 'var(--accent-color)';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -178,22 +178,22 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
       <div
         data-hud-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
+        className="w-full max-w-4xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
       >
         {/* Top Header */}
-        <header className="h-16 px-6 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/70 backdrop-blur-md shrink-0">
+        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-theme-card border border-theme flex items-center justify-center shadow-sm">
               <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
             </div>
             <div>
-              <h3 className="text-[14px] font-bold text-white tracking-wide flex items-center gap-2">
+              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide flex items-center gap-2">
                 <span>YouTube Music & Downloader</span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#151B25] text-[#31C5F4] border border-[#1B222E]">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-theme-card text-accent border border-theme">
                   Lossless Audio
                 </span>
               </h3>
-              <p className="text-[11px] text-[#5A687C]">
+              <p className="text-[11px] text-theme-muted">
                 Search tracks, browse trending music hits, or paste direct YouTube URLs
               </p>
             </div>
@@ -202,7 +202,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Close YouTube Downloader (Esc)"
           >
             <X size={15} />
@@ -210,12 +210,12 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
         </header>
 
         {/* Search & URL Bar Header */}
-        <form onSubmit={handleSearch} className="px-6 py-3.5 bg-[#0E121A] border-b border-[#1B222E] shrink-0 space-y-3">
+        <form onSubmit={handleSearch} className="px-6 py-3.5 bg-theme-header border-b border-theme shrink-0 space-y-3">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
               <Search
                 size={14}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A687C]"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-muted"
               />
               <input
                 type="text"
@@ -223,7 +223,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search song, artist, video or paste URL (https://...)"
-                className="w-full pl-9 pr-8 py-2 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12px] text-white placeholder-[#5A687C] focus:outline-none focus:border-[#31C5F4]/50 transition-colors"
+                className="w-full pl-9 pr-8 py-2 bg-theme-card border border-theme rounded-xl text-[12px] text-theme-primary placeholder-theme-muted focus:outline-none focus:border-accent/50 transition-colors"
               />
               {query && (
                 <button
@@ -232,7 +232,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                     setQuery('');
                     loadTrendingMusic();
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A687C] hover:text-white cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary cursor-pointer"
                 >
                   <X size={13} />
                 </button>
@@ -244,9 +244,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
               disabled={isSearching}
               style={{
                 backgroundColor: accent,
-                color: '#090C12',
               }}
-              className="px-4 py-2 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-40"
+              className="px-4 py-2 rounded-xl text-[12px] font-bold text-black flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-40"
             >
               {isSearching ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -265,7 +264,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                 loadTrendingMusic();
               }}
               title="Refresh trending hits"
-              className="p-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white transition-colors cursor-pointer"
             >
               <RefreshCw size={14} className={isSearching && isTrendingMode ? 'animate-spin' : ''} />
             </button>
@@ -282,8 +281,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                 }}
                 className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                   isTrendingMode && !query
-                    ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40'
-                    : 'text-[#8E95A5] hover:text-white bg-[#151B25] border border-[#1B222E]'
+                    ? 'bg-theme-card-selected text-accent border border-accent/40'
+                    : 'text-theme-secondary hover:text-white bg-theme-card border border-theme'
                 }`}
               >
                 <TrendingUp size={12} />
@@ -291,31 +290,31 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
               </button>
 
               {!isTrendingMode && query && (
-                <span className="text-[#8E95A5] flex items-center gap-1">
+                <span className="text-theme-secondary flex items-center gap-1">
                   <span>Results for</span>
-                  <strong className="text-white font-semibold">"{query}"</strong>
+                  <strong className="text-theme-primary font-semibold">"{query}"</strong>
                 </span>
               )}
             </div>
 
             {selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
-                <span className="text-[#31C5F4] font-bold flex items-center gap-1">
+                <span className="text-accent font-bold flex items-center gap-1">
                   <Layers size={12} />
                   <span>{selectedIds.length} selected</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setSelectedIds([])}
-                  className="text-[#8E95A5] hover:text-white cursor-pointer underline text-[10.5px]"
+                  className="text-theme-secondary hover:text-white cursor-pointer underline text-[10.5px]"
                 >
                   Deselect all
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadSelected}
-                  style={{ backgroundColor: accent, color: '#090C12' }}
-                  className="px-3 py-1 rounded-lg font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1"
+                  style={{ backgroundColor: accent }}
+                  className="px-3 py-1 rounded-lg font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 text-black"
                 >
                   <Download size={12} />
                   <span>Download ({selectedIds.length})</span>
@@ -326,27 +325,27 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
         </form>
 
         {/* Scrollable Tracks List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 bg-[#0B0E14]">
+        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 bg-theme-surface">
           {isSearching ? (
             <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
               <Loader2 size={32} className="animate-spin" style={{ color: accent }} />
               <div className="space-y-1">
-                <h4 className="text-[14px] font-bold text-white">
+                <h4 className="text-[14px] font-bold text-theme-primary">
                   {isTrendingMode ? 'Loading Trending Charts...' : 'Searching YouTube...'}
                 </h4>
-                <p className="text-[11.5px] text-[#5A687C]">
+                <p className="text-[11.5px] text-theme-muted">
                   Extracting audio streams directly from source
                 </p>
               </div>
             </div>
           ) : results.length === 0 ? (
             <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center text-[#5A687C]">
+              <div className="w-14 h-14 rounded-2xl bg-theme-card border border-theme flex items-center justify-center text-theme-muted">
                 <Music2 size={26} />
               </div>
               <div className="space-y-1">
-                <h4 className="text-[14px] font-bold text-white">No Songs Found</h4>
-                <p className="text-[12px] text-[#5A687C] max-w-sm">
+                <h4 className="text-[14px] font-bold text-theme-primary">No Songs Found</h4>
+                <p className="text-[12px] text-theme-muted max-w-sm">
                   Try searching for an artist, song title, or paste a YouTube URL to download.
                 </p>
               </div>
@@ -366,8 +365,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                   }}
                   className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-4 cursor-pointer group shadow-sm ${
                     isSelected
-                      ? 'bg-[#151B25] border-[#31C5F4] shadow-[0_0_15px_rgba(49,197,244,0.15)]'
-                      : 'bg-[#10141C] hover:bg-[#151B25]/80 border-[#1B222E] hover:border-[#31C5F4]/40'
+                      ? 'bg-theme-card-selected border-accent'
+                      : 'bg-theme-sidebar hover:bg-theme-card border-theme hover:border-accent/40'
                   }`}
                 >
                   {/* Left: Checkbox + Thumbnail & Play Preview */}
@@ -384,8 +383,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                       }}
                       className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
                         isSelected
-                          ? 'text-[#090C12]'
-                          : 'bg-[#151B25] border-[#1B222E] group-hover:border-[#31C5F4]/50'
+                          ? 'text-black'
+                          : 'bg-theme-card border-theme group-hover:border-accent/50'
                       }`}
                     >
                       {isSelected && <Check size={12} className="stroke-[3.5]" />}
@@ -393,7 +392,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
 
                     {/* Thumbnail with Preview Play Button */}
                     <div
-                      className="relative w-14 h-11 rounded-xl overflow-hidden bg-[#151B25] border border-[#1B222E] flex-shrink-0 group/thumb cursor-pointer"
+                      className="relative w-14 h-11 rounded-xl overflow-hidden bg-theme-card border border-theme flex-shrink-0 group/thumb cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleTogglePreview(item);
@@ -423,13 +422,13 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                     {/* Title & Channel */}
                     <div className="min-w-0">
                       <h4
-                        className="text-[12.5px] font-bold text-white truncate leading-snug"
+                        className="text-[12.5px] font-bold text-theme-primary truncate leading-snug"
                         title={item.title}
                       >
                         {item.title}
                       </h4>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5A687C]">
-                        <span className="truncate text-[#8E95A5]">@{item.channel || 'YouTube'}</span>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-theme-muted">
+                        <span className="truncate text-theme-secondary">@{item.channel || 'YouTube'}</span>
                         {item.duration && (
                           <>
                             <span>•</span>
@@ -464,7 +463,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                       className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
                         isPreviewing
                           ? ''
-                          : 'bg-[#151B25] border-[#1B222E] text-[#8E95A5] hover:text-white'
+                          : 'bg-theme-card border-theme text-theme-secondary hover:text-white'
                       }`}
                     >
                       {isPreviewing ? (
@@ -479,7 +478,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                       type="button"
                       disabled={isDownloading}
                       onClick={() => handleDownload(item, true)}
-                      className="px-2.5 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-[11px] font-bold text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      className="px-2.5 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-[11px] font-bold text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <Scissors size={11} style={{ color: accent }} />
                       <span>Trim</span>
@@ -492,9 +491,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                       onClick={() => handleDownload(item, false)}
                       style={{
                         backgroundColor: accent,
-                        color: '#090C12',
                       }}
-                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-50"
+                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-50 text-black"
                     >
                       {isDownloading ? (
                         <>
@@ -516,8 +514,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
         </div>
 
         {/* Footer */}
-        <footer className="h-16 px-6 border-t border-[#1B222E] flex items-center justify-between bg-[#0E121A] shrink-0">
-          <div className="flex items-center gap-2 text-[11.5px] text-[#5A687C]">
+        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
+          <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
             <span>{results.length} songs loaded</span>
             <span>•</span>
             <span>Direct lossless audio extraction without ads</span>
@@ -528,9 +526,8 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
             onClick={handleClose}
             style={{
               backgroundColor: accent,
-              color: '#090C12',
             }}
-            className="px-6 py-2 rounded-xl text-[12px] font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+            className="px-6 py-2 rounded-xl text-[12px] font-bold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
           >
             Done
           </button>

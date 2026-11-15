@@ -54,7 +54,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     initialEnd: 0,
   });
 
-  const accent = accentColor || '#31C5F4';
+  const accent = accentColor || 'var(--accent-color)';
 
   // Decode audio peaks for the waveform & obtain high-precision duration
   useEffect(() => {
@@ -385,10 +385,10 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
       <div
         data-hud-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden select-none transition-all duration-150"
+        className="w-full max-w-3xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden select-none transition-all duration-150"
       >
         {/* Modal Header */}
-        <header className="h-16 px-6 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/70 backdrop-blur-md shrink-0">
+        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-3">
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center border shadow-sm"
@@ -401,13 +401,13 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
               <Scissors size={15} />
             </div>
             <div>
-              <h3 className="text-[14px] font-bold text-white tracking-wide flex items-center gap-2">
+              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide flex items-center gap-2">
                 <span>Audio Trimmer</span>
-                <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full bg-[#151B25] text-[#31C5F4] border border-[#1B222E]">
+                <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full bg-theme-card text-accent border border-theme">
                   {formatTime(duration)}
                 </span>
               </h3>
-              <p className="text-[11px] text-[#5A687C] truncate max-w-md">{sound.title}</p>
+              <p className="text-[11px] text-theme-muted truncate max-w-md">{sound.title}</p>
             </div>
           </div>
           <button
@@ -416,7 +416,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
               if (audioRef.current) audioRef.current.pause();
               onClose();
             }}
-            className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Close (Esc)"
           >
             <X size={15} />
@@ -424,14 +424,14 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
         </header>
 
         {/* Modal Body */}
-        <div className="p-6 flex flex-col gap-4 bg-[#0B0E14]">
+        <div className="p-6 flex flex-col gap-4 bg-theme-surface">
           {/* Waveform Card */}
-          <div className="p-5 bg-[#10141C] border border-[#1B222E] rounded-2xl space-y-3.5">
+          <div className="p-5 bg-theme-sidebar border border-theme rounded-2xl space-y-3.5">
             {/* Top Info Badge Row */}
             <div className="flex items-center justify-between text-xs font-mono">
-              <div className="flex items-center gap-2 text-[#8E95A5]">
+              <div className="flex items-center gap-2 text-theme-secondary">
                 <span>Current:</span>
-                <span className="text-white font-bold">{formatTime(currentTime)}</span>
+                <span className="text-theme-primary font-bold">{formatTime(currentTime)}</span>
               </div>
               <div
                 className="px-3 py-1 rounded-xl font-bold flex items-center gap-2 border"
@@ -442,7 +442,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                 }}
               >
                 <span>Trimmed Span:</span>
-                <span className="text-white font-mono">{trimmedLength.toFixed(2)}s</span>
+                <span className="text-theme-primary font-mono">{trimmedLength.toFixed(2)}s</span>
               </div>
             </div>
 
@@ -450,12 +450,12 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             <div
               ref={waveformRef}
               onClick={handleTrackClick}
-              className="relative w-full h-28 bg-[#090C12] rounded-2xl border border-[#1B222E] overflow-hidden cursor-crosshair group flex items-center"
+              className="relative w-full h-28 bg-theme-app rounded-2xl border border-theme overflow-hidden cursor-crosshair group flex items-center"
             >
             {/* Waveform Bars (Clean flat rendering without fuzzy glows) */}
             <div className="w-full h-full flex items-center justify-between gap-[2px] px-2 pointer-events-none">
               {isLoadingWaveform ? (
-                <div className="w-full flex items-center justify-center text-[#5A6880] text-xs">
+                <div className="w-full flex items-center justify-center text-theme-muted text-xs">
                   <span>Analyzing audio waveform...</span>
                 </div>
               ) : (
@@ -503,7 +503,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                 setDragMode('window');
               }}
               title="Drag selection window"
-              className="absolute top-0 bottom-0 cursor-grab active:cursor-grabbing border-y border-transparent transition-colors hover:border-[#31C5F4]/40"
+              className="absolute top-0 bottom-0 cursor-grab active:cursor-grabbing border-y border-transparent transition-colors hover:border-accent/40"
               style={{
                 left: `${startPercent}%`,
                 width: `${endPercent - startPercent}%`,
@@ -583,15 +583,15 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
           {/* Micro-Adjustment Fine-Tuning Pods */}
           <div className="grid grid-cols-2 gap-4">
             {/* Start Fine-Tuner */}
-            <div className="p-4 rounded-2xl bg-[#10141C] border border-[#1B222E] flex flex-col gap-2">
+            <div className="p-4 rounded-2xl bg-theme-sidebar border border-theme flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#5A687C]">Start Time</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">Start Time</span>
                 <button
                   type="button"
                   onClick={() => {
                     setTrimStart(Math.round(currentTime * 100) / 100);
                   }}
-                  className="text-[10.5px] font-semibold text-[#31C5F4] hover:underline cursor-pointer"
+                  className="text-[10.5px] font-semibold text-accent hover:underline cursor-pointer"
                 >
                   Set to Playhead
                 </button>
@@ -602,7 +602,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setTrimStart((prev) => Math.max(0, Math.round((prev - 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-white hover:border-[#31C5F4]/40 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
                     title="-0.1s"
                   >
                     <Minus size={13} />
@@ -610,7 +610,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setTrimStart((prev) => Math.min(trimEnd - 0.1, Math.round((prev + 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-white hover:border-[#31C5F4]/40 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
                     title="+0.1s"
                   >
                     <Plus size={13} />
@@ -620,15 +620,15 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             </div>
 
             {/* End Fine-Tuner */}
-            <div className="p-4 rounded-2xl bg-[#10141C] border border-[#1B222E] flex flex-col gap-2">
+            <div className="p-4 rounded-2xl bg-theme-sidebar border border-theme flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#5A687C]">End Time</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">End Time</span>
                 <button
                   type="button"
                   onClick={() => {
                     setTrimEnd(Math.max(trimStart + 0.1, Math.round(currentTime * 100) / 100));
                   }}
-                  className="text-[10.5px] font-semibold text-[#31C5F4] hover:underline cursor-pointer"
+                  className="text-[10.5px] font-semibold text-accent hover:underline cursor-pointer"
                 >
                   Set to Playhead
                 </button>
@@ -639,7 +639,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setTrimEnd((prev) => Math.max(trimStart + 0.1, Math.round((prev - 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-white hover:border-[#31C5F4]/40 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
                     title="-0.1s"
                   >
                     <Minus size={13} />
@@ -647,7 +647,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setTrimEnd((prev) => Math.min(duration, Math.round((prev + 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-white hover:border-[#31C5F4]/40 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
                     title="+0.1s"
                   >
                     <Plus size={13} />
@@ -658,14 +658,14 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
           </div>
 
           {/* Player & Audition Controls Bar */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#10141C] border border-[#1B222E]">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-theme-sidebar border border-theme">
             <div className="flex items-center gap-2">
               {/* Play / Pause Selection */}
               <button
                 type="button"
                 onClick={handleTogglePlayTrim}
-                className="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-md"
-                style={{ backgroundColor: accent, color: '#090C12' }}
+                className="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-md text-black"
+                style={{ backgroundColor: accent }}
               >
                 {isPlaying ? <Pause size={15} /> : <Play size={15} className="fill-current" />}
                 <span>{isPlaying ? 'Pause' : 'Play Selection'}</span>
@@ -677,8 +677,8 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                 onClick={() => setIsLooping(!isLooping)}
                 className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                   isLooping
-                    ? 'bg-[#151B25] text-[#31C5F4] border-[#31C5F4]/60'
-                    : 'bg-[#151B25] border-[#1B222E] text-[#8E95A5] hover:text-white'
+                    ? 'bg-theme-card-selected text-accent border-accent/60'
+                    : 'bg-theme-card border-theme text-theme-secondary hover:text-white'
                 }`}
                 title={isLooping ? 'Looping enabled' : 'Enable loop'}
               >
@@ -689,7 +689,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
               <button
                 type="button"
                 onClick={handleStop}
-                className="p-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white transition-colors cursor-pointer"
+                className="p-2 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white transition-colors cursor-pointer"
                 title="Stop playback"
               >
                 <Square size={15} />
@@ -701,8 +701,8 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
                 onClick={handleTogglePlayFull}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
                   isPlayingFull
-                    ? 'bg-[#151B25] border-[#31C5F4]/50 text-[#31C5F4]'
-                    : 'bg-[#151B25] border-[#1B222E] text-[#8E95A5] hover:text-white'
+                    ? 'bg-theme-card-selected border-accent/50 text-accent'
+                    : 'bg-theme-card border border-theme text-theme-secondary hover:text-white'
                 }`}
                 title="Listen to full un-trimmed audio"
               >
@@ -715,7 +715,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             <button
               type="button"
               onClick={handleReset}
-              className="px-3 py-2 rounded-xl text-xs font-semibold text-[#8E95A5] hover:text-white hover:bg-white/5 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-2 rounded-xl text-xs font-semibold text-theme-secondary hover:text-white hover:bg-white/5 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <RotateCcw size={13} />
               <span>Reset Range</span>
@@ -724,14 +724,14 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
         </div>
 
         {/* Modal Footer / Save Options */}
-        <footer className="h-16 px-6 border-t border-[#1B222E] flex items-center justify-between bg-[#0E121A] shrink-0">
+        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
           <button
             type="button"
             onClick={() => {
               if (audioRef.current) audioRef.current.pause();
               onClose();
             }}
-            className="px-4 py-2 rounded-xl text-[12px] font-semibold text-[#8E95A5] hover:text-white bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-[12px] font-semibold text-theme-secondary hover:text-white bg-theme-card hover:bg-theme-card-hover border border-theme transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -740,7 +740,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             <button
               type="button"
               onClick={handleSaveAsNew}
-              className="px-4 py-2 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-white text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="px-4 py-2 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-white text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
             >
               <CopyPlus size={14} style={{ color: accent }} />
               <span>Save as New Sound</span>
@@ -749,8 +749,8 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className="px-5 py-2 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-md"
-              style={{ backgroundColor: accent, color: '#090C12' }}
+              className="px-5 py-2 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-md text-black"
+              style={{ backgroundColor: accent }}
             >
               <Check size={14} className="stroke-[2.5]" />
               <span>Save Trim</span>

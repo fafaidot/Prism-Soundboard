@@ -102,7 +102,7 @@ export const GlobalTooltipProvider: React.FC = () => {
         transform: tooltip.position === 'bottom' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
       }}
     >
-      <div className="px-2.5 py-1.5 rounded-[9px] bg-[#12141c]/95 border border-[#2b3142] text-white text-[11px] font-semibold tracking-wide whitespace-nowrap shadow-[0_8px_25px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-1.5">
+      <div className="px-2.5 py-1.5 rounded-[9px] bg-theme-card/95 border border-theme text-theme-primary text-[11px] font-semibold tracking-wide whitespace-nowrap shadow-[0_8px_25px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-1.5">
         {tooltip.text}
       </div>
     </div>,
@@ -180,7 +180,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
               transform: getTransform(),
             }}
           >
-            <div className="px-2.5 py-1.5 rounded-[9px] bg-[#12141c]/95 border border-[#2b3142] text-white text-[11px] font-semibold tracking-wide whitespace-nowrap shadow-[0_8px_25px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-1.5">
+            <div className="px-2.5 py-1.5 rounded-[9px] bg-theme-card/95 border border-theme text-theme-primary text-[11px] font-semibold tracking-wide whitespace-nowrap shadow-[0_8px_25px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-1.5">
               {content}
             </div>
           </div>,

@@ -58,15 +58,15 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   return (
     <div className="w-full flex items-stretch justify-between gap-4 select-none px-6 pb-4">
       {/* Left Pod: Stacked Speaker & Mic Volume */}
-      <div className="px-5 py-2.5 rounded-2xl bg-[#151B25] border border-[#1B222E] flex flex-col justify-center gap-2 shadow-xl flex-shrink-0 min-w-[240px] h-[64px]">
+      <div className="px-5 py-2.5 rounded-2xl bg-theme-card border border-theme flex flex-col justify-center gap-2 shadow-xl flex-shrink-0 min-w-[240px] h-[64px]">
         {/* Speaker Volume */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleToggleMute}
-            className="flex items-center justify-center focus:outline-none cursor-pointer flex-shrink-0 text-[#31C5F4] hover:brightness-110"
+            className="flex items-center justify-center focus:outline-none cursor-pointer flex-shrink-0 text-accent hover:brightness-110"
             title={isMuted ? 'Unmute Sounds' : 'Mute Sounds'}
           >
-            {isMuted ? <VolumeX size={15} className="text-[#ff3b30]" /> : <Volume2 size={15} />}
+            {isMuted ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} />}
           </button>
           <Slider
             min={0}
@@ -79,7 +79,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             }}
             className="w-32"
           />
-          <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-9 text-right flex-shrink-0">
+          <span className="font-mono text-[11px] font-semibold text-accent w-9 text-right flex-shrink-0">
             {speakerVolume}%
           </span>
         </div>
@@ -87,7 +87,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         {/* Mic Volume */}
         {onMicProjectionVolumeChange && (
           <div className="flex items-center gap-3">
-            <Mic size={15} className="flex-shrink-0 text-[#31C5F4]" />
+            <Mic size={15} className="flex-shrink-0 text-accent" />
             <Slider
               min={0}
               max={200}
@@ -99,7 +99,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               }}
               className="w-32"
             />
-            <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-9 text-right flex-shrink-0">
+            <span className="font-mono text-[11px] font-semibold text-accent w-9 text-right flex-shrink-0">
               {micProjectionVolume}%
             </span>
           </div>
@@ -107,10 +107,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       </div>
 
       {/* Right / Main Playback Pod - matched to h-[64px] */}
-      <div className="flex-1 px-5 py-2.5 rounded-2xl bg-[#151B25] border border-[#1B222E] flex items-center justify-between gap-5 shadow-xl min-w-0 h-[64px]">
+      <div className="flex-1 px-5 py-2.5 rounded-2xl bg-theme-card border border-theme flex items-center justify-between gap-5 shadow-xl min-w-0 h-[64px]">
         {/* Sound Cover & Name */}
         <div className="flex items-center gap-3 min-w-0 max-w-xs">
-          <div className="w-10 h-10 rounded-lg bg-[#0E131A] border border-[#1B222E] overflow-hidden flex items-center justify-center text-[#5a687c] flex-shrink-0 shadow-sm">
+          <div className="w-10 h-10 rounded-lg bg-theme-surface border border-theme overflow-hidden flex items-center justify-center text-theme-muted flex-shrink-0 shadow-sm">
             {activeSound?.thumbnail ? (
               <img
                 src={activeSound.thumbnail}
@@ -118,14 +118,14 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <Music size={18} className="text-[#31C5F4]" />
+              <Music size={18} className="text-accent" />
             )}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-[12px] font-semibold text-white truncate">
+            <span className="text-[12px] font-semibold text-theme-primary truncate">
               {activeSound ? activeSound.title : 'No Sound Playing'}
             </span>
-            <span className="text-[10px] text-[#5a687c] truncate">
+            <span className="text-[10px] text-theme-muted truncate">
               {activeSound?.author || (activeSound ? 'Ready' : 'Select a sound to play')}
             </span>
           </div>
@@ -154,7 +154,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             onClick={() => onSkipSound && onSkipSound(-5)}
             disabled={!activeSound}
             title="Rewind 5s"
-            className="p-1 rounded-lg text-[#5a687c] hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+            className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
           >
             <ChevronLeft size={16} />
           </button>
@@ -163,7 +163,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             onClick={onTogglePause}
             disabled={!activeSound}
             title={isPaused ? 'Resume' : 'Pause'}
-            className="w-8 h-8 rounded-full border border-[#31C5F4] text-[#31C5F4] hover:bg-[#31C5F4] hover:text-[#090B10] flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
+            className="w-8 h-8 rounded-full border border-accent text-accent hover:bg-accent hover:text-black flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
           >
             {isPaused || !activeSound ? (
               <Play size={13} className="fill-current ml-0.5" />
@@ -176,7 +176,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             onClick={() => onSkipSound && onSkipSound(5)}
             disabled={!activeSound}
             title="Forward 5s"
-            className="p-1 rounded-lg text-[#5a687c] hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+            className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
           >
             <ChevronRight size={16} />
           </button>

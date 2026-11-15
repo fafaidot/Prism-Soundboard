@@ -86,7 +86,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   onDownloadSound,
   accentColor,
 }) => {
-  const accent = accentColor || '#31C5F4';
+  const accent = accentColor || 'var(--accent-color)';
   const [sounds, setSounds] = useState<SoundItem[]>(initialSounds);
   const [selectedSoundId, setSelectedSoundId] = useState<string | null>(() => {
     if (activeSoundIds && activeSoundIds.length > 0) {
@@ -405,15 +405,15 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
       <div
         data-hud-pod="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[1380px] h-[720px] max-h-[94vh] bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in fade-in duration-150"
+        className="w-full max-w-[1380px] h-[720px] max-h-[94vh] bg-theme-surface border border-theme rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in fade-in duration-150"
       >
         {/* Top Header Bar: Edge-to-Edge Desktop Bar (Matching Main App Image) */}
-        <header className="h-16 px-6 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/80 backdrop-blur-md shrink-0">
+        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header shrink-0">
           {/* Left: PRISM HUD Brand & Open Main App */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
-              <span className="text-[13px] font-black uppercase tracking-wider text-white">
+              <span className="text-[13px] font-black uppercase tracking-wider text-theme-primary">
                 PRISM <span style={{ color: accent }}>HUD</span>
               </span>
             </div>
@@ -421,7 +421,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             <button
               type="button"
               onClick={handleOpenMainApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white text-[11px] font-bold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-theme-primary text-[11px] font-bold transition-all cursor-pointer"
               title="Open full Prism Soundboard desktop app"
             >
               <ExternalLink size={12} style={{ color: accent }} />
@@ -432,19 +432,19 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
           {/* Center: Search & Filter Tabs */}
           <div className="flex items-center gap-3">
             <div className="relative w-64 md:w-80">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A687C]" />
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-muted" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search sounds, clips, tags..."
-                className="w-full pl-9 pr-8 py-2 bg-[#151B25] border border-[#1B222E] focus:border-[#31C5F4]/60 rounded-xl text-[12px] text-white placeholder-[#5A687C] focus:outline-none transition-all shadow-inner"
+                className="w-full pl-9 pr-8 py-2 bg-theme-card border border-theme focus:border-accent/60 rounded-xl text-[12px] text-theme-primary placeholder-theme-muted focus:outline-none transition-all shadow-inner"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A687C] hover:text-white cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary cursor-pointer"
                 >
                   <X size={12} />
                 </button>
@@ -452,7 +452,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             </div>
 
             {/* Filter Pills */}
-            <div className="flex items-center gap-1 bg-[#151B25] p-1 rounded-xl border border-[#1B222E] shrink-0">
+            <div className="flex items-center gap-1 bg-theme-card p-1 rounded-xl border border-theme shrink-0">
               {([
                 { id: 'all', label: 'All' },
                 { id: 'favorites', label: 'Favorites', icon: Star },
@@ -467,8 +467,8 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     onClick={() => setActiveFilter(tab.id)}
                     className={`h-7 px-2.5 flex items-center gap-1 justify-center rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                       activeFilter === tab.id
-                        ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40 shadow-sm'
-                        : 'text-[#8E95A5] hover:text-white'
+                        ? 'bg-accent-soft text-accent border border-accent/40 shadow-sm'
+                        : 'text-theme-muted hover:text-theme-primary'
                     }`}
                   >
                     {Icon && <Icon size={11} style={activeFilter === tab.id ? { color: accent } : undefined} />}
@@ -489,7 +489,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
               className={`h-8 px-3 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all border ${
                 hasActiveSounds
                   ? 'bg-red-500/20 border-red-500 text-red-400 cursor-pointer hover:bg-red-500/30 active:scale-95'
-                  : 'bg-[#151B25] border-[#1B222E] text-[#5A687C] cursor-not-allowed opacity-50'
+                  : 'bg-theme-card border-theme text-theme-muted cursor-not-allowed opacity-50'
               }`}
             >
               <Square size={11} className={hasActiveSounds ? 'fill-current' : ''} />
@@ -508,13 +508,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                 onClick={onToggleHearMyself}
                 style={
                   hearMyself
-                    ? { backgroundColor: `${accent}25`, borderColor: accent, color: accent }
+                    ? { backgroundColor: 'var(--accent-soft)', borderColor: accent, color: accent }
                     : undefined
                 }
                 className={`w-8 h-8 flex items-center justify-center rounded-xl border transition-all cursor-pointer ${
                   hearMyself
                     ? ''
-                    : 'bg-[#151B25] hover:bg-[#1B222E] border-[#1B222E] text-[#8E95A5] hover:text-white'
+                    : 'bg-theme-card hover:bg-theme-card-hover border-theme text-theme-muted hover:text-theme-primary'
                 }`}
                 title={hearMyself ? 'Hear Myself: ACTIVE' : 'Hear Myself: OFF'}
               >
@@ -526,8 +526,8 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             <button
               type="button"
               onClick={() => setIsHudYouTubeOpen(true)}
-              style={{ backgroundColor: accent, color: '#090C12' }}
-              className="w-8 h-8 rounded-xl flex items-center justify-center font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+              style={{ backgroundColor: accent }}
+              className="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
               title="Download Sound from YouTube"
             >
               <Plus size={16} className="stroke-[2.5]" />
@@ -537,7 +537,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-muted hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
               title="Close Overlay (Esc)"
             >
               <X size={15} />
@@ -548,14 +548,14 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
         {/* Main Content Area: Left Center Sound Library + Right Integrated Properties Panel */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Center Library Grid Area */}
-          <div className="flex-1 flex flex-col min-w-0 bg-[#0B0E14] overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 bg-theme-app overflow-hidden">
             {/* Library Subheader */}
             <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
               <div className="flex items-baseline gap-2.5">
-                <h2 className="text-[17px] font-extrabold text-white tracking-wide">
+                <h2 className="text-[17px] font-extrabold text-theme-primary tracking-wide">
                   Sound library
                 </h2>
-                <span className="text-[11.5px] text-[#5A687C] font-semibold">
+                <span className="text-[11.5px] text-theme-muted font-semibold">
                   {filteredSounds.length} sounds
                 </span>
               </div>
@@ -565,14 +565,14 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSortMenu(!showSortMenu)}
-                  className="h-8 px-3 flex items-center gap-1.5 bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 rounded-xl text-[#8E95A5] hover:text-white text-[11px] font-semibold transition-all cursor-pointer"
+                  className="h-8 px-3 flex items-center gap-1.5 bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 rounded-xl text-theme-secondary hover:text-theme-primary text-[11px] font-semibold transition-all cursor-pointer"
                 >
                   <ArrowUpDown size={12} style={{ color: accent }} className="shrink-0" />
-                  <span>SORT BY <strong className="text-white font-bold">{sortLabels[sortBy] || 'Recently added'}</strong></span>
+                  <span>SORT BY <strong className="text-theme-primary font-bold">{sortLabels[sortBy] || 'Recently added'}</strong></span>
                 </button>
 
                 {showSortMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-[#10141C] border border-[#1B222E] rounded-xl py-1 z-[100] animate-in fade-in zoom-in-95 duration-100 shadow-xl">
+                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-theme-card border border-theme rounded-xl py-1 z-[100] animate-in fade-in zoom-in-95 duration-100 shadow-xl">
                     {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
                       <button
                         key={key}
@@ -583,7 +583,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         }}
                         style={sortBy === key ? { color: accent } : undefined}
                         className={`w-full px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer ${
-                          sortBy === key ? 'bg-white/5 font-bold' : 'text-white'
+                          sortBy === key ? 'bg-white/5 font-bold' : 'text-theme-primary'
                         }`}
                       >
                         <span>{sortLabels[key]}</span>
@@ -598,7 +598,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             {/* Sound Cards Grid */}
             <div className="flex-1 overflow-y-auto px-6 py-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3.5 content-start auto-rows-max">
               {filteredSounds.length === 0 ? (
-                <div className="col-span-full py-20 text-center text-[#5A687C] text-[13px] font-semibold">
+                <div className="col-span-full py-20 text-center text-theme-muted text-[13px] font-semibold">
                   No sounds matched your filter query.
                 </div>
               ) : (
@@ -622,13 +622,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       }
                       className={`group relative flex flex-col justify-between p-2.5 rounded-2xl transition-all duration-150 cursor-pointer select-none shadow-sm ${
                         isPlaying || isSelected
-                          ? 'bg-[#151B25] border-2 border-[#31C5F4] ring-1 ring-[#31C5F4]/30 shadow-[0_0_15px_rgba(49,197,244,0.15)]'
-                          : 'bg-[#10141C] hover:bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40'
+                          ? 'bg-theme-card-selected border-2 border-accent ring-1 ring-accent/30 shadow-md'
+                          : 'bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40'
                       }`}
                       title={`${sound.title} (Click to select & play)`}
                     >
                       {/* Artwork Box */}
-                      <div className="relative w-full aspect-[4/3] rounded-xl bg-[#090C12] border border-[#1B222E] flex items-center justify-center overflow-hidden">
+                      <div className="relative w-full aspect-[4/3] rounded-xl bg-theme-surface border border-theme flex items-center justify-center overflow-hidden">
                         {hasThumbnail ? (
                           <img
                             src={sound.thumbnail}
@@ -637,7 +637,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                             loading="lazy"
                           />
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-[#090C12] p-2 text-center">
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-theme-surface p-2 text-center">
                             {isClipSound ? (
                               <Clapperboard size={24} style={{ color: accent }} className="mb-1" />
                             ) : (
@@ -651,7 +651,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                           <div className="absolute top-1.5 left-1.5 z-20 flex items-center">
                             <span
                               style={{ color: accent }}
-                              className="px-1.5 py-0.5 rounded-md bg-[#123244] border border-[#31C5F4]/40 text-[10px] font-mono font-bold leading-none shadow-sm"
+                              className="px-1.5 py-0.5 rounded-md bg-accent-soft border border-accent/40 text-[10px] font-mono font-bold leading-none shadow-sm"
                             >
                               {sound.hotkey}
                             </span>
@@ -675,7 +675,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         {/* Playing Equalizer Animation Indicator */}
                         {isPlaying && (
                           <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] flex items-center justify-center z-15 pointer-events-none">
-                            <div className="w-9 h-9 rounded-full bg-black/70 backdrop-blur-md border border-[#31C5F4]/50 shadow-md flex items-center justify-center">
+                            <div className="w-9 h-9 rounded-full bg-black/70 backdrop-blur-md border border-accent/50 shadow-md flex items-center justify-center">
                               <div className="flex items-end gap-[3px] h-3.5 w-3.5 justify-center">
                                 <span className="w-[2px] rounded-full animate-[bounce_0.6s_infinite_alternate]" style={{ height: '55%', backgroundColor: accent }} />
                                 <span className="w-[2px] rounded-full animate-[bounce_0.8s_infinite_alternate]" style={{ height: '100%', backgroundColor: accent }} />
@@ -688,7 +688,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                       {/* Title */}
                       <div className="w-full mt-2 px-0.5 text-center">
-                        <span className="text-[11.5px] font-bold text-white leading-tight line-clamp-2 break-words">
+                        <span className="text-[11.5px] font-bold text-theme-primary leading-tight line-clamp-2 break-words">
                           {sound.title}
                         </span>
                       </div>
@@ -699,9 +699,9 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             </div>
 
             {/* Bottom Dock: Dual-Pod Volume & Transport Bar */}
-            <div className="px-6 py-3 border-t border-[#1B222E] bg-[#0E121A] flex items-center justify-between gap-4 shrink-0">
+            <div className="px-6 py-3 border-t border-theme bg-theme-header flex items-center justify-between gap-4 shrink-0">
               {/* Left Pod: Speaker Volume & Mic Gain */}
-              <div className="px-4 py-2 rounded-2xl bg-[#10141C] border border-[#1B222E] flex items-center gap-4 shadow-xl shrink-0 h-[60px]">
+              <div className="px-4 py-2 rounded-2xl bg-theme-card border border-theme flex items-center gap-4 shadow-xl shrink-0 h-[60px]">
                 <div className="flex items-center gap-2">
                   <Volume2 size={15} style={{ color: accent }} className="flex-shrink-0" />
                   <Slider
@@ -712,7 +712,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     onChange={(val) => onSpeakerVolumeChange(val)}
                     className="w-24 sm:w-28"
                   />
-                  <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-8 text-right flex-shrink-0">
+                  <span className="font-mono text-[11px] font-semibold text-accent w-8 text-right flex-shrink-0">
                     {speakerVolume}%
                   </span>
                 </div>
@@ -728,7 +728,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       onChange={(val) => onMicProjectionVolumeChange(val)}
                       className="w-24 sm:w-28"
                     />
-                    <span className="font-mono text-[11px] font-semibold text-[#31C5F4] w-8 text-right flex-shrink-0">
+                    <span className="font-mono text-[11px] font-semibold text-accent w-8 text-right flex-shrink-0">
                       {micProjectionVolume}%
                     </span>
                   </div>
@@ -736,10 +736,10 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
               </div>
 
               {/* Right Pod: Now Playing Pill */}
-              <div className="flex-1 px-4 py-2 rounded-2xl bg-[#10141C] border border-[#1B222E] flex items-center justify-between gap-4 shadow-xl min-w-0 h-[60px]">
+              <div className="flex-1 px-4 py-2 rounded-2xl bg-theme-card border border-theme flex items-center justify-between gap-4 shadow-xl min-w-0 h-[60px]">
                 {/* Sound Cover & Name */}
                 <div className="flex items-center gap-2.5 min-w-0 max-w-[200px]">
-                  <div className="w-9 h-9 rounded-xl bg-[#151B25] border border-[#1B222E] overflow-hidden flex items-center justify-center text-[#5A687C] flex-shrink-0 shadow-sm">
+                  <div className="w-9 h-9 rounded-xl bg-theme-surface border border-theme overflow-hidden flex items-center justify-center text-theme-muted flex-shrink-0 shadow-sm">
                     {activeFloatingSound?.thumbnail ? (
                       <img
                         src={activeFloatingSound.thumbnail}
@@ -751,10 +751,10 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[12px] font-semibold text-white truncate" title={activeFloatingSound?.title || 'No Sound Playing'}>
+                    <span className="text-[12px] font-semibold text-theme-primary truncate" title={activeFloatingSound?.title || 'No Sound Playing'}>
                       {activeFloatingSound ? activeFloatingSound.title : 'No Sound Playing'}
                     </span>
-                    <span className="text-[10px] text-[#5A687C] truncate">
+                    <span className="text-[10px] text-theme-muted truncate">
                       {activeFloatingSound?.author ? (activeFloatingSound.author.startsWith('@') ? activeFloatingSound.author : `@${activeFloatingSound.author}`) : (activeFloatingSound ? 'Ready' : 'Select a sound to play')}
                     </span>
                   </div>
@@ -801,7 +801,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     }}
                     disabled={!activeFloatingSound}
                     title="Rewind 5s"
-                    className="p-1 rounded-lg text-[#5A687C] hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+                    className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -824,7 +824,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     }}
                     disabled={!activeFloatingSound}
                     title={activeFloatingSound && localPausedIds.includes(activeFloatingSound.id) ? 'Resume Playback' : 'Pause Playback'}
-                    className="w-8 h-8 rounded-full border border-[#31C5F4] text-[#31C5F4] hover:bg-[#31C5F4] hover:text-[#090C12] flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
+                    className="w-8 h-8 rounded-full border border-accent text-accent hover:bg-accent hover:text-black flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
                   >
                     {activeFloatingSound && !localPausedIds.includes(activeFloatingSound.id) ? (
                       <Pause size={13} className="fill-current" />
@@ -848,7 +848,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     }}
                     disabled={!activeFloatingSound}
                     title="Forward 5s"
-                    className="p-1 rounded-lg text-[#5A687C] hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+                    className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -859,7 +859,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
           {/* Right Side: Integrated Sound Properties Panel */}
           {selectedSound ? (
-            <aside className="w-[340px] min-w-[340px] bg-[#0E121A] border-l border-[#1B222E] p-5 flex flex-col justify-between overflow-y-auto shrink-0 select-none">
+            <aside className="w-[340px] min-w-[340px] bg-theme-sidebar border-l border-theme p-5 flex flex-col justify-between overflow-y-auto shrink-0 select-none">
               <div>
                 {/* Action Buttons Row: Scissors, Duplicate, Star, Delete */}
                 <div className="grid grid-cols-4 gap-2 mb-3.5">
@@ -867,7 +867,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     type="button"
                     onClick={() => setIsHudTrimmerOpen(true)}
                     title="Open Audio Trimmer"
-                    className="h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-[#31C5F4] flex items-center justify-center transition-colors cursor-pointer"
+                    className="h-9 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
                   >
                     <Scissors size={15} />
                   </button>
@@ -881,7 +881,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       }
                     }}
                     title="Duplicate Sound"
-                    className="h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                    className="h-9 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
                   >
                     <Copy size={15} />
                   </button>
@@ -896,8 +896,8 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       title={selectedSound.isFavorite ? 'Remove Favorite' : 'Add to Favorites'}
                       className={`h-9 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
                         selectedSound.isFavorite
-                          ? 'bg-[#292212] border-yellow-500/50 text-yellow-400'
-                          : 'bg-[#151B25] border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white'
+                          ? 'bg-amber-500/20 border-yellow-500/50 text-yellow-400'
+                          : 'bg-theme-card border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
                       }`}
                     >
                       <Star size={15} className={selectedSound.isFavorite ? 'fill-yellow-400' : ''} />
@@ -912,7 +912,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         onDeleteSound(selectedSound.id);
                       }}
                       title="Delete Sound"
-                      className="h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-red-500/50 text-[#8E95A5] hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+                      className="h-9 rounded-xl bg-theme-card border border-theme hover:border-red-500/50 text-theme-muted hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
                     >
                       <Trash2 size={15} />
                     </button>
@@ -921,7 +921,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                 {/* Selected Sound Info Card: Artwork + Title + PENCIL BUTTON opens EditSoundModal */}
                 <div className="flex items-center gap-3 p-1">
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-[#1B222E] shadow-sm bg-[#090C12] flex-shrink-0 flex items-center justify-center">
+                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-theme shadow-sm bg-theme-surface flex-shrink-0 flex items-center justify-center">
                     {selectedSound.thumbnail ? (
                       <img
                         src={selectedSound.thumbnail}
@@ -935,7 +935,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <h3 className="text-[13.5px] font-bold text-white truncate" title={selectedSound.title}>
+                      <h3 className="text-[13.5px] font-bold text-theme-primary truncate" title={selectedSound.title}>
                         {selectedSound.title}
                       </h3>
                       {/* PENCIL BUTTON: Opens EditSoundModal */}
@@ -943,12 +943,12 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         type="button"
                         onClick={() => setIsHudEditOpen(true)}
                         title="Edit sound details"
-                        className="p-1 text-[#5A687C] hover:text-[#31C5F4] transition-colors cursor-pointer shrink-0"
+                        className="p-1 text-theme-muted hover:text-accent transition-colors cursor-pointer shrink-0"
                       >
                         <Pencil size={13} />
                       </button>
                     </div>
-                    <p className="text-[11px] text-[#5A687C] truncate mt-0.5">
+                    <p className="text-[11px] text-theme-muted truncate mt-0.5">
                       {selectedSound.author
                         ? (selectedSound.author.startsWith('@') ? `by ${selectedSound.author}` : `by @${selectedSound.author}`)
                         : selectedSound.source === 'clip'
@@ -959,8 +959,8 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     </p>
                     {selectedSound.hotkey && (
                       <span
-                        style={{ color: accent, borderColor: `${accent}40` }}
-                        className="inline-block mt-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#123244] border"
+                        style={{ color: accent }}
+                        className="inline-block mt-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-accent-soft border border-accent/40"
                       >
                         Shortcut: {selectedSound.hotkey}
                       </span>
@@ -970,13 +970,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                 {/* Volume & Speed Sliders */}
                 <div className="mt-4 space-y-2.5">
-                  <div className="p-3 bg-[#151B25] rounded-xl border border-[#1B222E] flex items-center gap-2.5">
+                  <div className="p-3 bg-theme-card rounded-xl border border-theme flex items-center gap-2.5">
                     <Volume2
                       size={14}
-                      className={(selectedSound.volume ?? 100) > 100 ? 'text-[#f59e0b]' : ''}
+                      className={(selectedSound.volume ?? 100) > 100 ? 'text-amber-500' : ''}
                       style={(selectedSound.volume ?? 100) <= 100 ? { color: accent } : undefined}
                     />
-                    <span className="text-[11px] font-semibold text-[#8E95A5] w-7">Vol</span>
+                    <span className="text-[11px] font-semibold text-theme-muted w-7">Vol</span>
                     <Slider
                       min={0}
                       max={200}
@@ -986,15 +986,15 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       className="flex-1"
                     />
                     <span className={`text-[11px] font-mono font-bold w-10 text-right ${
-                      (selectedSound.volume ?? 100) > 100 ? 'text-[#f59e0b]' : 'text-[#31C5F4]'
+                      (selectedSound.volume ?? 100) > 100 ? 'text-amber-500' : 'text-accent'
                     }`}>
                       {selectedSound.volume ?? 100}%
                     </span>
                   </div>
 
-                  <div className="p-3 bg-[#151B25] rounded-xl border border-[#1B222E] flex items-center gap-2.5">
+                  <div className="p-3 bg-theme-card rounded-xl border border-theme flex items-center gap-2.5">
                     <SlidersHorizontal size={14} style={{ color: accent }} />
-                    <span className="text-[11px] font-semibold text-[#8E95A5] w-9">Speed</span>
+                    <span className="text-[11px] font-semibold text-theme-muted w-9">Speed</span>
                     <Slider
                       min={0.25}
                       max={2.0}
@@ -1003,7 +1003,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       onChange={(val) => handleSpeedChange(val)}
                       className="flex-1"
                     />
-                    <span className="text-[11px] font-mono font-bold text-[#31C5F4] w-10 text-right">
+                    <span className="text-[11px] font-mono font-bold text-accent w-10 text-right">
                       {(selectedSound.speed ?? 1.0).toFixed(2)}x
                     </span>
                   </div>
@@ -1011,9 +1011,9 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                 {/* Reproduction Mode */}
                 <div className="mt-4">
-                  <div className="flex items-center gap-1.5 text-white font-bold text-[11px] mb-2">
+                  <div className="flex items-center gap-1.5 text-theme-primary font-bold text-[11px] mb-2">
                     <RotateCcw size={13} style={{ color: accent }} />
-                    <span className="uppercase tracking-wider text-[#5A687C] text-[10px]">Playback Mode</span>
+                    <span className="uppercase tracking-wider text-theme-muted text-[10px]">Playback Mode</span>
                   </div>
 
                   <div className="flex items-center justify-between gap-1 px-1">
@@ -1024,13 +1024,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       title="Play & Overlap"
                       style={
                         selectedMode === 'overlap'
-                          ? { backgroundColor: accent, color: '#090C12' }
+                          ? { backgroundColor: accent }
                           : undefined
                       }
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                         selectedMode === 'overlap'
-                          ? 'scale-105 shadow-lg'
-                          : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white'
+                          ? 'scale-105 shadow-lg text-black font-extrabold'
+                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
                       }`}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24">
@@ -1046,13 +1046,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       title="Play & Pause"
                       style={
                         selectedMode === 'pause'
-                          ? { backgroundColor: accent, color: '#090C12' }
+                          ? { backgroundColor: accent }
                           : undefined
                       }
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                         selectedMode === 'pause'
-                          ? 'scale-105 shadow-lg'
-                          : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white'
+                          ? 'scale-105 shadow-lg text-black font-extrabold'
+                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
                       }`}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -1069,13 +1069,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       title="Play & Stop"
                       style={
                         selectedMode === 'stop'
-                          ? { backgroundColor: accent, color: '#090C12' }
+                          ? { backgroundColor: accent }
                           : undefined
                       }
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                         selectedMode === 'stop'
-                          ? 'scale-105 shadow-lg'
-                          : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white'
+                          ? 'scale-105 shadow-lg text-black font-extrabold'
+                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
                       }`}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -1091,13 +1091,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       title="Play & Restart"
                       style={
                         selectedMode === 'restart'
-                          ? { backgroundColor: accent, color: '#090C12' }
+                          ? { backgroundColor: accent }
                           : undefined
                       }
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                         selectedMode === 'restart'
-                          ? 'scale-105 shadow-lg'
-                          : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white'
+                          ? 'scale-105 shadow-lg text-black font-extrabold'
+                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
                       }`}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -1113,13 +1113,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       title="Play & Loop"
                       style={
                         selectedMode === 'push_loop'
-                          ? { backgroundColor: accent, color: '#090C12' }
+                          ? { backgroundColor: accent }
                           : undefined
                       }
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                         selectedMode === 'push_loop'
-                          ? 'scale-105 shadow-lg'
-                          : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8E95A5] hover:text-white'
+                          ? 'scale-105 shadow-lg text-black font-extrabold'
+                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
                       }`}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1131,7 +1131,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     </button>
                   </div>
 
-                  <div className="mt-1.5 text-center text-[11px] font-medium text-[#8E95A5]">
+                  <div className="mt-1.5 text-center text-[11px] font-medium text-theme-muted">
                     {selectedMode === 'overlap' && 'Play and Overlap'}
                     {selectedMode === 'pause' && 'Play and Pause'}
                     {selectedMode === 'stop' && 'Play and Stop'}
@@ -1142,24 +1142,24 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                 {/* Reproduction Options Section (4 Checkbox options) */}
                 <div className="mt-4 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-white font-bold text-[11px] mb-1.5">
+                  <div className="flex items-center gap-1.5 text-theme-primary font-bold text-[11px] mb-1.5">
                     <Sliders size={13} style={{ color: accent }} />
-                    <span className="uppercase tracking-wider text-[#5A687C] text-[10px]">Playback Options</span>
+                    <span className="uppercase tracking-wider text-theme-muted text-[10px]">Playback Options</span>
                   </div>
 
                   {/* 1. Stop Other Sounds */}
                   <div
                     onClick={() => handleOptionToggle('stopOtherSounds')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 cursor-pointer select-none transition-all"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
                   >
-                    <span className="text-[11.5px] font-medium text-[#8E95A5]">
+                    <span className="text-[11.5px] font-medium text-theme-secondary">
                       Stop Other Sounds
                     </span>
                     <div
                       className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
                         selectedOptions.stopOtherSounds
-                          ? 'bg-[#31C5F4] text-[#090C12]'
-                          : 'border border-[#233346] bg-[#0E131A]'
+                          ? 'bg-accent text-black font-extrabold'
+                          : 'border border-theme bg-theme-surface'
                       }`}
                     >
                       {selectedOptions.stopOtherSounds && <Check size={11} strokeWidth={3} />}
@@ -1169,16 +1169,16 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                   {/* 2. Mute Other Sounds */}
                   <div
                     onClick={() => handleOptionToggle('muteOtherSounds')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 cursor-pointer select-none transition-all"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
                   >
-                    <span className="text-[11.5px] font-medium text-[#8E95A5]">
+                    <span className="text-[11.5px] font-medium text-theme-secondary">
                       Mute Other Sounds
                     </span>
                     <div
                       className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
                         selectedOptions.muteOtherSounds
-                          ? 'bg-[#31C5F4] text-[#090C12]'
-                          : 'border border-[#233346] bg-[#0E131A]'
+                          ? 'bg-accent text-black font-extrabold'
+                          : 'border border-theme bg-theme-surface'
                       }`}
                     >
                       {selectedOptions.muteOtherSounds && <Check size={11} strokeWidth={3} />}
@@ -1188,16 +1188,16 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                   {/* 3. Mute Voice */}
                   <div
                     onClick={() => handleOptionToggle('muteVoice')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 cursor-pointer select-none transition-all"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
                   >
-                    <span className="text-[11.5px] font-medium text-[#8E95A5]">
+                    <span className="text-[11.5px] font-medium text-theme-secondary">
                       Mute Voice
                     </span>
                     <div
                       className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
                         selectedOptions.muteVoice
-                          ? 'bg-[#31C5F4] text-[#090C12]'
-                          : 'border border-[#233346] bg-[#0E131A]'
+                          ? 'bg-accent text-black font-extrabold'
+                          : 'border border-theme bg-theme-surface'
                       }`}
                     >
                       {selectedOptions.muteVoice && <Check size={11} strokeWidth={3} />}
@@ -1207,16 +1207,16 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                   {/* 4. Loop */}
                   <div
                     onClick={() => handleOptionToggle('loop')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 cursor-pointer select-none transition-all"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
                   >
-                    <span className="text-[11.5px] font-medium text-[#8E95A5]">
+                    <span className="text-[11.5px] font-medium text-theme-secondary">
                       Loop
                     </span>
                     <div
                       className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
                         selectedOptions.loop
-                          ? 'bg-[#31C5F4] text-[#090C12]'
-                          : 'border border-[#233346] bg-[#0E131A]'
+                          ? 'bg-accent text-black font-extrabold'
+                          : 'border border-theme bg-theme-surface'
                       }`}
                     >
                       {selectedOptions.loop && <Check size={11} strokeWidth={3} />}

@@ -88,12 +88,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         e.preventDefault();
         setShowMenu(true);
       }}
-      className="group relative bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4] rounded-2xl overflow-hidden flex flex-col transition-all duration-200 select-none"
+      className="group relative bg-theme-card border border-theme hover:border-accent rounded-2xl overflow-hidden flex flex-col transition-all duration-200 select-none"
     >
       {/* 16:9 Video Canvas Container */}
       <div
         onClick={onClick}
-        className="relative w-full aspect-video bg-[#0E131A] cursor-pointer overflow-hidden"
+        className="relative w-full aspect-video bg-theme-surface cursor-pointer overflow-hidden"
       >
         <video
           ref={videoRef}
@@ -145,13 +145,13 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   setTitleInput(clip.title);
                 }
               }}
-              className="flex-1 bg-[#0E131A] text-white text-[13px] font-semibold px-2 py-1 rounded outline-none border border-[#31C5F4]"
+              className="flex-1 bg-theme-surface text-theme-primary text-[13px] font-semibold px-2 py-1 rounded outline-none border border-accent"
             />
           ) : (
             <h3
               onClick={onClick}
               title={clip.title}
-              className="text-[13px] font-semibold text-white truncate cursor-pointer hover:text-[#31C5F4] transition-colors"
+              className="text-[13px] font-semibold text-theme-primary truncate cursor-pointer hover:text-accent transition-colors"
             >
               {clip.title}
             </h3>
@@ -163,16 +163,16 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="text-[#5a687c] hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+            className="text-theme-muted hover:text-theme-primary p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
           >
             <MoreVertical size={14} />
           </button>
         </div>
 
         {/* Subtitle Row: ● On device  •  14.8 MB  •  Today */}
-        <div className="flex items-center gap-2 text-[11px] text-[#5a687c] font-medium">
+        <div className="flex items-center gap-2 text-[11px] text-theme-muted font-medium">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>On device</span>
           </div>
           <span>•</span>
@@ -186,16 +186,16 @@ export const ClipCard: React.FC<ClipCardProps> = ({
       {showMenu && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-3 bottom-12 w-48 rounded-xl bg-[#151B25] border border-[#1B222E] p-1.5 shadow-2xl z-50 flex flex-col gap-0.5 text-[12px]"
+          className="absolute right-3 bottom-12 w-48 rounded-xl bg-theme-card border border-theme p-1.5 shadow-2xl z-50 flex flex-col gap-0.5 text-[12px]"
         >
           <button
             onClick={() => {
               setShowMenu(false);
               onOpenFolder();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
           >
-            <FolderOpen size={13} className="text-[#31C5F4]" />
+            <FolderOpen size={13} className="text-accent" />
             <span>Open in folder</span>
           </button>
           <button
@@ -203,9 +203,9 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               setShowMenu(false);
               setIsEditingTitle(true);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
           >
-            <Edit2 size={13} className="text-[#31C5F4]" />
+            <Edit2 size={13} className="text-accent" />
             <span>Rename</span>
           </button>
           <button
@@ -213,7 +213,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               setShowMenu(false);
               onToggleFavorite();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
           >
             <Star size={13} className="text-yellow-400" />
             <span>{clip.isFavorite ? 'Remove Favorite' : 'Favorite'}</span>
@@ -223,9 +223,9 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               setShowMenu(false);
               onExtractToSoundboard();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
           >
-            <Music size={13} className="text-[#a78bfa]" />
+            <Music size={13} className="text-accent" />
             <span>Extract to Soundboard</span>
           </button>
           <button
@@ -233,12 +233,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({
               setShowMenu(false);
               onTrim();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[#8e95a5] hover:bg-white/5 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
           >
-            <Scissors size={13} className="text-[#31C5F4]" />
+            <Scissors size={13} className="text-accent" />
             <span>Trim Clip</span>
           </button>
-          <div className="my-1 border-t border-[#1B222E]" />
+          <div className="my-1 border-t border-theme" />
           <button
             onClick={() => {
               setShowMenu(false);

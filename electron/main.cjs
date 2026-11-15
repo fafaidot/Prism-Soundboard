@@ -221,6 +221,13 @@ function showOverlayWindow() {
     overlayWindow.moveTop();
   } catch (e) {}
 
+  try {
+    const currentSettings = storageManager.loadSettings();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('settings-sync', currentSettings);
+    }
+  } catch (e) {}
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('request-overlay-sync');
   }
@@ -905,7 +912,11 @@ ipcMain.on('sync-toggle-pause-sound', (_event, soundId) => {
 });
 
 ipcMain.on('sync-settings-changed', (event, newSettings) => {
-  debouncedSaveSettingsFile(newSettings);
+  try {
+    storageManager.saveSettings(newSettings);
+  } catch (err) {
+    console.error('Failed to save settings on sync:', err);
+  }
   if (mainWindow && !mainWindow.isDestroyed() && event.sender !== mainWindow.webContents) {
     mainWindow.webContents.send('settings-sync', newSettings);
   }
@@ -1199,6 +1210,14 @@ ipcMain.handle('save-settings', async (_event, settings) => {
       }
     } catch (bootErr) {
       console.warn('Failed to set login item settings:', bootErr);
+    }
+
+    // Broadcast saved settings across all active windows so HUD and main window stay in lockstep
+    if (mainWindow && !mainWindow.isDestroyed() && _event.sender !== mainWindow.webContents) {
+      mainWindow.webContents.send('settings-sync', settings);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed() && _event.sender !== overlayWindow.webContents) {
+      overlayWindow.webContents.send('settings-sync', settings);
     }
 
     return true;
@@ -1702,7 +1721,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.4';
+    let currentVersion = '1.5.5';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {

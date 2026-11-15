@@ -104,12 +104,12 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
   if (!sound) {
     return (
-      <aside className="w-[310px] min-w-[310px] h-full bg-[#10141C] border-l border-[#1B222E] flex flex-col items-center justify-center p-6 text-center select-none transition-colors duration-150">
-        <div className="w-14 h-14 rounded-2xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center mb-3 text-[#5a687c]">
+      <aside className="w-[310px] min-w-[310px] h-full bg-theme-sidebar border-l border-theme flex flex-col items-center justify-center p-6 text-center select-none transition-colors duration-150">
+        <div className="w-14 h-14 rounded-2xl bg-theme-card border border-theme flex items-center justify-center mb-3 text-theme-muted">
           <Disc size={28} />
         </div>
-        <h3 className="text-[13px] font-bold text-white mb-1">No Sound Selected</h3>
-        <p className="text-[11px] text-[#5a687c] max-w-xs">
+        <h3 className="text-[13px] font-bold text-theme-primary mb-1">No Sound Selected</h3>
+        <p className="text-[11px] text-theme-muted max-w-xs">
           Select any sound to adjust volume, playback speed, shortcuts, or trimming options.
         </p>
       </aside>
@@ -172,13 +172,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   };
 
   return (
-    <aside className="w-[320px] min-w-[320px] h-full bg-[#10141C] border-l border-[#1B222E] flex flex-col overflow-y-auto p-5 select-none transition-colors duration-150 gap-5">
+    <aside className="w-[320px] min-w-[320px] h-full bg-theme-sidebar border-l border-theme flex flex-col overflow-y-auto p-5 select-none transition-colors duration-150 gap-5">
       {/* Top Action Row: [Scissors] [Duplicate] [Favorite] [Delete] */}
       <div className="grid grid-cols-4 gap-2">
         <button
           onClick={onOpenTrimmer}
           title="Trim Audio"
-          className="h-10 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-10 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
         >
           <Scissors size={15} />
         </button>
@@ -186,7 +186,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         <button
           onClick={onDuplicateSound}
           title="Duplicate Sound"
-          className="h-10 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-10 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
         >
           <Copy size={15} />
         </button>
@@ -196,8 +196,8 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
           title={sound.isFavorite ? 'Remove Favorite' : 'Add to Favorites'}
           className={`h-10 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
             sound.isFavorite
-              ? 'bg-[#292212] border-yellow-500/50 text-yellow-400'
-              : 'bg-[#151B25] border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+              ? 'bg-amber-500/20 border-yellow-500/50 text-yellow-400'
+              : 'bg-theme-card border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
           }`}
         >
           <Star size={15} className={sound.isFavorite ? 'fill-yellow-400' : ''} />
@@ -206,7 +206,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         <button
           onClick={onDeleteSound}
           title="Delete Sound"
-          className="h-10 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-red-500/50 text-[#8e95a5] hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+          className="h-10 rounded-xl bg-theme-card border border-theme hover:border-red-500/50 text-theme-secondary hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
         >
           <Trash2 size={15} />
         </button>
@@ -214,7 +214,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
       {/* Selected Sound Info Card */}
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-[#0E131A] border border-[#1B222E] overflow-hidden flex items-center justify-center text-[#31C5F4] flex-shrink-0 shadow-sm">
+        <div className="w-12 h-12 rounded-xl bg-theme-surface border border-theme overflow-hidden flex items-center justify-center text-accent flex-shrink-0 shadow-sm">
           {sound.thumbnail ? (
             <img
               src={sound.thumbnail}
@@ -222,26 +222,26 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
               className="w-full h-full object-cover"
             />
           ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
-            <Clapperboard size={22} className="text-[#31C5F4]" />
+            <Clapperboard size={22} className="text-accent" />
           ) : (
-            <Music size={22} className="text-[#31C5F4]" />
+            <Music size={22} className="text-accent" />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0 group/title">
-            <h3 className="text-[14px] font-bold text-white truncate" title={sound.title}>
+            <h3 className="text-[14px] font-bold text-theme-primary truncate" title={sound.title}>
               {sound.title}
             </h3>
             <button
               type="button"
               onClick={onEditDetails}
               title="Edit sound details"
-              className="p-1 text-[#5a687c] hover:text-[#31C5F4] transition-colors cursor-pointer shrink-0"
+              className="p-1 text-theme-muted hover:text-accent transition-colors cursor-pointer shrink-0"
             >
               <Pencil size={13} />
             </button>
           </div>
-          <p className="text-[11px] text-[#5a687c] truncate mt-0.5">
+          <p className="text-[11px] text-theme-muted truncate mt-0.5">
             {sound.author
               ? (sound.author.startsWith('@') ? `by ${sound.author}` : `by @${sound.author}`)
               : sound.source === 'clip'
@@ -260,8 +260,8 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             onClick={onStartListeningHotkey}
             className={`flex-1 py-2 px-3 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
               isListeningHotkey
-                ? 'bg-[#ff9500] text-black font-bold animate-pulse'
-                : 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40 hover:bg-[#153c52]'
+                ? 'bg-amber-500 text-black font-bold animate-pulse'
+                : 'bg-theme-card-selected text-accent border border-accent/40 hover:brightness-110'
             }`}
             title="Click to rebind shortcut"
           >
@@ -276,7 +276,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
               e.stopPropagation();
               onClearHotkey();
             }}
-            className="w-9 h-9 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#ff3b30]/50 hover:bg-[#ff3b30]/10 text-[#8e95a5] hover:text-[#ff453a] flex items-center justify-center transition-all cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-xl bg-theme-card border border-theme hover:border-red-500/50 hover:bg-red-500/10 text-theme-secondary hover:text-red-400 flex items-center justify-center transition-all cursor-pointer shrink-0"
             title="Remove shortcut"
           >
             <X size={14} />
@@ -287,15 +287,15 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
           onClick={onStartListeningHotkey}
           className={`w-full py-2.5 px-4 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
             isListeningHotkey
-              ? 'bg-[#ff9500] text-black font-bold animate-pulse'
-              : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-white'
+              ? 'bg-amber-500 text-black font-bold animate-pulse'
+              : 'bg-theme-card border border-theme hover:border-accent/50 text-white'
           }`}
         >
           {isListeningHotkey ? (
             <span>Press Any Key...</span>
           ) : (
             <>
-              <Plus size={13} className="text-[#31C5F4]" />
+              <Plus size={13} className="text-accent" />
               <span>+ Add shortcut</span>
             </>
           )}
@@ -304,13 +304,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
       {/* PLAYBACK Section */}
       <div className="flex flex-col gap-3">
-        <span className="text-[10px] font-bold text-[#5a687c] uppercase tracking-wider">
+        <span className="text-[10px] font-bold text-theme-muted uppercase tracking-wider">
           PLAYBACK
         </span>
 
         {/* Volume */}
         <div className="flex items-center justify-between gap-3 text-[12px]">
-          <span className="text-[#8e95a5] w-14">Volume</span>
+          <span className="text-theme-secondary w-14">Volume</span>
           <Slider
             min={0}
             max={200}
@@ -319,14 +319,14 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             onChange={(val) => handleVolumeChange(val)}
             className="flex-1"
           />
-          <span className="font-mono text-[#31C5F4] w-10 text-right font-medium">
+          <span className="font-mono text-accent w-10 text-right font-medium">
             {localVolume}%
           </span>
         </div>
 
         {/* Speed */}
         <div className="flex items-center justify-between gap-3 text-[12px]">
-          <span className="text-[#8e95a5] w-14">Speed</span>
+          <span className="text-theme-secondary w-14">Speed</span>
           <Slider
             min={0.25}
             max={2.0}
@@ -335,7 +335,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             onChange={(val) => handleSpeedChange(val)}
             className="flex-1"
           />
-          <span className="font-mono text-[#31C5F4] w-10 text-right font-medium">
+          <span className="font-mono text-accent w-10 text-right font-medium">
             {localSpeed.toFixed(2)}x
           </span>
         </div>
@@ -343,7 +343,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
       {/* PLAYBACK MODE Section */}
       <div className="flex flex-col gap-2.5">
-        <span className="text-[10px] font-bold text-[#5a687c] uppercase tracking-wider">
+        <span className="text-[10px] font-bold text-theme-muted uppercase tracking-wider">
           PLAYBACK MODE
         </span>
 
@@ -354,13 +354,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             title="Play & Overlap"
             style={
               currentMode === 'overlap'
-                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                ? { backgroundColor: accentColor || 'var(--accent-color)' }
                 : undefined
             }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'overlap'
-                ? 'shadow-lg scale-105'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+                ? 'shadow-lg scale-105 text-black font-extrabold'
+                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
             }`}
           >
             <svg width="15" height="15" viewBox="0 0 24 24">
@@ -375,13 +375,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             title="Play & Pause"
             style={
               currentMode === 'pause'
-                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                ? { backgroundColor: accentColor || 'var(--accent-color)' }
                 : undefined
             }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'pause'
-                ? 'shadow-lg scale-105'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+                ? 'shadow-lg scale-105 text-black font-extrabold'
+                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
             }`}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -397,13 +397,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             title="Play & Stop"
             style={
               currentMode === 'stop'
-                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                ? { backgroundColor: accentColor || 'var(--accent-color)' }
                 : undefined
             }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'stop'
-                ? 'shadow-lg scale-105'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+                ? 'shadow-lg scale-105 text-black font-extrabold'
+                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
             }`}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -418,13 +418,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             title="Play & Restart"
             style={
               currentMode === 'restart'
-                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                ? { backgroundColor: accentColor || 'var(--accent-color)' }
                 : undefined
             }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'restart'
-                ? 'shadow-lg scale-105'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+                ? 'shadow-lg scale-105 text-black font-extrabold'
+                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
             }`}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -439,13 +439,13 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             title="Play & Loop"
             style={
               currentMode === 'push_loop'
-                ? { backgroundColor: accentColor || '#31C5F4', color: '#090B10' }
+                ? { backgroundColor: accentColor || 'var(--accent-color)' }
                 : undefined
             }
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
               currentMode === 'push_loop'
-                ? 'shadow-lg scale-105'
-                : 'bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/50 text-[#8e95a5] hover:text-white'
+                ? 'shadow-lg scale-105 text-black font-extrabold'
+                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
             }`}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -460,7 +460,7 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
 
       {/* PLAYBACK OPTIONS Section */}
       <div className="flex flex-col gap-2">
-        <span className="text-[10px] font-bold text-[#5a687c] uppercase tracking-wider mb-0.5">
+        <span className="text-[10px] font-bold text-theme-muted uppercase tracking-wider mb-0.5">
           PLAYBACK OPTIONS
         </span>
 
@@ -475,14 +475,14 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             <div
               key={key}
               onClick={() => handleOptionToggle(key as any)}
-              className="flex items-center justify-between p-3 rounded-xl bg-[#151B25] border border-[#1B222E] hover:border-[#31C5F4]/40 transition-colors cursor-pointer text-[12px]"
+              className="flex items-center justify-between p-3 rounded-xl bg-theme-card border border-theme hover:border-accent/40 transition-colors cursor-pointer text-[12px]"
             >
-              <span className="text-[#8e95a5] font-medium">{label}</span>
+              <span className="text-theme-secondary font-medium">{label}</span>
               <div
                 className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
                   isChecked
-                    ? 'bg-[#31C5F4] text-[#090B10]'
-                    : 'border border-[#233346] bg-[#0E131A]'
+                    ? 'bg-accent text-black'
+                    : 'border border-theme bg-theme-surface'
                 }`}
               >
                 {isChecked && <Check size={11} strokeWidth={3} />}

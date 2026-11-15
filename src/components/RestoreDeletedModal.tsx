@@ -26,13 +26,13 @@ interface RestoreDeletedModalProps {
 export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
   isOpen,
   deletedSounds,
-  accentColor = '#31C5F4',
+  accentColor = 'var(--accent-color)',
   onClose,
   onRestore,
   onPermanentlyDelete,
   onOpenDeletedFolder,
 }) => {
-  const accent = accentColor || '#31C5F4';
+  const accent = accentColor || 'var(--accent-color)';
   const [search, setSearch] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'recent' | 'long'>('all');
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -130,10 +130,10 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
+        className="w-full max-w-3xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
       >
         {/* Top Header */}
-        <header className="h-16 px-6 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/70 backdrop-blur-md shrink-0">
+        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-3">
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center border shadow-sm"
@@ -146,13 +146,13 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
               <Trash2 size={16} />
             </div>
             <div>
-              <h3 className="text-[14px] font-bold text-white tracking-wide flex items-center gap-2">
+              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide flex items-center gap-2">
                 <span>Deleted Sounds Archive</span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#151B25] text-[#31C5F4] border border-[#1B222E]">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-theme-card text-accent border border-theme">
                   {deletedSounds.length} {deletedSounds.length === 1 ? 'sound' : 'sounds'}
                 </span>
               </h3>
-              <p className="text-[11px] text-[#5A687C]">
+              <p className="text-[11px] text-theme-muted">
                 Browse, preview, and restore deleted sounds back into your soundboard
               </p>
             </div>
@@ -162,7 +162,7 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
             <button
               type="button"
               onClick={onOpenDeletedFolder}
-              className="px-3 py-1.5 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] hover:border-[#31C5F4]/40 text-[#8E95A5] hover:text-white text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-theme-secondary hover:text-white text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
               title="Open 'deleted' folder on computer"
             >
               <FolderOpen size={13} style={{ color: accent }} />
@@ -171,7 +171,7 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
               title="Close Archive (Esc)"
             >
               <X size={15} />
@@ -180,24 +180,24 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
         </header>
 
         {/* Search & Filter Toolbar */}
-        <div className="px-6 py-3.5 bg-[#0E121A] border-b border-[#1B222E] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-6 py-3.5 bg-theme-header border-b border-theme flex items-center justify-between gap-3 shrink-0">
           <div className="relative flex-1">
             <Search
               size={14}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A687C]"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-muted"
             />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search deleted sounds by title or creator..."
-              className="w-full pl-9 pr-8 py-2 bg-[#151B25] border border-[#1B222E] rounded-xl text-[12px] text-white placeholder-[#5A687C] focus:outline-none focus:border-[#31C5F4]/50 transition-colors"
+              className="w-full pl-9 pr-8 py-2 bg-theme-card border border-theme rounded-xl text-[12px] text-theme-primary placeholder-theme-muted focus:outline-none focus:border-accent/50 transition-colors"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A687C] hover:text-white cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-white cursor-pointer"
               >
                 <X size={13} />
               </button>
@@ -205,14 +205,14 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
           </div>
 
           {/* Filter Pills */}
-          <div className="flex items-center gap-1 bg-[#151B25] p-1 rounded-xl border border-[#1B222E] shrink-0">
+          <div className="flex items-center gap-1 bg-theme-card p-1 rounded-xl border border-theme shrink-0">
             <button
               type="button"
               onClick={() => setFilterTab('all')}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 filterTab === 'all'
-                  ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40 shadow-sm'
-                  : 'text-[#8E95A5] hover:text-white'
+                  ? 'bg-theme-card-selected text-accent border border-accent/40 shadow-sm'
+                  : 'text-theme-secondary hover:text-white'
               }`}
             >
               All ({deletedSounds.length})
@@ -222,8 +222,8 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
               onClick={() => setFilterTab('recent')}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 filterTab === 'recent'
-                  ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40 shadow-sm'
-                  : 'text-[#8E95A5] hover:text-white'
+                  ? 'bg-theme-card-selected text-accent border border-accent/40 shadow-sm'
+                  : 'text-theme-secondary hover:text-white'
               }`}
             >
               <Clock size={11} />
@@ -234,8 +234,8 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
               onClick={() => setFilterTab('long')}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 filterTab === 'long'
-                  ? 'bg-[#123244] text-[#31C5F4] border border-[#31C5F4]/40 shadow-sm'
-                  : 'text-[#8E95A5] hover:text-white'
+                  ? 'bg-theme-card-selected text-accent border border-accent/40 shadow-sm'
+                  : 'text-theme-secondary hover:text-white'
               }`}
             >
               <Layers size={11} />
@@ -245,15 +245,15 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
         </div>
 
         {/* Scrollable Deleted Sounds List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 bg-[#0B0E14]">
+        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 bg-theme-surface">
           {filtered.length === 0 ? (
             <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-[#151B25] border border-[#1B222E] flex items-center justify-center text-[#5A687C]">
+              <div className="w-14 h-14 rounded-2xl bg-theme-card border border-theme flex items-center justify-center text-theme-muted">
                 <Trash2 size={24} />
               </div>
               <div className="space-y-1">
-                <h4 className="text-[14px] font-bold text-white">No Deleted Sounds Found</h4>
-                <p className="text-[12px] text-[#5A687C] max-w-sm">
+                <h4 className="text-[14px] font-bold text-theme-primary">No Deleted Sounds Found</h4>
+                <p className="text-[12px] text-theme-muted max-w-sm">
                   {deletedSounds.length === 0
                     ? 'When you delete a sound from your soundboard, it is safely stored here where it can be recovered anytime.'
                     : 'No deleted sounds matched your current search or filter query.'}
@@ -266,11 +266,11 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
               return (
                 <div
                   key={sound.id}
-                  className="p-3.5 bg-[#10141C] border border-[#1B222E] hover:border-[#31C5F4]/40 rounded-2xl flex items-center justify-between gap-4 transition-all shadow-sm group"
+                  className="p-3.5 bg-theme-sidebar border border-theme hover:border-accent/40 rounded-2xl flex items-center justify-between gap-4 transition-all shadow-sm group"
                 >
                   {/* Left: Thumbnail & Play Preview Button */}
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-[#151B25] border border-[#1B222E] flex-shrink-0 flex items-center justify-center">
+                    <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-theme-card border border-theme flex-shrink-0 flex items-center justify-center">
                       {sound.thumbnail ? (
                         <img
                           src={sound.thumbnail}
@@ -278,7 +278,7 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Volume2 size={18} className="text-[#5A687C]" />
+                        <Volume2 size={18} className="text-theme-muted" />
                       )}
                       <button
                         type="button"
@@ -298,7 +298,7 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
 
                     {/* Info */}
                     <div className="min-w-0">
-                      <div className="text-[13px] font-bold text-white truncate flex items-center gap-2">
+                      <div className="text-[13px] font-bold text-theme-primary truncate flex items-center gap-2">
                         <span>{sound.title}</span>
                         {isThisPreviewing && (
                           <span
@@ -313,7 +313,7 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-[#5A687C] flex items-center gap-2 mt-0.5">
+                      <div className="text-[11px] text-theme-muted flex items-center gap-2 mt-0.5">
                         <span>{sound.author || 'Sound file'}</span>
                         <span>•</span>
                         <span>{Math.round(sound.duration || 0)}s</span>
@@ -361,7 +361,7 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
                         onPermanentlyDelete(sound.id);
                       }}
                       title="Permanently erase file from computer"
-                      className="p-2 rounded-xl bg-[#151B25] hover:bg-red-500/15 border border-[#1B222E] hover:border-red-500/40 text-[#8E95A5] hover:text-red-400 transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-theme-card hover:bg-red-500/15 border border-theme hover:border-red-500/40 text-theme-secondary hover:text-red-400 transition-colors cursor-pointer"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -373,8 +373,8 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
         </div>
 
         {/* Footer */}
-        <footer className="h-16 px-6 border-t border-[#1B222E] flex items-center justify-between bg-[#0E121A] shrink-0">
-          <div className="flex items-center gap-2 text-[11.5px] text-[#5A687C]">
+        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
+          <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
             <span>{filtered.length} of {deletedSounds.length} sounds shown</span>
             <span>•</span>
             <span>Restored sounds return directly to your active library</span>
@@ -385,9 +385,8 @@ export const RestoreDeletedModal: React.FC<RestoreDeletedModalProps> = ({
             onClick={handleClose}
             style={{
               backgroundColor: accent,
-              color: '#090C12',
             }}
-            className="px-6 py-2 rounded-xl text-[12px] font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+            className="px-6 py-2 rounded-xl text-[12px] font-bold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
           >
             Done
           </button>

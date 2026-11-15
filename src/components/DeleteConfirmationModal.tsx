@@ -26,19 +26,19 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-[#0B0E14] border border-[#1B222E] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden transition-all duration-150"
+        className="w-full max-w-lg bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden transition-all duration-150"
       >
         {/* Header */}
-        <header className="h-16 px-6 border-b border-[#1B222E] flex items-center justify-between bg-[#0E121A]/70 backdrop-blur-md shrink-0">
+        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center shadow-sm">
               <Trash2 size={16} />
             </div>
             <div>
-              <h3 className="text-[14px] font-bold text-white tracking-wide">
+              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide">
                 Move Sound to Archive?
               </h3>
-              <p className="text-[11px] text-[#5A687C]">
+              <p className="text-[11px] text-theme-muted">
                 Sound is safely preserved in your deleted archive
               </p>
             </div>
@@ -47,7 +47,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] text-[#8E95A5] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Cancel"
           >
             <X size={15} />
@@ -55,40 +55,40 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
         </header>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4 bg-[#0B0E14]">
+        <div className="p-6 space-y-4 bg-theme-surface">
           {/* Sound Card */}
-          <div className="p-4 bg-[#10141C] border border-[#1B222E] rounded-2xl flex items-center gap-3.5">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-[#151B25] border border-[#1B222E] flex-shrink-0 flex items-center justify-center">
+          <div className="p-4 bg-theme-sidebar border border-theme rounded-2xl flex items-center gap-3.5">
+            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-theme-card border border-theme flex-shrink-0 flex items-center justify-center">
               {sound.thumbnail ? (
                 <img src={sound.thumbnail} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Volume2 size={20} className="text-[#31C5F4]" />
+                <Volume2 size={20} className="text-accent" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="text-[13.5px] font-bold text-white truncate leading-snug">
+              <h4 className="text-[13.5px] font-bold text-theme-primary truncate leading-snug">
                 {sound.title}
               </h4>
-              <p className="text-[11.5px] text-[#5A687C] truncate mt-0.5">
+              <p className="text-[11.5px] text-theme-muted truncate mt-0.5">
                 {sound.author || 'Sound file'} • {Math.round(sound.duration || 0)}s
               </p>
             </div>
           </div>
 
           {/* Explanation notice */}
-          <div className="p-4 bg-[#151B25]/50 border border-[#1B222E] rounded-2xl flex items-start gap-3">
-            <div className="w-7 h-7 rounded-lg bg-[#31C5F4]/10 border border-[#31C5F4]/20 text-[#31C5F4] flex items-center justify-center flex-shrink-0 mt-0.5">
+          <div className="p-4 bg-theme-card/50 border border-theme rounded-2xl flex items-start gap-3">
+            <div className="w-7 h-7 rounded-lg bg-accent/10 border border-accent/20 text-accent flex items-center justify-center flex-shrink-0 mt-0.5">
               <ShieldCheck size={14} />
             </div>
-            <p className="text-[11.5px] text-[#8E95A5] leading-relaxed">
-              The sound file will not be permanently deleted from your computer. It is safely moved to your <span className="text-white font-semibold">/deleted</span> archive folder and can be restored anytime from Settings or the Archive menu.
+            <p className="text-[11.5px] text-theme-secondary leading-relaxed">
+              The sound file will not be permanently deleted from your computer. It is safely moved to your <span className="text-theme-primary font-semibold">/deleted</span> archive folder and can be restored anytime from Settings or the Archive menu.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="h-16 px-6 border-t border-[#1B222E] flex items-center justify-between bg-[#0E121A] shrink-0">
-          <span className="text-[11px] text-[#5A687C]">
+        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
+          <span className="text-[11px] text-theme-muted">
             Can be recovered anytime from Archive
           </span>
 
@@ -96,7 +96,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-[12px] font-semibold text-[#8E95A5] hover:text-white bg-[#151B25] hover:bg-[#1B222E] border border-[#1B222E] transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl text-[12px] font-semibold text-theme-secondary hover:text-white bg-theme-card hover:bg-theme-card-hover border border-theme transition-colors cursor-pointer"
             >
               Cancel
             </button>

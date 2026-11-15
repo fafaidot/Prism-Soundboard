@@ -21,7 +21,7 @@ export const Slider: React.FC<SliderProps> = ({
   onChange,
   className = '',
   trackClassName = '',
-  fillColor = '#31C5F4',
+  fillColor = 'var(--accent-color)',
 }) => {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -151,7 +151,7 @@ export const Slider: React.FC<SliderProps> = ({
       } ${className}`}
     >
       {/* Background Track */}
-      <div className={`w-full h-1.5 rounded-full bg-[#0E131A] relative overflow-hidden ${trackClassName}`}>
+      <div className={`w-full h-1.5 rounded-full bg-theme-surface relative overflow-hidden ${trackClassName}`}>
         {/* Active Fill Track */}
         <div
           style={{
@@ -170,7 +170,7 @@ export const Slider: React.FC<SliderProps> = ({
           borderColor: fillColor,
           transition: isDraggingState ? 'none' : 'transform 75ms ease-out',
         }}
-        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#090B10] border-2 shadow-md group-hover:scale-110 active:scale-125 pointer-events-none"
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-theme-app border-2 shadow-md group-hover:scale-110 active:scale-125 pointer-events-none"
       />
     </div>
   );

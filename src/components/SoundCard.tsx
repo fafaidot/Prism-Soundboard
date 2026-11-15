@@ -28,7 +28,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
 }) => {
   const [isHoveringBtn, setIsHoveringBtn] = useState(false);
   const hasThumbnail = !!sound.thumbnail;
-  const accent = accentColor || '#31C5F4';
+  const accent = accentColor || 'var(--accent-color)';
 
   const formatDuration = (sec?: number) => {
     if (!sec) return '0:08';
@@ -47,12 +47,12 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
       }}
       className={`group relative flex flex-col p-2.5 rounded-xl border transition-all duration-150 cursor-pointer select-none ${
         isSelected
-          ? 'bg-[#123244] border-[#31C5F4]'
-          : 'bg-[#151B25] border-[#1B222E] hover:border-[#31C5F4]/50 hover:bg-[#1B2330]'
+          ? 'bg-theme-card-selected border-accent'
+          : 'bg-theme-card border-theme hover:border-accent/50 hover:bg-theme-card-hover'
       }`}
     >
       {/* Artwork / Media Area */}
-      <div className="relative w-full aspect-[4/3] rounded-lg bg-[#0E131A] overflow-hidden flex items-center justify-center">
+      <div className="relative w-full aspect-[4/3] rounded-lg bg-theme-surface overflow-hidden flex items-center justify-center">
         {hasThumbnail ? (
           <img
             src={sound.thumbnail}
@@ -60,9 +60,9 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 pointer-events-none"
           />
         ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
-          <Clapperboard size={30} className="text-[#31C5F4] group-hover:scale-110 transition-transform duration-150" />
+          <Clapperboard size={30} className="text-accent group-hover:scale-110 transition-transform duration-150" />
         ) : (
-          <Music size={30} className="text-[#31C5F4] group-hover:scale-110 transition-transform duration-150" />
+          <Music size={30} className="text-accent group-hover:scale-110 transition-transform duration-150" />
         )}
 
         {/* Interactive Subtle & Soft Center Play / Pause Button */}
@@ -82,19 +82,19 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
             }}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer shadow-lg backdrop-blur-md border ${
               isPlaying
-                ? 'bg-black/65 border-[#31C5F4]/50 text-[#31C5F4] hover:bg-black/80 hover:border-[#31C5F4]'
-                : 'bg-black/60 border-white/20 text-white/90 hover:border-[#31C5F4]/60 hover:text-[#31C5F4] hover:bg-black/80'
+                ? 'bg-black/65 border-accent/50 text-accent hover:bg-black/80 hover:border-accent'
+                : 'bg-black/60 border-white/20 text-white/90 hover:border-accent/60 hover:text-accent hover:bg-black/80'
             }`}
             title={isPlaying ? 'Stop Sound' : 'Play Sound'}
           >
             {isPlaying ? (
               isHoveringBtn ? (
-                <Square size={13} className="fill-[#31C5F4] text-[#31C5F4] rounded-[2px]" />
+                <Square size={13} className="fill-accent text-accent rounded-[2px]" />
               ) : (
                 <div className="flex items-end gap-[3px] h-3.5 w-3.5 justify-center pointer-events-none">
-                  <span className="w-[2px] bg-[#31C5F4] rounded-full animate-[bounce_0.6s_infinite_alternate]" style={{ height: '55%' }} />
-                  <span className="w-[2px] bg-[#31C5F4] rounded-full animate-[bounce_0.8s_infinite_alternate]" style={{ height: '100%' }} />
-                  <span className="w-[2px] bg-[#31C5F4] rounded-full animate-[bounce_0.5s_infinite_alternate]" style={{ height: '75%' }} />
+                  <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.6s_infinite_alternate]" style={{ height: '55%' }} />
+                  <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.8s_infinite_alternate]" style={{ height: '100%' }} />
+                  <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.5s_infinite_alternate]" style={{ height: '75%' }} />
                 </div>
               )
             ) : (
@@ -105,7 +105,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
 
         {/* Sound Shortcut in Top-Left Corner (if set) */}
         {sound.hotkey && (
-          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[10px] font-mono text-[#31C5F4] font-semibold border border-white/10 shadow-sm pointer-events-none z-20">
+          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[10px] font-mono text-accent font-semibold border border-white/10 shadow-sm pointer-events-none z-20">
             {sound.hotkey}
           </div>
         )}
@@ -118,7 +118,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
 
       {/* Title */}
       <div className="mt-2.5 px-1 text-center">
-        <h4 className="text-[12px] font-medium text-white truncate group-hover:text-[#31C5F4] transition-colors">
+        <h4 className="text-[12px] font-medium text-theme-primary truncate group-hover:text-accent transition-colors">
           {sound.title}
         </h4>
       </div>
