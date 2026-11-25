@@ -7,15 +7,12 @@ import {
   Music,
   Clapperboard,
   Plus,
-  Play,
-  Pause,
-  RotateCcw,
-  SkipForward,
-  Repeat,
   Check,
   Disc,
   X,
   Pencil,
+  Volume2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { SoundItem, ReproductionMode } from '../types';
 import { audioEngine } from '../services/audioEngine';
@@ -38,11 +35,9 @@ interface ControlPanelProps {
 
 const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   sound,
-  isPlaying,
   accentColor,
   isListeningHotkey = false,
   onUpdateSound,
-  onPlaySound,
   onStartListeningHotkey,
   onClearHotkey,
   onOpenTrimmer,
@@ -64,16 +59,9 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
       loop: false,
     }
   );
-  const optionsDebounceRef = useRef<any>(null);
 
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(sound?.title || '');
-
-  // Sync state when sound changes
   useEffect(() => {
     if (sound) {
-      setEditedTitle(sound.title || '');
-      setIsEditingTitle(false);
       setLocalVolume(sound.volume ?? 100);
       setLocalSpeed(sound.speed ?? 1.0);
       setLocalMode(sound.reproductionMode || 'stop');
@@ -86,31 +74,17 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
         }
       );
     }
-  }, [sound?.id, sound?.title, sound?.volume, sound?.speed, sound?.reproductionMode, sound?.reproductionOptions]);
-
-  const handleSaveTitle = () => {
-    if (!sound) return;
-    const trimmed = editedTitle.trim();
-    if (trimmed && trimmed !== sound.title) {
-      onUpdateSound({
-        ...sound,
-        title: trimmed,
-      });
-    } else {
-      setEditedTitle(sound.title);
-    }
-    setIsEditingTitle(false);
-  };
+  }, [sound?.id, sound?.volume, sound?.speed, sound?.reproductionMode, sound?.reproductionOptions]);
 
   if (!sound) {
     return (
-      <aside className="w-[310px] min-w-[310px] h-full bg-theme-sidebar border-l border-theme flex flex-col items-center justify-center p-6 text-center select-none transition-colors duration-150">
-        <div className="w-14 h-14 rounded-2xl bg-theme-card border border-theme flex items-center justify-center mb-3 text-theme-muted">
-          <Disc size={28} />
+      <aside className="w-[300px] min-w-[300px] h-full bg-[#0c1017]/55 backdrop-blur-xl border-l border-white/[0.08] flex flex-col items-center justify-center p-6 text-center select-none transition-colors duration-150">
+        <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center mb-3 text-slate-500">
+          <Disc size={22} />
         </div>
-        <h3 className="text-[13px] font-bold text-theme-primary mb-1">No Sound Selected</h3>
-        <p className="text-[11px] text-theme-muted max-w-xs">
-          Select any sound to adjust volume, playback speed, shortcuts, or trimming options.
+        <h3 className="text-[13px] font-semibold text-white mb-1">No sound selected</h3>
+        <p className="text-[11.5px] text-slate-400 max-w-xs leading-relaxed">
+          Select any sound to adjust playback, keybinds, volume, or trimming.
         </p>
       </aside>
     );
@@ -172,49 +146,53 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
   };
 
   return (
-    <aside className="w-[320px] min-w-[320px] h-full bg-theme-sidebar border-l border-theme flex flex-col overflow-y-auto p-5 select-none transition-colors duration-150 gap-5">
-      {/* Top Action Row: [Scissors] [Duplicate] [Favorite] [Delete] */}
-      <div className="grid grid-cols-4 gap-2">
+    <aside className="w-[300px] min-w-[300px] h-full bg-white/[0.02] backdrop-blur-xl border-l border-white/[0.08] flex flex-col overflow-y-auto p-4 select-none transition-colors duration-150 gap-4">
+      {/* Top Action Buttons */}
+      <div className="grid grid-cols-4 gap-1.5">
         <button
+          type="button"
           onClick={onOpenTrimmer}
-          title="Trim Audio"
-          className="h-10 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          title="Trim audio"
+          className="h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
         >
-          <Scissors size={15} />
+          <Scissors size={14} />
         </button>
 
         <button
+          type="button"
           onClick={onDuplicateSound}
-          title="Duplicate Sound"
-          className="h-10 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          title="Duplicate sound"
+          className="h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
         >
-          <Copy size={15} />
+          <Copy size={14} />
         </button>
 
         <button
+          type="button"
           onClick={() => onUpdateSound({ ...sound, isFavorite: !sound.isFavorite })}
-          title={sound.isFavorite ? 'Remove Favorite' : 'Add to Favorites'}
-          className={`h-10 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
+          title={sound.isFavorite ? 'Remove favorite' : 'Add to favorites'}
+          className={`h-8 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
             sound.isFavorite
-              ? 'bg-amber-500/20 border-yellow-500/50 text-yellow-400'
-              : 'bg-theme-card border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
+              ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+              : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/[0.08] text-slate-300 hover:text-white'
           }`}
         >
-          <Star size={15} className={sound.isFavorite ? 'fill-yellow-400' : ''} />
+          <Star size={14} className={sound.isFavorite ? 'fill-amber-400' : ''} />
         </button>
 
         <button
+          type="button"
           onClick={onDeleteSound}
-          title="Delete Sound"
-          className="h-10 rounded-xl bg-theme-card border border-theme hover:border-red-500/50 text-theme-secondary hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+          title="Delete sound"
+          className="h-8 rounded-lg bg-white/[0.03] hover:bg-rose-500/15 border border-white/[0.08] hover:border-rose-500/30 text-slate-300 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
         >
-          <Trash2 size={15} />
+          <Trash2 size={14} />
         </button>
       </div>
 
-      {/* Selected Sound Info Card */}
+      {/* Selected Sound Info Header */}
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-theme-surface border border-theme overflow-hidden flex items-center justify-center text-accent flex-shrink-0 shadow-sm">
+        <div className="w-11 h-11 rounded-lg bg-[#0e1219] border border-white/[0.08] overflow-hidden flex items-center justify-center text-accent shrink-0 shadow-xs">
           {sound.thumbnail ? (
             <img
               src={sound.thumbnail}
@@ -222,95 +200,88 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
               className="w-full h-full object-cover"
             />
           ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
-            <Clapperboard size={22} className="text-accent" />
+            <Clapperboard size={20} className="text-accent opacity-80" />
           ) : (
-            <Music size={22} className="text-accent" />
+            <Music size={20} className="text-accent opacity-80" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0 group/title">
-            <h3 className="text-[14px] font-bold text-theme-primary truncate" title={sound.title}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="text-[13px] font-semibold text-white truncate" title={sound.title}>
               {sound.title}
             </h3>
             <button
               type="button"
               onClick={onEditDetails}
               title="Edit sound details"
-              className="p-1 text-theme-muted hover:text-accent transition-colors cursor-pointer shrink-0"
+              className="p-1 text-slate-400 hover:text-accent transition-colors cursor-pointer shrink-0"
             >
-              <Pencil size={13} />
+              <Pencil size={12} />
             </button>
           </div>
-          <p className="text-[11px] text-theme-muted truncate mt-0.5">
-            {sound.author
-              ? (sound.author.startsWith('@') ? `by ${sound.author}` : `by @${sound.author}`)
-              : sound.source === 'clip'
-              ? 'from Game Clip'
-              : sound.source === 'youtube'
-              ? 'from YouTube'
-              : 'Sound effect'}
+          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+            {sound.author || 'Sound effect'}
           </p>
         </div>
       </div>
 
-      {/* Shortcut Button / Display */}
+      {/* Shortcut Key Display / Rebind */}
       {sound.hotkey ? (
         <div className="flex items-center gap-1.5 w-full">
           <button
+            type="button"
             onClick={onStartListeningHotkey}
-            className={`flex-1 py-2 px-3 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`flex-1 py-1.5 px-3 rounded-lg text-[11px] font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
               isListeningHotkey
-                ? 'bg-amber-500 text-black font-bold animate-pulse'
-                : 'bg-theme-card-selected text-accent border border-accent/40 hover:brightness-110'
+                ? 'bg-amber-400 text-slate-950 font-bold'
+                : 'bg-accent/15 border border-accent/40 text-accent hover:brightness-110'
             }`}
             title="Click to rebind shortcut"
           >
             {isListeningHotkey ? (
-              <span>Press Key (Del to clear)...</span>
+              <span>Listening for key...</span>
             ) : (
-              <span className="truncate">Shortcut: {sound.hotkey}</span>
+              <span>Key: {sound.hotkey}</span>
             )}
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onClearHotkey();
             }}
-            className="w-9 h-9 rounded-xl bg-theme-card border border-theme hover:border-red-500/50 hover:bg-red-500/10 text-theme-secondary hover:text-red-400 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.08] hover:border-rose-500/40 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
             title="Remove shortcut"
           >
-            <X size={14} />
+            <X size={13} />
           </button>
         </div>
       ) : (
         <button
+          type="button"
           onClick={onStartListeningHotkey}
-          className={`w-full py-2.5 px-4 rounded-xl text-[12px] font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`w-full py-1.5 px-3 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
             isListeningHotkey
-              ? 'bg-amber-500 text-black font-bold animate-pulse'
-              : 'bg-theme-card border border-theme hover:border-accent/50 text-white'
+              ? 'bg-amber-400 text-slate-950 font-bold'
+              : 'bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.16] text-slate-300 hover:text-white'
           }`}
         >
           {isListeningHotkey ? (
-            <span>Press Any Key...</span>
+            <span>Listening for key...</span>
           ) : (
             <>
               <Plus size={13} className="text-accent" />
-              <span>+ Add shortcut</span>
+              <span>Add key shortcut</span>
             </>
           )}
         </button>
       )}
 
-      {/* PLAYBACK Section */}
-      <div className="flex flex-col gap-3">
-        <span className="text-[10px] font-bold text-theme-muted uppercase tracking-wider">
-          PLAYBACK
-        </span>
-
-        {/* Volume */}
-        <div className="flex items-center justify-between gap-3 text-[12px]">
-          <span className="text-theme-secondary w-14">Volume</span>
+      {/* Sliders: Volume and Speed */}
+      <div className="space-y-2">
+        <div className="p-2.5 bg-white/[0.02] rounded-lg border border-white/[0.07] flex items-center gap-2">
+          <Volume2 size={13} className="text-accent shrink-0" />
+          <span className="text-[11px] font-medium text-slate-400 w-12">Volume</span>
           <Slider
             min={0}
             max={200}
@@ -319,14 +290,14 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             onChange={(val) => handleVolumeChange(val)}
             className="flex-1"
           />
-          <span className="font-mono text-accent w-10 text-right font-medium">
+          <span className="font-mono text-[11px] font-medium text-slate-200 w-9 text-right tabular-nums">
             {localVolume}%
           </span>
         </div>
 
-        {/* Speed */}
-        <div className="flex items-center justify-between gap-3 text-[12px]">
-          <span className="text-theme-secondary w-14">Speed</span>
+        <div className="p-2.5 bg-white/[0.02] rounded-lg border border-white/[0.07] flex items-center gap-2">
+          <SlidersHorizontal size={13} className="text-accent shrink-0" />
+          <span className="text-[11px] font-medium text-slate-400 w-12">Speed</span>
           <Slider
             min={0.25}
             max={2.0}
@@ -335,157 +306,71 @@ const ControlPanelComponent: React.FC<ControlPanelProps> = ({
             onChange={(val) => handleSpeedChange(val)}
             className="flex-1"
           />
-          <span className="font-mono text-accent w-10 text-right font-medium">
+          <span className="font-mono text-[11px] font-medium text-slate-200 w-9 text-right tabular-nums">
             {localSpeed.toFixed(2)}x
           </span>
         </div>
       </div>
 
-      {/* PLAYBACK MODE Section */}
-      <div className="flex flex-col gap-2.5">
-        <span className="text-[10px] font-bold text-theme-muted uppercase tracking-wider">
-          PLAYBACK MODE
-        </span>
+      {/* Playback Mode */}
+      <div>
+        <div className="text-[11px] font-medium text-slate-400 mb-2">
+          Playback behavior
+        </div>
 
-        <div className="flex items-center justify-between gap-1.5">
-          {/* 1. Play & Overlap */}
-          <button
-            onClick={() => handleModeChange('overlap')}
-            title="Play & Overlap"
-            style={
-              currentMode === 'overlap'
-                ? { backgroundColor: accentColor || 'var(--accent-color)' }
-                : undefined
-            }
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              currentMode === 'overlap'
-                ? 'shadow-lg scale-105 text-black font-extrabold'
-                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
-            }`}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24">
-              <path d="M7 5C4.5 7.5 4.5 16.5 7 19" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M10 5l10 7-10 7V5z" fill="currentColor" />
-            </svg>
-          </button>
-
-          {/* 2. Play & Pause */}
-          <button
-            onClick={() => handleModeChange('pause')}
-            title="Play & Pause"
-            style={
-              currentMode === 'pause'
-                ? { backgroundColor: accentColor || 'var(--accent-color)' }
-                : undefined
-            }
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              currentMode === 'pause'
-                ? 'shadow-lg scale-105 text-black font-extrabold'
-                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
-            }`}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4 5l8 7-8 7V5z" />
-              <rect x="14" y="5" width="3" height="14" rx="1" />
-              <rect x="19" y="5" width="3" height="14" rx="1" />
-            </svg>
-          </button>
-
-          {/* 3. Play & Stop */}
-          <button
-            onClick={() => handleModeChange('stop')}
-            title="Play & Stop"
-            style={
-              currentMode === 'stop'
-                ? { backgroundColor: accentColor || 'var(--accent-color)' }
-                : undefined
-            }
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              currentMode === 'stop'
-                ? 'shadow-lg scale-105 text-black font-extrabold'
-                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
-            }`}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M5 5l7 7-7 7V5z" />
-              <rect x="14" y="6" width="7" height="12" rx="1.5" />
-            </svg>
-          </button>
-
-          {/* 4. Play & Restart */}
-          <button
-            onClick={() => handleModeChange('restart')}
-            title="Play & Restart"
-            style={
-              currentMode === 'restart'
-                ? { backgroundColor: accentColor || 'var(--accent-color)' }
-                : undefined
-            }
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              currentMode === 'restart'
-                ? 'shadow-lg scale-105 text-black font-extrabold'
-                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
-            }`}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="4.5" y="5" width="2.5" height="14" rx="1" />
-              <path d="M9.5 5l10 7-10 7V5z" />
-            </svg>
-          </button>
-
-          {/* 5. Play & Loop */}
-          <button
-            onClick={() => handleModeChange('push_loop')}
-            title="Play & Loop"
-            style={
-              currentMode === 'push_loop'
-                ? { backgroundColor: accentColor || 'var(--accent-color)' }
-                : undefined
-            }
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              currentMode === 'push_loop'
-                ? 'shadow-lg scale-105 text-black font-extrabold'
-                : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-secondary hover:text-white'
-            }`}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-              <path d="M16 21h5v-5" />
-            </svg>
-          </button>
+        <div className="grid grid-cols-5 gap-1">
+          {[
+            { id: 'overlap' as ReproductionMode, label: 'Overlap', title: 'Play & Overlap' },
+            { id: 'pause' as ReproductionMode, label: 'Pause', title: 'Play & Pause' },
+            { id: 'stop' as ReproductionMode, label: 'Stop', title: 'Play & Stop' },
+            { id: 'restart' as ReproductionMode, label: 'Restart', title: 'Play & Restart' },
+            { id: 'push_loop' as ReproductionMode, label: 'Loop', title: 'Play & Loop' },
+          ].map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => handleModeChange(mode.id)}
+              title={mode.title}
+              className={`h-8 rounded-md text-[10px] font-medium transition-colors cursor-pointer border flex items-center justify-center ${
+                currentMode === mode.id
+                  ? 'bg-accent/20 border-accent/60 text-accent shadow-xs'
+                  : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* PLAYBACK OPTIONS Section */}
-      <div className="flex flex-col gap-2">
-        <span className="text-[10px] font-bold text-theme-muted uppercase tracking-wider mb-0.5">
-          PLAYBACK OPTIONS
-        </span>
+      {/* Playback Options */}
+      <div className="space-y-1.5 pt-1">
+        <div className="text-[11px] font-medium text-slate-400 mb-1.5">
+          Options
+        </div>
 
         {[
-          { key: 'stopOtherSounds', label: 'Stop other sounds' },
-          { key: 'muteOtherSounds', label: 'Mute other sounds' },
-          { key: 'muteVoice', label: 'Mute voice' },
-          { key: 'loop', label: 'Loop' },
+          { key: 'stopOtherSounds' as const, label: 'Stop other sounds' },
+          { key: 'muteOtherSounds' as const, label: 'Mute other sounds' },
+          { key: 'muteVoice' as const, label: 'Mute voice while playing' },
+          { key: 'loop' as const, label: 'Loop continuously' },
         ].map(({ key, label }) => {
           const isChecked = !!(options as any)[key];
           return (
             <div
               key={key}
-              onClick={() => handleOptionToggle(key as any)}
-              className="flex items-center justify-between p-3 rounded-xl bg-theme-card border border-theme hover:border-accent/40 transition-colors cursor-pointer text-[12px]"
+              onClick={() => handleOptionToggle(key)}
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] cursor-pointer transition-colors"
             >
-              <span className="text-theme-secondary font-medium">{label}</span>
+              <span className="text-[11px] text-slate-300 font-medium">{label}</span>
               <div
-                className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
+                className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-colors ${
                   isChecked
-                    ? 'bg-accent text-black'
-                    : 'border border-theme bg-theme-surface'
+                    ? 'bg-accent text-slate-950 font-bold'
+                    : 'border border-white/20 bg-white/[0.03]'
                 }`}
               >
-                {isChecked && <Check size={11} strokeWidth={3} />}
+                {isChecked && <Check size={10} strokeWidth={3} />}
               </div>
             </div>
           );

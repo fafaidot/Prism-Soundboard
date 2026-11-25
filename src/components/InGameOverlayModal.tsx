@@ -8,17 +8,14 @@ import {
   ExternalLink,
   Square,
   Headphones,
-  RotateCcw,
-  Sliders,
+  SlidersHorizontal,
   Check,
   Plus,
   Scissors,
-  SlidersHorizontal,
   Trash2,
   Copy,
   ArrowUpDown,
   Search,
-  Video,
   Clapperboard,
   Star,
   ChevronRight,
@@ -26,6 +23,7 @@ import {
   Play,
   Pause,
   Pencil,
+  RotateCcw,
 } from 'lucide-react';
 import prismLogo from '../assets/Prism.png';
 import { audioEngine } from '../services/audioEngine';
@@ -37,6 +35,7 @@ import { Slider } from './Slider';
 interface InGameOverlayModalProps {
   isOpen: boolean;
   isStandaloneOverlay?: boolean;
+  enableFrostedGlass?: boolean;
   sounds: SoundItem[];
   activeSoundIds: string[];
   pausedSoundIds?: string[];
@@ -67,6 +66,7 @@ interface InGameOverlayModalProps {
 export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   isOpen,
   isStandaloneOverlay = false,
+  enableFrostedGlass = true,
   sounds: initialSounds,
   activeSoundIds,
   pausedSoundIds = [],
@@ -105,13 +105,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   const volumeDebounceRef = useRef<any>(null);
   const speedDebounceRef = useRef<any>(null);
 
-  const isHudTrimmerOpenRef = useRef(isHudTrimmerOpen);
-  isHudTrimmerOpenRef.current = isHudTrimmerOpen;
-  const isHudYouTubeOpenRef = useRef(isHudYouTubeOpen);
-  isHudYouTubeOpenRef.current = isHudYouTubeOpen;
-  const isHudEditOpenRef = useRef(isHudEditOpen);
-  isHudEditOpenRef.current = isHudEditOpen;
-
   useEffect(() => {
     setSounds(initialSounds);
     if (activeSoundIds && activeSoundIds.length > 0) {
@@ -124,7 +117,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
     }
   }, [initialSounds]);
 
-  // When opening overlay or when a sound starts playing, select the currently playing sound
   useEffect(() => {
     if (activeSoundIds && activeSoundIds.length > 0) {
       const playingId = activeSoundIds[activeSoundIds.length - 1];
@@ -142,7 +134,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
     setLocalPausedIds(pausedSoundIds);
   }, [pausedSoundIds]);
 
-  // Synchronize live volume, speed, and paused sound updates from main app
   useEffect(() => {
     const cleanupVol = window.soundboardAPI?.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('live-sound-volume-updated', ({ soundId, volume }: { soundId: string; volume: number }) => {
@@ -202,7 +193,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
         case 'oldest':
           return (a.dateAdded || 0) - (b.dateAdded || 0);
         case 'alphabetical':
-          return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
+          return a.title.localeCompare(b.title);
         case 'most_played':
           return (b.playCount || 0) - (a.playCount || 0);
         case 'duration':
@@ -213,70 +204,36 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
     });
   }, [sounds, searchQuery, activeFilter, sortBy]);
 
-  const sortLabels = {
-    newest: 'Recently added',
-    oldest: 'Oldest first',
-    alphabetical: 'Alphabetical (A-Z)',
-    most_played: 'Most played',
-    duration: 'Duration',
-  };
-
   const selectedSound = useMemo(() => {
-    return sounds.find((s) => s.id === selectedSoundId) || sounds[0] || null;
+    if (!selectedSoundId) return null;
+    return sounds.find((s) => s.id === selectedSoundId) || null;
   }, [sounds, selectedSoundId]);
 
-  // Global Esc key & window blur listener so Escape or clicking off closes overlay
+  // Handle hotkeys (Esc closes overlay)
   useEffect(() => {
     if (!isOpen && !isStandaloneOverlay) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isHudEditOpenRef.current) {
-          setIsHudEditOpen(false);
+        if (isHudYouTubeOpen) {
+          setIsHudYouTubeOpen(false);
           return;
         }
-        if (isHudTrimmerOpenRef.current) {
+        if (isHudTrimmerOpen) {
           setIsHudTrimmerOpen(false);
           return;
         }
-        if (isHudYouTubeOpenRef.current) {
-          setIsHudYouTubeOpen(false);
+        if (isHudEditOpen) {
+          setIsHudEditOpen(false);
           return;
         }
         onClose();
       }
     };
 
-    const handleWindowBlur = () => {
-      if (isHudTrimmerOpenRef.current || isHudYouTubeOpenRef.current || isHudEditOpenRef.current) {
-        return;
-      }
-      onClose();
-    };
-
-    const handleDocumentPointerDown = (e: MouseEvent | PointerEvent) => {
-      if (isHudTrimmerOpenRef.current || isHudYouTubeOpenRef.current || isHudEditOpenRef.current) {
-        return;
-      }
-      const target = e.target as HTMLElement;
-      if (target.closest('[data-hud-pod]') || target.closest('[data-hud-modal]')) {
-        return;
-      }
-      onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('pointerdown', handleDocumentPointerDown, true);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('pointerdown', handleDocumentPointerDown, true);
-    };
-  }, [isOpen, isStandaloneOverlay, onClose]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isStandaloneOverlay, isHudYouTubeOpen, isHudTrimmerOpen, isHudEditOpen, onClose]);
 
   if (!isOpen && !isStandaloneOverlay) return null;
 
@@ -285,88 +242,67 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   const handleOpenMainApp = () => {
     if (window.soundboardAPI?.showMainWindow) {
       window.soundboardAPI.showMainWindow();
+      onClose();
     }
-    onClose();
+  };
+
+  const sortLabels: Record<string, string> = {
+    newest: 'Recently added',
+    oldest: 'Oldest added',
+    alphabetical: 'Alphabetical',
+    most_played: 'Most played',
+    duration: 'Duration',
   };
 
   const handleModeChange = (mode: ReproductionMode) => {
     if (!selectedSound || !onUpdateSound) return;
-    const updated = {
-      ...selectedSound,
-      reproductionMode: mode,
-    };
-    setSounds((prev) => prev.map((s) => (s.id === selectedSound.id ? updated : s)));
+    const updated = { ...selectedSound, reproductionMode: mode };
     onUpdateSound(updated);
+    setSounds((prev) => prev.map((s) => (s.id === selectedSound.id ? updated : s)));
   };
 
   const handleOptionToggle = (key: 'stopOtherSounds' | 'muteOtherSounds' | 'muteVoice' | 'loop') => {
     if (!selectedSound || !onUpdateSound) return;
-    const opts = selectedSound.reproductionOptions || {
+    const currentOptions = selectedSound.reproductionOptions || {
       stopOtherSounds: true,
       muteOtherSounds: false,
       muteVoice: false,
       loop: false,
     };
-    const updated = {
-      ...selectedSound,
-      reproductionOptions: {
-        ...opts,
-        [key]: !opts[key],
-      },
-    };
-    setSounds((prev) => prev.map((s) => (s.id === selectedSound.id ? updated : s)));
+    const updatedOptions = { ...currentOptions, [key]: !currentOptions[key] };
+    const updated = { ...selectedSound, reproductionOptions: updatedOptions };
     onUpdateSound(updated);
+    setSounds((prev) => prev.map((s) => (s.id === selectedSound.id ? updated : s)));
   };
 
-  const handleVolumeChange = (newVolume: number) => {
+  const handleVolumeChange = (vol: number) => {
     if (!selectedSound) return;
-    const clamped = Math.max(0, Math.min(200, newVolume));
+    setSounds((prev) => prev.map((s) => (s.id === selectedSound.id ? { ...s, volume: vol } : s)));
+    audioEngine.setSoundVolume(selectedSound.id, vol);
 
-    setSounds((prev) =>
-      prev.map((s) => (s.id === selectedSound.id ? { ...s, volume: clamped } : s))
-    );
-
-    audioEngine.setSoundVolume(selectedSound.id, clamped);
     if (window.soundboardAPI?.sendIpcCommand) {
-      window.soundboardAPI.sendIpcCommand('sync-sound-volume-live', { soundId: selectedSound.id, volume: clamped });
+      window.soundboardAPI.sendIpcCommand('sync-sound-volume-live', { soundId: selectedSound.id, volume: vol });
     }
 
-    if (volumeDebounceRef.current) {
-      clearTimeout(volumeDebounceRef.current);
-    }
+    if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current);
     volumeDebounceRef.current = setTimeout(() => {
-      if (onUpdateSound) {
-        onUpdateSound({
-          ...selectedSound,
-          volume: clamped,
-        });
-      }
+      if (onUpdateSound) onUpdateSound({ ...selectedSound, volume: vol });
     }, 120);
   };
 
-  const handleSpeedChange = (newSpeed: number) => {
+  const handleSpeedChange = (speed: number) => {
     if (!selectedSound) return;
-    const clamped = Math.max(0.25, Math.min(2.0, parseFloat(newSpeed.toFixed(2))));
-
-    setSounds((prev) =>
-      prev.map((s) => (s.id === selectedSound.id ? { ...s, speed: clamped } : s))
-    );
-
+    const clamped = Math.round(speed * 20) / 20;
+    setSounds((prev) => prev.map((s) => (s.id === selectedSound.id ? { ...s, speed: clamped } : s)));
     audioEngine.setSoundSpeed(selectedSound.id, clamped);
+
     if (window.soundboardAPI?.sendIpcCommand) {
       window.soundboardAPI.sendIpcCommand('sync-sound-speed-live', { soundId: selectedSound.id, speed: clamped });
     }
 
-    if (speedDebounceRef.current) {
-      clearTimeout(speedDebounceRef.current);
-    }
+    if (speedDebounceRef.current) clearTimeout(speedDebounceRef.current);
     speedDebounceRef.current = setTimeout(() => {
-      if (onUpdateSound) {
-        onUpdateSound({
-          ...selectedSound,
-          speed: clamped,
-        });
-      }
+      if (onUpdateSound) onUpdateSound({ ...selectedSound, speed: clamped });
     }, 120);
   };
 
@@ -378,7 +314,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
   };
   const selectedMode: ReproductionMode = selectedSound?.reproductionMode || 'stop';
 
-  // Floating active chunk sound: Most recently triggered sound that is still playing
   const activeFloatingSound = useMemo(() => {
     if (!activeSoundIds || activeSoundIds.length === 0) return null;
     for (let i = activeSoundIds.length - 1; i >= 0; i--) {
@@ -388,7 +323,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
     return null;
   }, [activeSoundIds, sounds]);
 
-  const activeFloatingProgress = activeFloatingSound ? (playbackProgressMap[activeFloatingSound.id] || 0) : 0;
+  const activeFloatingProgress = activeFloatingSound ? playbackProgressMap[activeFloatingSound.id] || 0 : 0;
 
   return (
     <div
@@ -397,167 +332,156 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
           onClose();
         }
       }}
-      className={`fixed inset-0 z-[9999] flex items-center justify-center select-none ${
-        isStandaloneOverlay ? 'bg-transparent p-0' : 'bg-black/75 backdrop-blur-md p-4'
+      className={`fixed inset-0 z-[9999] flex flex-col select-none overflow-hidden ${
+        isStandaloneOverlay
+          ? 'w-full h-full bg-[#090b10]/35 rounded-2xl border border-white/20 shadow-[0_24px_70px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.22)]'
+          : 'w-full h-full bg-[#090b10]/45 backdrop-blur-2xl'
       }`}
     >
-      {/* Central Unified Mainstream Overlay Dashboard Container */}
+      {/* Main HUD Full-View Container */}
       <div
         data-hud-pod="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[1380px] h-[720px] max-h-[94vh] bg-theme-surface border border-theme rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in fade-in duration-150"
+        className="w-full h-full flex flex-col overflow-hidden bg-transparent"
       >
-        {/* Top Header Bar: Edge-to-Edge Desktop Bar (Matching Main App Image) */}
-        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header shrink-0">
-          {/* Left: PRISM HUD Brand & Open Main App */}
+        {/* Top Header Bar */}
+        <header className="h-14 px-5 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.03] backdrop-blur-xl shrink-0">
+          {/* Left: Brand Identity & Open Main App */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
-              <span className="text-[13px] font-black uppercase tracking-wider text-theme-primary">
-                PRISM <span style={{ color: accent }}>HUD</span>
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] font-semibold text-white tracking-tight">Prism HUD</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+              </div>
             </div>
 
             <button
               type="button"
               onClick={handleOpenMainApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-theme-primary text-[11px] font-bold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 hover:text-white text-[11px] font-medium transition-colors cursor-pointer"
               title="Open full Prism Soundboard desktop app"
             >
-              <ExternalLink size={12} style={{ color: accent }} />
-              <span>Open App</span>
+              <ExternalLink size={12} className="text-accent" />
+              <span>Open app</span>
             </button>
           </div>
 
-          {/* Center: Search & Filter Tabs */}
+          {/* Center: Search & Segmented Filter Tabs */}
           <div className="flex items-center gap-3">
-            <div className="relative w-64 md:w-80">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-muted" />
+            <div className="relative w-64 md:w-72">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search sounds, clips, tags..."
-                className="w-full pl-9 pr-8 py-2 bg-theme-card border border-theme focus:border-accent/60 rounded-xl text-[12px] text-theme-primary placeholder-theme-muted focus:outline-none transition-all shadow-inner"
+                className="w-full pl-8 pr-7 py-1.5 bg-white/[0.04] border border-white/[0.08] focus:border-accent rounded-lg text-[12px] text-white placeholder-slate-500 focus:outline-none transition-colors"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
                 >
                   <X size={12} />
                 </button>
               )}
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 bg-theme-card p-1 rounded-xl border border-theme shrink-0">
+            {/* Segmented Filter Control */}
+            <div className="flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
               {([
                 { id: 'all', label: 'All' },
-                { id: 'favorites', label: 'Favorites', icon: Star },
-                { id: 'clips', label: 'Clips', icon: Clapperboard },
-                { id: 'youtube', label: 'YouTube', icon: Video },
-              ] as const).map((tab) => {
-                const Icon = (tab as any).icon;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveFilter(tab.id)}
-                    className={`h-7 px-2.5 flex items-center gap-1 justify-center rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      activeFilter === tab.id
-                        ? 'bg-accent-soft text-accent border border-accent/40 shadow-sm'
-                        : 'text-theme-muted hover:text-theme-primary'
-                    }`}
-                  >
-                    {Icon && <Icon size={11} style={activeFilter === tab.id ? { color: accent } : undefined} />}
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
+                { id: 'favorites', label: 'Favorites' },
+                { id: 'clips', label: 'Clips' },
+                { id: 'youtube', label: 'YouTube' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveFilter(tab.id)}
+                  className={`h-7 px-3 flex items-center justify-center rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                    activeFilter === tab.id
+                      ? 'bg-white/[0.12] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Right Toolbar: Stop All, Headphones, Add Sound, Close */}
+          {/* Right Controls */}
           <div className="flex items-center gap-2">
             {/* Stop All Button */}
             <button
               type="button"
               onClick={onStopAll}
               disabled={!hasActiveSounds}
-              className={`h-8 px-3 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all border ${
+              className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 transition-colors border ${
                 hasActiveSounds
-                  ? 'bg-red-500/20 border-red-500 text-red-400 cursor-pointer hover:bg-red-500/30 active:scale-95'
-                  : 'bg-theme-card border-theme text-theme-muted cursor-not-allowed opacity-50'
+                  ? 'bg-rose-500/15 border-rose-500/40 text-rose-300 cursor-pointer hover:bg-rose-500/25'
+                  : 'bg-white/[0.02] border-white/[0.06] text-slate-500 cursor-not-allowed opacity-50'
               }`}
             >
               <Square size={11} className={hasActiveSounds ? 'fill-current' : ''} />
-              <span>Stop All</span>
+              <span>Stop all</span>
               {activeSoundIds.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[9.5px] font-mono font-bold leading-tight">
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9.5px] font-mono font-bold leading-tight tabular-nums">
                   {activeSoundIds.length}
                 </span>
               )}
             </button>
 
-            {/* Hear Myself Headphone Monitor Toggle */}
+            {/* Hear Myself Toggle */}
             {onToggleHearMyself && (
               <button
                 type="button"
                 onClick={onToggleHearMyself}
-                style={
+                className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer ${
                   hearMyself
-                    ? { backgroundColor: 'var(--accent-soft)', borderColor: accent, color: accent }
-                    : undefined
-                }
-                className={`w-8 h-8 flex items-center justify-center rounded-xl border transition-all cursor-pointer ${
-                  hearMyself
-                    ? ''
-                    : 'bg-theme-card hover:bg-theme-card-hover border-theme text-theme-muted hover:text-theme-primary'
+                    ? 'bg-accent/15 border-accent/40 text-accent'
+                    : 'bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-400 hover:text-white'
                 }`}
-                title={hearMyself ? 'Hear Myself: ACTIVE' : 'Hear Myself: OFF'}
+                title={hearMyself ? 'Hear myself: On' : 'Hear myself: Off'}
               >
                 <Headphones size={14} />
               </button>
             )}
 
-            {/* Add Sound / YouTube Downloader */}
+            {/* Add Sound */}
             <button
               type="button"
               onClick={() => setIsHudYouTubeOpen(true)}
-              style={{ backgroundColor: accent }}
-              className="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
-              title="Download Sound from YouTube"
+              className="w-8 h-8 rounded-lg bg-accent text-slate-950 hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              title="Download sound from YouTube"
             >
-              <Plus size={16} className="stroke-[2.5]" />
+              <Plus size={15} strokeWidth={2.5} />
             </button>
 
             {/* Close HUD */}
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-muted hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
-              title="Close Overlay (Esc)"
+              className="w-8 h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="Close overlay (Esc)"
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           </div>
         </header>
 
-        {/* Main Content Area: Left Center Sound Library + Right Integrated Properties Panel */}
+        {/* Main Content Area: Sound Grid + Inspector */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Center Library Grid Area */}
-          <div className="flex-1 flex flex-col min-w-0 bg-theme-app overflow-hidden">
+          {/* Sound Library Grid */}
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-transparent overflow-hidden">
             {/* Library Subheader */}
-            <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-              <div className="flex items-baseline gap-2.5">
-                <h2 className="text-[17px] font-extrabold text-theme-primary tracking-wide">
-                  Sound library
-                </h2>
-                <span className="text-[11.5px] text-theme-muted font-semibold">
-                  {filteredSounds.length} sounds
-                </span>
+            <div className="flex items-center justify-between px-6 pt-3.5 pb-2 shrink-0">
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-[14px] font-semibold text-white tracking-tight">Sound library</h2>
+                <span className="text-[11px] text-slate-400 tabular-nums">({filteredSounds.length})</span>
               </div>
 
               {/* Sorting Selector */}
@@ -565,29 +489,28 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSortMenu(!showSortMenu)}
-                  className="h-8 px-3 flex items-center gap-1.5 bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 rounded-xl text-theme-secondary hover:text-theme-primary text-[11px] font-semibold transition-all cursor-pointer"
+                  className="h-7 px-2.5 flex items-center gap-1.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-md text-slate-300 hover:text-white text-[11px] font-medium transition-colors cursor-pointer"
                 >
-                  <ArrowUpDown size={12} style={{ color: accent }} className="shrink-0" />
-                  <span>SORT BY <strong className="text-theme-primary font-bold">{sortLabels[sortBy] || 'Recently added'}</strong></span>
+                  <ArrowUpDown size={11} className="text-accent" />
+                  <span>Sort: {sortLabels[sortBy] || 'Recently added'}</span>
                 </button>
 
                 {showSortMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 bg-theme-card border border-theme rounded-xl py-1 z-[100] animate-in fade-in zoom-in-95 duration-100 shadow-xl">
+                  <div className="absolute right-0 top-full mt-1 w-40 frosted-dropdown bg-[#0e1219]/50 backdrop-blur-2xl border border-white/[0.14] rounded-xl p-1 z-[100] shadow-2xl">
                     {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
                       <button
                         key={key}
                         type="button"
                         onClick={() => {
-                          setSortBy(key);
+                          setSortBy(key as any);
                           setShowSortMenu(false);
                         }}
-                        style={sortBy === key ? { color: accent } : undefined}
-                        className={`w-full px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer ${
-                          sortBy === key ? 'bg-white/5 font-bold' : 'text-theme-primary'
+                        className={`w-full px-3 py-1.5 text-left text-[11px] font-medium flex items-center justify-between hover:bg-white/[0.06] transition-colors cursor-pointer ${
+                          sortBy === key ? 'text-accent font-semibold' : 'text-slate-300'
                         }`}
                       >
                         <span>{sortLabels[key]}</span>
-                        {sortBy === key && <Check size={12} style={{ color: accent }} />}
+                        {sortBy === key && <Check size={12} className="text-accent" />}
                       </button>
                     ))}
                   </div>
@@ -596,10 +519,10 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             </div>
 
             {/* Sound Cards Grid */}
-            <div className="flex-1 overflow-y-auto px-6 py-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3.5 content-start auto-rows-max">
+            <div className="flex-1 overflow-y-auto px-6 py-2 pb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 content-start auto-rows-max">
               {filteredSounds.length === 0 ? (
-                <div className="col-span-full py-20 text-center text-theme-muted text-[13px] font-semibold">
-                  No sounds matched your filter query.
+                <div className="col-span-full py-20 text-center text-slate-500 text-[13px] font-medium">
+                  No sounds match your search.
                 </div>
               ) : (
                 filteredSounds.map((sound) => {
@@ -615,82 +538,101 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         setSelectedSoundId(sound.id);
                         onPlaySound(sound);
                       }}
-                      style={
-                        isSelected || isPlaying
-                          ? { borderColor: accent }
-                          : undefined
-                      }
-                      className={`group relative flex flex-col justify-between p-2.5 rounded-2xl transition-all duration-150 cursor-pointer select-none shadow-sm ${
-                        isPlaying || isSelected
-                          ? 'bg-theme-card-selected border-2 border-accent ring-1 ring-accent/30 shadow-md'
-                          : 'bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40'
-                      }`}
-                      title={`${sound.title} (Click to select & play)`}
+                      className="group relative flex flex-col cursor-pointer select-none transition-all duration-200"
                     >
-                      {/* Artwork Box */}
-                      <div className="relative w-full aspect-[4/3] rounded-xl bg-theme-surface border border-theme flex items-center justify-center overflow-hidden">
-                        {hasThumbnail ? (
-                          <img
-                            src={sound.thumbnail}
-                            alt={sound.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-theme-surface p-2 text-center">
-                            {isClipSound ? (
-                              <Clapperboard size={24} style={{ color: accent }} className="mb-1" />
-                            ) : (
-                              <Music size={24} style={{ color: accent }} className="mb-1" />
-                            )}
-                          </div>
-                        )}
+                      {/* Ambient Thumbnail Color Glow (Radiating outward past card borders) */}
+                      {hasThumbnail ? (
+                        <div
+                          className={`ambient-glow absolute -inset-3 rounded-2xl bg-cover bg-center blur-2xl pointer-events-none transition-opacity duration-300 ${
+                            isSelected || isPlaying ? 'opacity-55' : 'opacity-35'
+                          }`}
+                          style={{ backgroundImage: `url(${sound.thumbnail})` }}
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <div
+                          className={`ambient-glow absolute -inset-3 rounded-2xl bg-accent/20 blur-2xl pointer-events-none transition-opacity duration-300 ${
+                            isSelected || isPlaying ? 'opacity-35' : 'opacity-15'
+                          }`}
+                          aria-hidden="true"
+                        />
+                      )}
 
-                        {/* Top-Left Hotkey Badge */}
-                        {sound.hotkey && (
-                          <div className="absolute top-1.5 left-1.5 z-20 flex items-center">
-                            <span
-                              style={{ color: accent }}
-                              className="px-1.5 py-0.5 rounded-md bg-accent-soft border border-accent/40 text-[10px] font-mono font-bold leading-none shadow-sm"
-                            >
-                              {sound.hotkey}
+                      {/* Frosted Glass Card Surface */}
+                      <div
+                        className={`frosted-card relative flex flex-col p-2 rounded-xl border transition-all duration-200 overflow-hidden ${
+                          isSelected
+                            ? 'bg-[#122538]/75 border-accent/80 backdrop-blur-2xl shadow-md ring-1 ring-accent/30'
+                            : isPlaying
+                            ? 'bg-[#102030]/70 border-accent/60 backdrop-blur-2xl shadow-md ring-1 ring-accent/20'
+                            : 'bg-white/[0.05] hover:bg-white/[0.09] border-white/[0.1] hover:border-white/[0.22] backdrop-blur-2xl shadow-xs'
+                        }`}
+                      >
+                        {/* Subtle top specular highlight */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent pointer-events-none" />
+
+                        {/* Media Area */}
+                        <div className="relative z-10 w-full aspect-[4/3] rounded-lg bg-black/50 border border-white/[0.08] flex items-center justify-center overflow-hidden shadow-sm">
+                          {hasThumbnail ? (
+                            <img
+                              src={sound.thumbnail}
+                              alt={sound.title}
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                              {isClipSound ? (
+                                <Clapperboard size={22} className="text-accent opacity-80" />
+                              ) : (
+                                <Music size={22} className="text-accent opacity-80" />
+                              )}
+                            </div>
+                          )}
+
+                          {/* Top-Left Hotkey Badge */}
+                          {sound.hotkey && (
+                            <div className="absolute top-1.5 left-1.5 z-20">
+                              <span className="px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-xs border border-white/10 text-[9.5px] font-mono font-medium text-slate-200 leading-none">
+                                {sound.hotkey}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Top-Right Favorite Star */}
+                          {sound.isFavorite && (
+                            <div className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/70 text-amber-400 z-20">
+                              <Star size={11} className="fill-amber-400" />
+                            </div>
+                          )}
+
+                          {/* Duration Badge */}
+                          {sound.duration > 0 && (
+                            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[9.5px] font-mono font-medium text-slate-300 pointer-events-none tabular-nums">
+                              {Math.floor(sound.duration / 60)}:{Math.floor(sound.duration % 60).toString().padStart(2, '0')}
                             </span>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Top-Right Favorite Star */}
-                        {sound.isFavorite && (
-                          <div className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/70 text-yellow-400 z-20">
-                            <Star size={11} className="fill-yellow-400" />
-                          </div>
-                        )}
-
-                        {/* Duration Badge */}
-                        {sound.duration > 0 && (
-                          <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-sm text-[10px] font-mono font-bold text-white/90 border border-white/10 z-10 pointer-events-none">
-                            {Math.floor(sound.duration / 60)}:{Math.floor(sound.duration % 60).toString().padStart(2, '0')}
-                          </span>
-                        )}
-
-                        {/* Playing Equalizer Animation Indicator */}
-                        {isPlaying && (
-                          <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] flex items-center justify-center z-15 pointer-events-none">
-                            <div className="w-9 h-9 rounded-full bg-black/70 backdrop-blur-md border border-accent/50 shadow-md flex items-center justify-center">
-                              <div className="flex items-end gap-[3px] h-3.5 w-3.5 justify-center">
-                                <span className="w-[2px] rounded-full animate-[bounce_0.6s_infinite_alternate]" style={{ height: '55%', backgroundColor: accent }} />
-                                <span className="w-[2px] rounded-full animate-[bounce_0.8s_infinite_alternate]" style={{ height: '100%', backgroundColor: accent }} />
-                                <span className="w-[2px] rounded-full animate-[bounce_0.5s_infinite_alternate]" style={{ height: '75%', backgroundColor: accent }} />
+                          {/* Micro-Equalizer when Playing */}
+                          {isPlaying && (
+                            <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center z-15 pointer-events-none">
+                              <div className="w-8 h-8 rounded-full bg-black/80 border border-accent/40 flex items-center justify-center shadow-md">
+                                <div className="flex items-end gap-[2.5px] h-3 w-3 justify-center">
+                                  <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.6s_infinite_alternate]" style={{ height: '55%' }} />
+                                  <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.8s_infinite_alternate]" style={{ height: '100%' }} />
+                                  <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.5s_infinite_alternate]" style={{ height: '75%' }} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
 
-                      {/* Title */}
-                      <div className="w-full mt-2 px-0.5 text-center">
-                        <span className="text-[11.5px] font-bold text-theme-primary leading-tight line-clamp-2 break-words">
-                          {sound.title}
-                        </span>
+                        {/* Title */}
+                        <div className="relative z-10 w-full mt-1.5 px-0.5">
+                          <span className="text-[11.5px] font-medium text-slate-200 group-hover:text-white leading-tight line-clamp-1 break-words">
+                            {sound.title}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -698,48 +640,47 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
               )}
             </div>
 
-            {/* Bottom Dock: Dual-Pod Volume & Transport Bar */}
-            <div className="px-6 py-3 border-t border-theme bg-theme-header flex items-center justify-between gap-4 shrink-0">
-              {/* Left Pod: Speaker Volume & Mic Gain */}
-              <div className="px-4 py-2 rounded-2xl bg-theme-card border border-theme flex items-center gap-4 shadow-xl shrink-0 h-[60px]">
+            {/* Bottom Dock: Unified Transport and Volume Strip (Docked frosted glass, no dead space) */}
+            <div className="w-full px-6 py-2.5 border-t border-white/[0.08] bg-white/[0.03] backdrop-blur-2xl flex items-center justify-between gap-4 select-none shrink-0 z-20">
+              {/* Volume Faders: Master Output & Mic Gain */}
+              <div className="flex items-center gap-4 shrink-0">
                 <div className="flex items-center gap-2">
-                  <Volume2 size={15} style={{ color: accent }} className="flex-shrink-0" />
+                  <Volume2 size={14} className="text-accent shrink-0" />
                   <Slider
                     min={0}
                     max={100}
                     step={1}
                     value={speakerVolume}
                     onChange={(val) => onSpeakerVolumeChange(val)}
-                    className="w-24 sm:w-28"
+                    className="w-24"
                   />
-                  <span className="font-mono text-[11px] font-semibold text-accent w-8 text-right flex-shrink-0">
+                  <span className="font-mono text-[11px] font-medium text-slate-300 w-8 text-right tabular-nums">
                     {speakerVolume}%
                   </span>
                 </div>
 
                 {onMicProjectionVolumeChange && (
-                  <div className="flex items-center gap-2">
-                    <Mic size={15} style={{ color: accent }} className="flex-shrink-0" />
+                  <div className="flex items-center gap-2 pl-3 border-l border-white/[0.08]">
+                    <Mic size={14} className="text-accent shrink-0" />
                     <Slider
                       min={0}
                       max={200}
                       step={1}
                       value={micProjectionVolume}
                       onChange={(val) => onMicProjectionVolumeChange(val)}
-                      className="w-24 sm:w-28"
+                      className="w-24"
                     />
-                    <span className="font-mono text-[11px] font-semibold text-accent w-8 text-right flex-shrink-0">
+                    <span className="font-mono text-[11px] font-medium text-slate-300 w-8 text-right tabular-nums">
                       {micProjectionVolume}%
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Right Pod: Now Playing Pill */}
-              <div className="flex-1 px-4 py-2 rounded-2xl bg-theme-card border border-theme flex items-center justify-between gap-4 shadow-xl min-w-0 h-[60px]">
-                {/* Sound Cover & Name */}
+              {/* Now Playing Console & Scrubber */}
+              <div className="flex-1 flex items-center justify-between gap-3 min-w-0">
                 <div className="flex items-center gap-2.5 min-w-0 max-w-[200px]">
-                  <div className="w-9 h-9 rounded-xl bg-theme-surface border border-theme overflow-hidden flex items-center justify-center text-theme-muted flex-shrink-0 shadow-sm">
+                  <div className="w-8 h-8 rounded-md bg-white/[0.04] border border-white/[0.08] overflow-hidden flex items-center justify-center text-slate-500 shrink-0">
                     {activeFloatingSound?.thumbnail ? (
                       <img
                         src={activeFloatingSound.thumbnail}
@@ -747,21 +688,21 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <Music size={16} style={{ color: accent }} />
+                      <Music size={14} className="text-accent opacity-75" />
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[12px] font-semibold text-theme-primary truncate" title={activeFloatingSound?.title || 'No Sound Playing'}>
-                      {activeFloatingSound ? activeFloatingSound.title : 'No Sound Playing'}
+                    <span className="text-[12px] font-medium text-white truncate" title={activeFloatingSound?.title || 'No sound active'}>
+                      {activeFloatingSound ? activeFloatingSound.title : 'Ready'}
                     </span>
-                    <span className="text-[10px] text-theme-muted truncate">
-                      {activeFloatingSound?.author ? (activeFloatingSound.author.startsWith('@') ? activeFloatingSound.author : `@${activeFloatingSound.author}`) : (activeFloatingSound ? 'Ready' : 'Select a sound to play')}
+                    <span className="text-[10px] text-slate-400 truncate">
+                      {activeFloatingSound?.author || (activeFloatingSound ? 'Playing' : 'Select a sound to play')}
                     </span>
                   </div>
                 </div>
 
                 {/* Scrubber Timeline */}
-                <div className="flex-1 flex items-center min-w-0 px-1">
+                <div className="flex-1 flex items-center min-w-0 px-3">
                   <Slider
                     min={0}
                     max={1}
@@ -784,8 +725,8 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                   />
                 </div>
 
-                {/* Transport Controls: Previous, Play/Pause, Next */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Transport Controls */}
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -801,7 +742,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     }}
                     disabled={!activeFloatingSound}
                     title="Rewind 5s"
-                    className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
+                    className="p-1 rounded-md text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-30"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -823,13 +764,13 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       }
                     }}
                     disabled={!activeFloatingSound}
-                    title={activeFloatingSound && localPausedIds.includes(activeFloatingSound.id) ? 'Resume Playback' : 'Pause Playback'}
-                    className="w-8 h-8 rounded-full border border-accent text-accent hover:bg-accent hover:text-black flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
+                    title={activeFloatingSound && localPausedIds.includes(activeFloatingSound.id) ? 'Resume playback' : 'Pause playback'}
+                    className="w-7 h-7 rounded-full bg-accent text-slate-950 flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 hover:brightness-110 active:scale-95"
                   >
                     {activeFloatingSound && !localPausedIds.includes(activeFloatingSound.id) ? (
-                      <Pause size={13} className="fill-current" />
+                      <Pause size={12} className="fill-current" />
                     ) : (
-                      <Play size={13} className="fill-current ml-0.5" />
+                      <Play size={12} className="fill-current ml-0.5" />
                     )}
                   </button>
 
@@ -848,7 +789,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                     }}
                     disabled={!activeFloatingSound}
                     title="Forward 5s"
-                    className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
+                    className="p-1 rounded-md text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-30"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -857,33 +798,31 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             </div>
           </div>
 
-          {/* Right Side: Integrated Sound Properties Panel */}
+          {/* Right Inspector Panel */}
           {selectedSound ? (
-            <aside className="w-[340px] min-w-[340px] bg-theme-sidebar border-l border-theme p-5 flex flex-col justify-between overflow-y-auto shrink-0 select-none">
-              <div>
-                {/* Action Buttons Row: Scissors, Duplicate, Star, Delete */}
-                <div className="grid grid-cols-4 gap-2 mb-3.5">
+            <aside className="w-[320px] min-w-[320px] bg-white/[0.02] backdrop-blur-2xl border-l border-white/[0.08] p-4 flex flex-col justify-between overflow-y-auto shrink-0 select-none">
+              <div className="space-y-4">
+                {/* Actions Toolbar */}
+                <div className="grid grid-cols-4 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setIsHudTrimmerOpen(true)}
-                    title="Open Audio Trimmer"
-                    className="h-9 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
+                    title="Audio trimmer"
+                    className="h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
                   >
-                    <Scissors size={15} />
+                    <Scissors size={14} />
                   </button>
 
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (onDuplicateSound) {
-                        onDuplicateSound(selectedSound);
-                      }
+                      if (onDuplicateSound) onDuplicateSound(selectedSound);
                     }}
-                    title="Duplicate Sound"
-                    className="h-9 rounded-xl bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
+                    title="Duplicate sound"
+                    className="h-8 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                   >
-                    <Copy size={15} />
+                    <Copy size={14} />
                   </button>
 
                   {onUpdateSound && (
@@ -893,14 +832,14 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         e.stopPropagation();
                         onUpdateSound({ ...selectedSound, isFavorite: !selectedSound.isFavorite });
                       }}
-                      title={selectedSound.isFavorite ? 'Remove Favorite' : 'Add to Favorites'}
-                      className={`h-9 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
+                      title={selectedSound.isFavorite ? 'Remove favorite' : 'Add to favorites'}
+                      className={`h-8 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
                         selectedSound.isFavorite
-                          ? 'bg-amber-500/20 border-yellow-500/50 text-yellow-400'
-                          : 'bg-theme-card border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                          : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/[0.08] text-slate-300 hover:text-white'
                       }`}
                     >
-                      <Star size={15} className={selectedSound.isFavorite ? 'fill-yellow-400' : ''} />
+                      <Star size={14} className={selectedSound.isFavorite ? 'fill-amber-400' : ''} />
                     </button>
                   )}
 
@@ -911,72 +850,54 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                         e.stopPropagation();
                         onDeleteSound(selectedSound.id);
                       }}
-                      title="Delete Sound"
-                      className="h-9 rounded-xl bg-theme-card border border-theme hover:border-red-500/50 text-theme-muted hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Delete sound"
+                      className="h-8 rounded-lg bg-white/[0.03] hover:bg-rose-500/15 border border-white/[0.08] hover:border-rose-500/30 text-slate-300 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
 
-                {/* Selected Sound Info Card: Artwork + Title + PENCIL BUTTON opens EditSoundModal */}
+                {/* Sound Info Header */}
                 <div className="flex items-center gap-3 p-1">
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-theme shadow-sm bg-theme-surface flex-shrink-0 flex items-center justify-center">
+                  <div className="relative w-11 h-11 rounded-lg overflow-hidden border border-white/[0.08] bg-[#0e1219] shrink-0 flex items-center justify-center">
                     {selectedSound.thumbnail ? (
-                      <img
-                        src={selectedSound.thumbnail}
-                        alt={selectedSound.title}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={selectedSound.thumbnail} alt={selectedSound.title} className="w-full h-full object-cover" />
                     ) : (
-                      <Music size={20} style={{ color: accent }} />
+                      <Music size={18} className="text-accent opacity-80" />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <h3 className="text-[13.5px] font-bold text-theme-primary truncate" title={selectedSound.title}>
+                      <h3 className="text-[13px] font-semibold text-white truncate" title={selectedSound.title}>
                         {selectedSound.title}
                       </h3>
-                      {/* PENCIL BUTTON: Opens EditSoundModal */}
                       <button
                         type="button"
                         onClick={() => setIsHudEditOpen(true)}
                         title="Edit sound details"
-                        className="p-1 text-theme-muted hover:text-accent transition-colors cursor-pointer shrink-0"
+                        className="p-1 text-slate-400 hover:text-accent transition-colors cursor-pointer shrink-0"
                       >
-                        <Pencil size={13} />
+                        <Pencil size={12} />
                       </button>
                     </div>
-                    <p className="text-[11px] text-theme-muted truncate mt-0.5">
-                      {selectedSound.author
-                        ? (selectedSound.author.startsWith('@') ? `by ${selectedSound.author}` : `by @${selectedSound.author}`)
-                        : selectedSound.source === 'clip'
-                        ? 'from Game Clip'
-                        : selectedSound.source === 'youtube'
-                        ? 'from YouTube'
-                        : 'Sound effect'}
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {selectedSound.author || 'Sound effect'}
                     </p>
                     {selectedSound.hotkey && (
-                      <span
-                        style={{ color: accent }}
-                        className="inline-block mt-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-accent-soft border border-accent/40"
-                      >
-                        Shortcut: {selectedSound.hotkey}
+                      <span className="inline-block mt-1 text-[9.5px] font-mono font-medium px-1.5 py-0.2 rounded bg-accent/15 border border-accent/30 text-accent">
+                        Key: {selectedSound.hotkey}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Volume & Speed Sliders */}
-                <div className="mt-4 space-y-2.5">
-                  <div className="p-3 bg-theme-card rounded-xl border border-theme flex items-center gap-2.5">
-                    <Volume2
-                      size={14}
-                      className={(selectedSound.volume ?? 100) > 100 ? 'text-amber-500' : ''}
-                      style={(selectedSound.volume ?? 100) <= 100 ? { color: accent } : undefined}
-                    />
-                    <span className="text-[11px] font-semibold text-theme-muted w-7">Vol</span>
+                {/* Faders: Volume and Speed */}
+                <div className="space-y-2">
+                  <div className="p-2.5 bg-white/[0.02] rounded-lg border border-white/[0.07] flex items-center gap-2.5">
+                    <Volume2 size={13} className="text-accent shrink-0" />
+                    <span className="text-[11px] font-medium text-slate-400 w-12">Volume</span>
                     <Slider
                       min={0}
                       max={200}
@@ -985,16 +906,14 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       onChange={(val) => handleVolumeChange(val)}
                       className="flex-1"
                     />
-                    <span className={`text-[11px] font-mono font-bold w-10 text-right ${
-                      (selectedSound.volume ?? 100) > 100 ? 'text-amber-500' : 'text-accent'
-                    }`}>
+                    <span className="text-[11px] font-mono font-medium text-slate-200 w-10 text-right tabular-nums">
                       {selectedSound.volume ?? 100}%
                     </span>
                   </div>
 
-                  <div className="p-3 bg-theme-card rounded-xl border border-theme flex items-center gap-2.5">
-                    <SlidersHorizontal size={14} style={{ color: accent }} />
-                    <span className="text-[11px] font-semibold text-theme-muted w-9">Speed</span>
+                  <div className="p-2.5 bg-white/[0.02] rounded-lg border border-white/[0.07] flex items-center gap-2.5">
+                    <SlidersHorizontal size={13} className="text-accent shrink-0" />
+                    <span className="text-[11px] font-medium text-slate-400 w-12">Speed</span>
                     <Slider
                       min={0.25}
                       max={2.0}
@@ -1003,225 +922,72 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
                       onChange={(val) => handleSpeedChange(val)}
                       className="flex-1"
                     />
-                    <span className="text-[11px] font-mono font-bold text-accent w-10 text-right">
+                    <span className="text-[11px] font-mono font-medium text-slate-200 w-10 text-right tabular-nums">
                       {(selectedSound.speed ?? 1.0).toFixed(2)}x
                     </span>
                   </div>
                 </div>
 
                 {/* Reproduction Mode */}
-                <div className="mt-4">
-                  <div className="flex items-center gap-1.5 text-theme-primary font-bold text-[11px] mb-2">
-                    <RotateCcw size={13} style={{ color: accent }} />
-                    <span className="uppercase tracking-wider text-theme-muted text-[10px]">Playback Mode</span>
+                <div>
+                  <div className="text-[11px] font-medium text-slate-400 mb-2">
+                    Playback behavior
                   </div>
 
-                  <div className="flex items-center justify-between gap-1 px-1">
-                    {/* 1. Play & Overlap */}
-                    <button
-                      type="button"
-                      onClick={() => handleModeChange('overlap')}
-                      title="Play & Overlap"
-                      style={
-                        selectedMode === 'overlap'
-                          ? { backgroundColor: accent }
-                          : undefined
-                      }
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        selectedMode === 'overlap'
-                          ? 'scale-105 shadow-lg text-black font-extrabold'
-                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
-                      }`}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24">
-                        <path d="M7 5C4.5 7.5 4.5 16.5 7 19" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                        <path d="M10 5l10 7-10 7V5z" fill="currentColor" />
-                      </svg>
-                    </button>
-
-                    {/* 2. Play & Pause */}
-                    <button
-                      type="button"
-                      onClick={() => handleModeChange('pause')}
-                      title="Play & Pause"
-                      style={
-                        selectedMode === 'pause'
-                          ? { backgroundColor: accent }
-                          : undefined
-                      }
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        selectedMode === 'pause'
-                          ? 'scale-105 shadow-lg text-black font-extrabold'
-                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
-                      }`}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M4 5l8 7-8 7V5z" />
-                        <rect x="14" y="5" width="3" height="14" rx="1" />
-                        <rect x="19" y="5" width="3" height="14" rx="1" />
-                      </svg>
-                    </button>
-
-                    {/* 3. Play & Stop */}
-                    <button
-                      type="button"
-                      onClick={() => handleModeChange('stop')}
-                      title="Play & Stop"
-                      style={
-                        selectedMode === 'stop'
-                          ? { backgroundColor: accent }
-                          : undefined
-                      }
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        selectedMode === 'stop'
-                          ? 'scale-105 shadow-lg text-black font-extrabold'
-                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
-                      }`}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M5 5l7 7-7 7V5z" />
-                        <rect x="14" y="6" width="7" height="12" rx="1.5" />
-                      </svg>
-                    </button>
-
-                    {/* 4. Play & Restart */}
-                    <button
-                      type="button"
-                      onClick={() => handleModeChange('restart')}
-                      title="Play & Restart"
-                      style={
-                        selectedMode === 'restart'
-                          ? { backgroundColor: accent }
-                          : undefined
-                      }
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        selectedMode === 'restart'
-                          ? 'scale-105 shadow-lg text-black font-extrabold'
-                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
-                      }`}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="4.5" y="5" width="2.5" height="14" rx="1" />
-                        <path d="M9.5 5l10 7-10 7V5z" />
-                      </svg>
-                    </button>
-
-                    {/* 5. Play & Loop */}
-                    <button
-                      type="button"
-                      onClick={() => handleModeChange('push_loop')}
-                      title="Play & Loop"
-                      style={
-                        selectedMode === 'push_loop'
-                          ? { backgroundColor: accent }
-                          : undefined
-                      }
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        selectedMode === 'push_loop'
-                          ? 'scale-105 shadow-lg text-black font-extrabold'
-                          : 'bg-theme-card border border-theme hover:border-accent/50 text-theme-muted hover:text-theme-primary'
-                      }`}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                        <path d="M3 3v5h5" />
-                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                        <path d="M16 21h5v-5" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="mt-1.5 text-center text-[11px] font-medium text-theme-muted">
-                    {selectedMode === 'overlap' && 'Play and Overlap'}
-                    {selectedMode === 'pause' && 'Play and Pause'}
-                    {selectedMode === 'stop' && 'Play and Stop'}
-                    {selectedMode === 'restart' && 'Play and Restart'}
-                    {selectedMode === 'push_loop' && 'Play and Loop'}
+                  <div className="grid grid-cols-5 gap-1">
+                    {[
+                      { id: 'overlap' as ReproductionMode, label: 'Overlap', title: 'Play & Overlap' },
+                      { id: 'pause' as ReproductionMode, label: 'Pause', title: 'Play & Pause' },
+                      { id: 'stop' as ReproductionMode, label: 'Stop', title: 'Play & Stop' },
+                      { id: 'restart' as ReproductionMode, label: 'Restart', title: 'Play & Restart' },
+                      { id: 'push_loop' as ReproductionMode, label: 'Loop', title: 'Play & Loop' },
+                    ].map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => handleModeChange(mode.id)}
+                        title={mode.title}
+                        className={`h-8 rounded-md text-[10.5px] font-medium transition-colors cursor-pointer border flex items-center justify-center ${
+                          selectedMode === mode.id
+                            ? 'bg-accent/20 border-accent/60 text-accent shadow-xs'
+                            : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Reproduction Options Section (4 Checkbox options) */}
-                <div className="mt-4 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-theme-primary font-bold text-[11px] mb-1.5">
-                    <Sliders size={13} style={{ color: accent }} />
-                    <span className="uppercase tracking-wider text-theme-muted text-[10px]">Playback Options</span>
+                {/* Reproduction Options Toggles */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] font-medium text-slate-400 mb-1.5">
+                    Options
                   </div>
 
-                  {/* 1. Stop Other Sounds */}
-                  <div
-                    onClick={() => handleOptionToggle('stopOtherSounds')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
-                  >
-                    <span className="text-[11.5px] font-medium text-theme-secondary">
-                      Stop Other Sounds
-                    </span>
+                  {[
+                    { key: 'stopOtherSounds' as const, label: 'Stop other sounds' },
+                    { key: 'muteOtherSounds' as const, label: 'Mute other sounds' },
+                    { key: 'muteVoice' as const, label: 'Mute voice while playing' },
+                    { key: 'loop' as const, label: 'Loop continuously' },
+                  ].map((opt) => (
                     <div
-                      className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                        selectedOptions.stopOtherSounds
-                          ? 'bg-accent text-black font-extrabold'
-                          : 'border border-theme bg-theme-surface'
-                      }`}
+                      key={opt.key}
+                      onClick={() => handleOptionToggle(opt.key)}
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] cursor-pointer transition-colors"
                     >
-                      {selectedOptions.stopOtherSounds && <Check size={11} strokeWidth={3} />}
+                      <span className="text-[11px] text-slate-300 font-medium">{opt.label}</span>
+                      <div
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-colors ${
+                          selectedOptions[opt.key]
+                            ? 'bg-accent text-slate-950 font-bold'
+                            : 'border border-white/20 bg-white/[0.03]'
+                        }`}
+                      >
+                        {selectedOptions[opt.key] && <Check size={10} strokeWidth={3} />}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* 2. Mute Other Sounds */}
-                  <div
-                    onClick={() => handleOptionToggle('muteOtherSounds')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
-                  >
-                    <span className="text-[11.5px] font-medium text-theme-secondary">
-                      Mute Other Sounds
-                    </span>
-                    <div
-                      className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                        selectedOptions.muteOtherSounds
-                          ? 'bg-accent text-black font-extrabold'
-                          : 'border border-theme bg-theme-surface'
-                      }`}
-                    >
-                      {selectedOptions.muteOtherSounds && <Check size={11} strokeWidth={3} />}
-                    </div>
-                  </div>
-
-                  {/* 3. Mute Voice */}
-                  <div
-                    onClick={() => handleOptionToggle('muteVoice')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
-                  >
-                    <span className="text-[11.5px] font-medium text-theme-secondary">
-                      Mute Voice
-                    </span>
-                    <div
-                      className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                        selectedOptions.muteVoice
-                          ? 'bg-accent text-black font-extrabold'
-                          : 'border border-theme bg-theme-surface'
-                      }`}
-                    >
-                      {selectedOptions.muteVoice && <Check size={11} strokeWidth={3} />}
-                    </div>
-                  </div>
-
-                  {/* 4. Loop */}
-                  <div
-                    onClick={() => handleOptionToggle('loop')}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-theme-card border border-theme hover:border-accent/40 cursor-pointer select-none transition-all"
-                  >
-                    <span className="text-[11.5px] font-medium text-theme-secondary">
-                      Loop
-                    </span>
-                    <div
-                      className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                        selectedOptions.loop
-                          ? 'bg-accent text-black font-extrabold'
-                          : 'border border-theme bg-theme-surface'
-                      }`}
-                    >
-                      {selectedOptions.loop && <Check size={11} strokeWidth={3} />}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </aside>
@@ -1229,7 +995,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
         </div>
       </div>
 
-      {/* Embedded YouTube Search & Download Modal for HUD */}
+      {/* Sub-modals inside HUD */}
       {isHudYouTubeOpen && (
         <YouTubeSearchModal
           isOpen={isHudYouTubeOpen}
@@ -1237,14 +1003,11 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
           onClose={() => setIsHudYouTubeOpen(false)}
           accentColor={accent}
           onDownloadSound={async (res) => {
-            if (onDownloadSound) {
-              await onDownloadSound(res);
-            }
+            if (onDownloadSound) await onDownloadSound(res);
           }}
         />
       )}
 
-      {/* Embedded Audio Trimmer Modal for HUD */}
       {isHudTrimmerOpen && selectedSound && (
         <AudioTrimmerModal
           sound={selectedSound}
@@ -1277,7 +1040,6 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
         />
       )}
 
-      {/* Embedded Edit Sound Modal for HUD */}
       {isHudEditOpen && selectedSound && (
         <EditSoundModal
           isOpen={isHudEditOpen}
@@ -1285,9 +1047,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
           onClose={() => setIsHudEditOpen(false)}
           accentColor={accent}
           onSave={(updated) => {
-            if (onUpdateSound) {
-              onUpdateSound(updated);
-            }
+            if (onUpdateSound) onUpdateSound(updated);
             setSounds((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
             setIsHudEditOpen(false);
           }}

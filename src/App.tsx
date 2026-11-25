@@ -46,16 +46,39 @@ const DEFAULT_SETTINGS: AudioSettings = {
   minimizeToTray: true,
   sortBy: 'newest',
   activeFilter: 'all',
+  enableFrostedGlass: true,
 };
 
 export const App: React.FC = () => {
   const isStandaloneOverlay = useMemo(() => {
     return new URLSearchParams(window.location.search).get('overlay') === 'true';
   }, []);
+
+  useEffect(() => {
+    if (isStandaloneOverlay) {
+      document.documentElement.classList.add('is-overlay');
+      document.body.classList.add('is-overlay');
+      document.documentElement.style.background = 'transparent';
+      document.documentElement.style.backgroundColor = 'transparent';
+      document.body.style.background = 'transparent';
+      document.body.style.backgroundColor = 'transparent';
+    }
+  }, [isStandaloneOverlay]);
   const isDataLoadedRef = useRef(false);
   const [sounds, setSounds] = useState<SoundItem[]>([]);
   const [deletedSounds, setDeletedSounds] = useState<SoundItem[]>([]);
   const [settings, setSettings] = useState<AudioSettings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    const isFrosted = settings.enableFrostedGlass !== false;
+    document.documentElement.classList.toggle('no-frosted-glass', !isFrosted);
+    if (document.body) {
+      document.body.style.backgroundColor = isFrosted ? 'transparent' : '#090b10';
+    }
+    if (window.soundboardAPI?.sendIpcCommand) {
+      window.soundboardAPI.sendIpcCommand('set-frosted-glass-enabled', isFrosted);
+    }
+  }, [settings.enableFrostedGlass]);
   const [selectedSoundId, setSelectedSoundId] = useState<string | null>(null);
   const [activeSoundIds, setActiveSoundIds] = useState<string[]>([]);
   const [pausedSoundIds, setPausedSoundIds] = useState<string[]>([]);
@@ -1175,6 +1198,7 @@ export const App: React.FC = () => {
         <InGameOverlayModal
           isOpen={true}
           isStandaloneOverlay={true}
+          enableFrostedGlass={settings.enableFrostedGlass !== false}
           accentColor={currentTheme.accent}
           sounds={sounds}
           activeSoundIds={activeSoundIds}
@@ -1294,7 +1318,7 @@ export const App: React.FC = () => {
           }
         }
       }}
-      style={{ backgroundColor: currentTheme.bgApp }}
+      style={{ backgroundColor: settings.enableFrostedGlass !== false ? 'rgba(9, 11, 16, 0.78)' : '#090b10' }}
       className="flex flex-col h-screen w-screen overflow-hidden text-white transition-colors duration-200"
     >
       {/* 36px TitleBar */}
@@ -1306,49 +1330,49 @@ export const App: React.FC = () => {
         onOpenDeletedArchive={() => setIsRestoreModalOpen(true)}
       />
 
-      {/* Main Container below TitleBar: Left Navigation Rail + Main Workspace */}
+      {/* Main Container below TitleBar: Floating Navigation Rail + Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Navigation Rail (Dock) */}
-        <div className="w-[68px] min-w-[68px] h-full bg-theme-sidebar border-r border-theme flex flex-col items-center justify-between py-4 select-none z-40">
-          <div className="flex flex-col items-center gap-2.5">
+        {/* Floating Frosted Glass Navigation Rail */}
+        <aside className="frosted-sidebar my-3 ml-3.5 mb-3 h-[calc(100%-24px)] w-13 min-w-[52px] rounded-2xl bg-white/[0.04] backdrop-blur-2xl border border-white/[0.14] shadow-[0_16px_40px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex flex-col items-center justify-between py-3.5 select-none z-40 shrink-0">
+          <div className="flex flex-col items-center gap-2">
             {/* Sound Library Icon */}
             <button
               onClick={() => setActiveView('sounds')}
               title="Sound Library"
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeView === 'sounds'
-                  ? 'bg-theme-card-selected border border-accent text-accent'
-                  : 'bg-theme-card border border-theme text-theme-muted hover:text-white hover:bg-theme-card-hover'
+                  ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs backdrop-blur-md'
+                  : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
               }`}
             >
-              <Music size={18} />
+              <Music size={17} />
             </button>
 
             {/* Video Library Icon */}
             <button
               onClick={() => setActiveView('clips')}
               title="Video Library"
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeView === 'clips'
-                  ? 'bg-theme-card-selected border border-accent text-accent'
-                  : 'bg-theme-card border border-theme text-theme-muted hover:text-white hover:bg-theme-card-hover'
+                  ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs backdrop-blur-md'
+                  : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
               }`}
             >
-              <Video size={18} />
+              <Video size={17} />
             </button>
           </div>
 
-          {/* Bottom Rail Cluster: Deleted Archive Button + Settings Button */}
-          <div className="flex flex-col items-center gap-2.5">
-            {/* Deleted Archive Button */}
+          {/* Bottom Rail: Archive & Settings */}
+          <div className="flex flex-col items-center gap-2">
+            {/* Deleted Archive */}
             <button
               onClick={() => setIsRestoreModalOpen(true)}
-              title={deletedSounds.length > 0 ? `Deleted Sounds Archive (${deletedSounds.length})` : 'Deleted Sounds Archive'}
-              className="w-11 h-11 rounded-xl bg-theme-card border border-theme text-theme-secondary hover:text-white hover:bg-theme-card-hover flex items-center justify-center transition-all cursor-pointer relative"
+              title={deletedSounds.length > 0 ? `Deleted sounds archive (${deletedSounds.length})` : 'Deleted sounds archive'}
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer relative"
             >
               <Trash2 size={16} />
               {deletedSounds.length > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-theme-card-selected border border-accent/60 text-accent font-mono text-[9px] font-bold">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold tabular-nums">
                   {deletedSounds.length}
                 </span>
               )}
@@ -1358,15 +1382,15 @@ export const App: React.FC = () => {
             <button
               onClick={() => setIsSettingsModalOpen(true)}
               title="Settings"
-              className="w-11 h-11 rounded-xl bg-theme-card border border-theme text-theme-muted hover:text-white hover:bg-theme-card-hover flex items-center justify-center transition-all cursor-pointer"
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer"
             >
-              <Settings size={18} />
+              <Settings size={17} />
             </button>
           </div>
-        </div>
+        </aside>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Main Content Area (Floating alongside the sidebar) */}
+        <div className="frosted-workspace flex-1 flex flex-col overflow-hidden my-3 mr-3.5 ml-2.5 rounded-2xl border border-white/[0.1] bg-white/[0.02] shadow-[0_12px_36px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]">
           {/* Top Command Shelf */}
           <CommandBar
             activeView={activeView}
@@ -1478,29 +1502,22 @@ export const App: React.FC = () => {
                   /* Video Clips Grid (Centered 3-column layout matching Image 2) */
                   <div className="max-w-[1400px] mx-auto w-full">
                     {/* Header: Title + Subtitle with Sort Dropdown */}
-                    <div className="flex flex-col gap-1 mb-6">
-                      <div className="flex items-center gap-2.5">
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Video library</h1>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/15 border border-red-500/30 text-red-400">
-                          Very Experimental
-                        </span>
-                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/15 border border-red-500/30 text-red-400">
-                          May not work as expected
-                        </span>
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-baseline gap-2.5">
+                        <h1 className="text-[16px] font-semibold text-white tracking-tight">Video library</h1>
+                        <span className="text-[12px] text-slate-400 tabular-nums">({filteredClips.length})</span>
                       </div>
-                      <div className="flex items-center gap-3 text-[12px] text-theme-muted">
-                        <span>{filteredClips.length} Videos</span>
-                        <span className="text-theme-muted/60">SORT BY</span>
+                      <div className="flex items-center gap-2">
                         <div className="relative">
                           <button
                             onClick={() => setShowSortMenu(!showSortMenu)}
-                            className="flex items-center gap-1.5 text-white/90 hover:text-accent font-medium cursor-pointer transition-colors"
+                            className="h-7 px-2.5 rounded-md bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] flex items-center gap-1.5 text-slate-300 hover:text-white text-[11px] font-medium transition-colors cursor-pointer"
                           >
-                            <span>{sortLabels[sortBy] || 'Recently added'}</span>
-                            <ChevronDown size={13} />
+                            <span>Sort: {sortLabels[sortBy] || 'Recently added'}</span>
+                            <ChevronDown size={11} className="text-slate-400" />
                           </button>
                           {showSortMenu && (
-                            <div className="absolute left-0 top-6 w-44 rounded-xl bg-theme-card border border-theme p-1 shadow-2xl z-50 flex flex-col gap-0.5">
+                            <div className="absolute right-0 top-8 w-40 rounded-xl frosted-dropdown bg-[#0e1219]/50 backdrop-blur-2xl border border-white/[0.14] p-1.5 shadow-2xl z-50 flex flex-col gap-0.5">
                               {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
                                 <button
                                   key={opt}
@@ -1509,10 +1526,10 @@ export const App: React.FC = () => {
                                     handleSaveSettings({ ...settings, sortBy: opt });
                                     setShowSortMenu(false);
                                   }}
-                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
+                                  className={`w-full flex items-center justify-between px-2.5 py-1 rounded-md text-[11px] cursor-pointer transition-colors ${
                                     sortBy === opt
-                                      ? 'bg-theme-card-selected text-accent font-medium'
-                                      : 'text-theme-secondary hover:bg-white/5 hover:text-white'
+                                      ? 'text-accent font-semibold'
+                                      : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
                                   }`}
                                 >
                                   <span>{sortLabels[opt]}</span>
@@ -1592,44 +1609,43 @@ export const App: React.FC = () => {
                 ) : (
                   /* Sounds Grid View matching Image 1 */
                   <div>
-                    {/* Header: Title + Subtitle with Sort Dropdown & Clear All */}
-                    <div className="flex items-center justify-between mb-5">
-                      <div className="flex flex-col gap-1">
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Sound library</h1>
-                        <div className="flex items-center gap-3 text-[12px] text-theme-muted">
-                          <span>{filteredSounds.length} sounds</span>
-                          <span className="text-theme-muted/60">SORT BY</span>
-                          <div className="relative">
-                            <button
-                              onClick={() => setShowSortMenu(!showSortMenu)}
-                              className="flex items-center gap-1.5 text-white/90 hover:text-accent font-medium cursor-pointer transition-colors"
-                            >
-                              <span>{sortLabels[sortBy] || 'Recently added'}</span>
-                              <ChevronDown size={13} />
-                            </button>
-                            {showSortMenu && (
-                              <div className="absolute left-0 top-6 w-44 rounded-xl bg-theme-card border border-theme p-1 shadow-2xl z-50 flex flex-col gap-0.5">
-                                {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
-                                  <button
-                                    key={opt}
-                                    onClick={() => {
-                                      setSortBy(opt);
-                                      handleSaveSettings({ ...settings, sortBy: opt });
-                                      setShowSortMenu(false);
-                                    }}
-                                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] cursor-pointer transition-colors ${
-                                      sortBy === opt
-                                        ? 'bg-theme-card-selected text-accent font-medium'
-                                        : 'text-theme-secondary hover:bg-white/5 hover:text-white'
-                                    }`}
-                                  >
-                                    <span>{sortLabels[opt]}</span>
-                                    {sortBy === opt && <Check size={12} className="text-accent" />}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                    {/* Header: Title + Subtitle with Sort Dropdown */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-baseline gap-2.5">
+                        <h1 className="text-[16px] font-semibold text-white tracking-tight">Sound library</h1>
+                        <span className="text-[12px] text-slate-400 tabular-nums">({filteredSounds.length})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowSortMenu(!showSortMenu)}
+                            className="h-7 px-2.5 rounded-md bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] flex items-center gap-1.5 text-slate-300 hover:text-white text-[11px] font-medium transition-colors cursor-pointer"
+                          >
+                            <span>Sort: {sortLabels[sortBy] || 'Recently added'}</span>
+                            <ChevronDown size={11} className="text-slate-400" />
+                          </button>
+                          {showSortMenu && (
+                            <div className="absolute right-0 top-8 w-40 rounded-xl frosted-dropdown bg-[#0e1219]/50 backdrop-blur-2xl border border-white/[0.14] p-1.5 shadow-2xl z-50 flex flex-col gap-0.5">
+                              {(Object.keys(sortLabels) as SortOption[]).map((opt) => (
+                                <button
+                                  key={opt}
+                                  onClick={() => {
+                                    setSortBy(opt);
+                                    handleSaveSettings({ ...settings, sortBy: opt });
+                                    setShowSortMenu(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-2.5 py-1 rounded-md text-[11px] cursor-pointer transition-colors ${
+                                    sortBy === opt
+                                      ? 'text-accent font-semibold'
+                                      : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
+                                  }`}
+                                >
+                                  <span>{sortLabels[opt]}</span>
+                                  {sortBy === opt && <Check size={12} className="text-accent" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1676,17 +1692,17 @@ export const App: React.FC = () => {
                         />
                       ))}
 
-                      {/* "+ Add" Square Tile */}
+                      {/* "+ Add" Tile */}
                       <div
                         onClick={() => setIsYouTubeModalOpen(true)}
-                        className="group aspect-[4/3] rounded-xl border border-dashed border-theme hover:border-accent/60 bg-theme-card/40 hover:bg-theme-card flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
+                        className="group aspect-[4/3] rounded-xl border border-white/[0.08] hover:border-accent/40 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-md flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
                         title="Add new sound"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-accent text-black flex items-center justify-center transition-all group-hover:scale-110 shadow-md">
-                          <Plus size={20} className="stroke-[2.75]" />
+                        <div className="w-8 h-8 rounded-lg bg-accent text-slate-950 flex items-center justify-center transition-transform group-hover:scale-105 shadow-xs">
+                          <Plus size={16} strokeWidth={2.5} />
                         </div>
-                        <span className="text-[12px] font-semibold text-theme-secondary group-hover:text-white transition-colors">
-                          Add Sound
+                        <span className="text-[11.5px] font-medium text-slate-400 group-hover:text-white transition-colors">
+                          Add sound
                         </span>
                       </div>
                     </div>
@@ -1857,93 +1873,93 @@ export const App: React.FC = () => {
       />
 
       {/* In-Game Always-On-Top Overlay Window */}
-      <InGameOverlayModal
-        isOpen={isOverlayOpen}
-        sounds={sounds}
-        activeSoundIds={activeSoundIds}
-        pausedSoundIds={pausedSoundIds}
-        playbackProgressMap={playbackProgressMap}
-        speakerVolume={settings.masterSpeakerVolume}
-        micProjectionVolume={settings.micInputVolume}
-        hearMyself={settings.hearMyself}
-        recordDuration={settings.videoClipDuration || settings.recordDuration || 30}
-        recordSource={settings.recordSource || 'screen'}
-        onToggleHearMyself={handleToggleHearMyself}
-        onStartRecordClip={handleTriggerVideoClip}
-        onChangeRecordDuration={(dur) => {
-          videoClipper.setDuration(dur);
-          handleSaveSettings({ ...settings, recordDuration: dur, videoClipDuration: dur });
-        }}
-        onChangeRecordSource={(src) => {
-          handleSaveSettings({ ...settings, recordSource: src });
-        }}
-        onPlaySound={handlePlaySound}
-        onStopAll={handleStopAll}
-        onClose={() => setIsOverlayOpen(false)}
-        onSpeakerVolumeChange={(vol) => {
-          audioEngine.setMasterSpeakerVolume(vol);
-          handleSaveSettings({ ...settings, masterSpeakerVolume: vol, masterMicVolume: vol });
-        }}
-        onMicProjectionVolumeChange={(vol) => {
-          audioEngine.setMicInputVolume(vol);
-          handleSaveSettings({ ...settings, micInputVolume: vol });
-        }}
-        onReorderSounds={(newSounds) => {
-          updateAndSaveSounds(newSounds);
-        }}
-        onUpdateSound={handleUpdateSound}
-        onDuplicateSound={(sound) => handleDuplicateSound(sound)}
-        onDeleteSound={(soundId) => {
-          const target = sounds.find((s) => s.id === soundId);
-          if (target && target.hotkey && window.soundboardAPI) {
-            window.soundboardAPI.unregisterGlobalHotkey(target.hotkey);
-          }
-          const filtered = sounds.filter((s) => s.id !== soundId);
-          updateAndSaveSounds(filtered);
-          if (selectedSoundId === soundId) {
-            setSelectedSoundId(filtered.length > 0 ? filtered[0].id : null);
-          }
-        }}
-        onAddSound={() => {
-          if (window.soundboardAPI?.showMainWindow) {
-            window.soundboardAPI.showMainWindow();
-          }
-          setIsYouTubeModalOpen(true);
-        }}
-        accentColor={currentTheme.accent}
-      />
+      {isOverlayOpen && (
+        <InGameOverlayModal
+          isOpen={isOverlayOpen}
+          enableFrostedGlass={settings.enableFrostedGlass !== false}
+          sounds={sounds}
+          activeSoundIds={activeSoundIds}
+          pausedSoundIds={pausedSoundIds}
+          playbackProgressMap={playbackProgressMap}
+          speakerVolume={settings.masterSpeakerVolume}
+          micProjectionVolume={settings.micInputVolume}
+          hearMyself={settings.hearMyself}
+          recordDuration={settings.videoClipDuration || settings.recordDuration || 30}
+          recordSource={settings.recordSource || 'screen'}
+          onToggleHearMyself={handleToggleHearMyself}
+          onStartRecordClip={handleTriggerVideoClip}
+          onChangeRecordDuration={(dur) => {
+            videoClipper.setDuration(dur);
+            handleSaveSettings({ ...settings, recordDuration: dur, videoClipDuration: dur });
+          }}
+          onChangeRecordSource={(src) => {
+            handleSaveSettings({ ...settings, recordSource: src });
+          }}
+          onPlaySound={handlePlaySound}
+          onStopAll={handleStopAll}
+          onClose={() => setIsOverlayOpen(false)}
+          onSpeakerVolumeChange={(vol) => {
+            audioEngine.setMasterSpeakerVolume(vol);
+            handleSaveSettings({ ...settings, masterSpeakerVolume: vol, masterMicVolume: vol });
+          }}
+          onMicProjectionVolumeChange={(vol) => {
+            audioEngine.setMicInputVolume(vol);
+            handleSaveSettings({ ...settings, micInputVolume: vol });
+          }}
+          onReorderSounds={(newSounds) => {
+            updateAndSaveSounds(newSounds);
+          }}
+          onUpdateSound={handleUpdateSound}
+          onDuplicateSound={(sound) => handleDuplicateSound(sound)}
+          onDeleteSound={(soundId) => {
+            const target = sounds.find((s) => s.id === soundId);
+            if (target && target.hotkey && window.soundboardAPI) {
+              window.soundboardAPI.unregisterGlobalHotkey(target.hotkey);
+            }
+            const filtered = sounds.filter((s) => s.id !== soundId);
+            updateAndSaveSounds(filtered);
+            if (selectedSoundId === soundId) {
+              setSelectedSoundId(filtered.length > 0 ? filtered[0].id : null);
+            }
+          }}
+          onAddSound={() => {
+            if (window.soundboardAPI?.showMainWindow) {
+              window.soundboardAPI.showMainWindow();
+            }
+            setIsYouTubeModalOpen(true);
+          }}
+          accentColor={currentTheme.accent}
+        />
+      )}
 
       {/* Startup Update Alert Modal */}
       {startupUpdate && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-theme-surface border border-theme rounded-[20px] shadow-2xl p-6 text-theme-primary space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-[12px] bg-accent-soft border border-accent/30 flex items-center justify-center">
-                  <Sparkles size={20} className="text-accent" />
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-bold text-theme-primary flex items-center gap-2">
-                    <span>New Version Available</span>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-accent text-black font-extrabold">
-                      {startupUpdate.latestVersion || startupUpdate.releaseName}
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-theme-muted">
-                    An update for Prism Soundboard is ready to download
-                  </p>
-                </div>
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center frosted-backdrop bg-black/35 p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] overflow-hidden text-theme-primary flex flex-col">
+            <header className="h-16 px-6 border-b border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
+              <div>
+                <h3 className="text-[15px] font-bold text-theme-primary flex items-center gap-2">
+                  <span>New Version Available</span>
+                  <span className="text-[12px] font-mono font-semibold text-accent">
+                    {startupUpdate.latestVersion || startupUpdate.releaseName}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-theme-muted">
+                  An update for Prism Soundboard is ready to download
+                </p>
               </div>
               <button
                 onClick={() => setStartupUpdate(null)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-theme-muted hover:text-theme-primary bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-theme-muted hover:text-theme-primary bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors cursor-pointer"
               >
-                <X size={14} />
+                <X size={15} />
               </button>
-            </div>
+            </header>
+
+            <div className="p-6 space-y-4">
 
             {startupUpdate.releaseNotes && (
-              <div className="p-3 bg-black/40 rounded-[12px] border border-white/5 text-[11.5px] text-theme-secondary max-h-40 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
+              <div className="pt-3 border-t border-white/[0.08] text-[11.5px] text-theme-secondary max-h-40 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
                 {startupUpdate.releaseNotes}
               </div>
             )}
@@ -1954,7 +1970,7 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {isUpdatingApp ? (
+            {isUpdatingApp && (
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between text-[12px]">
                   <span className="text-theme-primary font-semibold flex items-center gap-2">
@@ -1977,8 +1993,11 @@ export const App: React.FC = () => {
                     : 'The app will close and update automatically when finished.'}
                 </p>
               </div>
-            ) : (
-              <div className="flex items-center justify-between pt-2">
+            )}
+            </div>
+
+            {!isUpdatingApp && (
+              <footer className="h-16 px-6 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
                 <button
                   onClick={() => {
                     if (window.soundboardAPI?.openExternal && startupUpdate.releaseUrl) {
@@ -1991,10 +2010,10 @@ export const App: React.FC = () => {
                   <ExternalLink size={12} />
                 </button>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <button
                     onClick={() => setStartupUpdate(null)}
-                    className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-theme-secondary hover:text-theme-primary bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-[12px] font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors cursor-pointer"
                   >
                     Later
                   </button>
@@ -2027,13 +2046,13 @@ export const App: React.FC = () => {
                     style={{
                       backgroundColor: 'var(--accent-color)',
                     }}
-                    className="flex items-center gap-2 px-5 py-2 rounded-[10px] text-[12px] font-bold text-black hover:brightness-110 active:scale-98 transition-all cursor-pointer shadow-lg"
+                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-[12px] font-bold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
                   >
                     <Download size={14} />
                     <span>Update Now</span>
                   </button>
                 </div>
-              </div>
+              </footer>
             )}
           </div>
         </div>

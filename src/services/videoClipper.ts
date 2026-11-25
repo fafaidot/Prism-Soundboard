@@ -57,8 +57,6 @@ class VideoClipper {
     if (this.bufferDurationSeconds !== newDur) {
       console.log(`[VideoClipper] Setting buffer duration to ${newDur}s (was ${this.bufferDurationSeconds}s)`);
       this.bufferDurationSeconds = newDur;
-      // Note: We deliberately do NOT wipe or cancel existing slots here.
-      // Any video frames already buffered are safely preserved.
     }
   }
 

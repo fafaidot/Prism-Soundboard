@@ -1,32 +1,107 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 interface GlobalTooltipState {
   text: string;
-  x: number;
-  y: number;
-  position: 'top' | 'bottom';
   visible: boolean;
+}
+
+/**
+ * Computes exact pixel coordinates (left, top) ensuring the tooltip
+ * is strictly contained within the window viewport, avoiding clipping
+ * at left, right, top, and bottom edges.
+ */
+function computeClampedPosition(
+  targetEl: HTMLElement,
+  tipEl: HTMLElement,
+  requestedPos?: 'top' | 'bottom' | 'left' | 'right' | null
+): { left: number; top: number } {
+  const tRect = targetEl.getBoundingClientRect();
+  const tipRect = tipEl.getBoundingClientRect();
+  const w = tipRect.width;
+  const h = tipRect.height;
+  const MARGIN = 12; // minimum distance in px from any window edge
+  const GAP = 8;     // clearance from the target element
+
+  let side = requestedPos;
+
+  if (!side) {
+    // Intelligent edge auto-detection based on viewport position
+    if (tRect.left < 75 && tRect.top > 35 && tRect.bottom < window.innerHeight - 35) {
+      // Left navigation rail / left-docked controls: place to the right
+      side = 'right';
+    } else if (tRect.right > window.innerWidth - 75 && tRect.top > 35 && tRect.bottom < window.innerHeight - 35) {
+      // Right edge controls: place to the left
+      side = 'left';
+    } else if (tRect.top < 60) {
+      // Near top of window (e.g. TitleBar, CommandBar): place below
+      side = 'bottom';
+    } else if (tRect.bottom > window.innerHeight - 65) {
+      // Near bottom of window (e.g. BottomToolbar): place above
+      side = 'top';
+    } else {
+      // Default: place above
+      side = 'top';
+    }
+  }
+
+  let left = 0;
+  let top = 0;
+
+  if (side === 'right') {
+    left = tRect.right + GAP;
+    top = tRect.top + tRect.height / 2 - h / 2;
+    // If overflowing right window edge, flip to left if space permits
+    if (left + w > window.innerWidth - MARGIN && tRect.left - GAP - w >= MARGIN) {
+      left = tRect.left - GAP - w;
+    }
+  } else if (side === 'left') {
+    left = tRect.left - GAP - w;
+    top = tRect.top + tRect.height / 2 - h / 2;
+    // If overflowing left window edge, flip to right if space permits
+    if (left < MARGIN && tRect.right + GAP + w <= window.innerWidth - MARGIN) {
+      left = tRect.right + GAP;
+    }
+  } else if (side === 'bottom') {
+    left = tRect.left + tRect.width / 2 - w / 2;
+    top = tRect.bottom + GAP;
+    // If overflowing bottom window edge, flip to top if space permits
+    if (top + h > window.innerHeight - MARGIN && tRect.top - GAP - h >= MARGIN) {
+      top = tRect.top - GAP - h;
+    }
+  } else {
+    // 'top'
+    left = tRect.left + tRect.width / 2 - w / 2;
+    top = tRect.top - GAP - h;
+    // If overflowing top window edge, flip to bottom if space permits
+    if (top < MARGIN && tRect.bottom + GAP + h <= window.innerHeight - MARGIN) {
+      top = tRect.bottom + GAP;
+    }
+  }
+
+  // HARD VIEWPORT CLAMP: Guarantees [left, left + w] and [top, top + h] remain strictly within window bounds
+  left = Math.max(MARGIN, Math.min(window.innerWidth - w - MARGIN, left));
+  top = Math.max(MARGIN, Math.min(window.innerHeight - h - MARGIN, top));
+
+  return { left: Math.round(left), top: Math.round(top) };
 }
 
 export const GlobalTooltipProvider: React.FC = () => {
   const [tooltip, setTooltip] = useState<GlobalTooltipState>({
     text: '',
-    x: 0,
-    y: 0,
-    position: 'top',
     visible: false,
   });
 
   const timerRef = useRef<any>(null);
-  const currentTargetRef = useRef<Element | null>(null);
+  const currentTargetRef = useRef<HTMLElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleMouseOver = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement)?.closest('[data-tooltip], [title]');
+      const target = (e.target as HTMLElement)?.closest('[data-tooltip], [title]') as HTMLElement | null;
       if (!target) return;
 
-      // If it has title, transfer it to data-tooltip to suppress the browser's default ugly tooltip!
+      // Transfer native title to data-tooltip to suppress browser native tooltip
       if (target.hasAttribute('title')) {
         const titleVal = target.getAttribute('title');
         if (titleVal && titleVal.trim()) {
@@ -43,25 +118,11 @@ export const GlobalTooltipProvider: React.FC = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         if (currentTargetRef.current !== target) return;
-
-        const rect = target.getBoundingClientRect();
-        const preferredPos = (target.getAttribute('data-tooltip-pos') as 'top' | 'bottom') || 
-          (rect.top < 60 ? 'bottom' : 'top');
-
-        let x = rect.left + rect.width / 2;
-        let y = preferredPos === 'bottom' ? rect.bottom + 8 : rect.top - 8;
-
-        // Keep within viewport horizontally
-        x = Math.max(16, Math.min(window.innerWidth - 16, x));
-
         setTooltip({
           text,
-          x,
-          y,
-          position: preferredPos,
           visible: true,
         });
-      }, 180);
+      }, 160);
     };
 
     const handleMouseOut = (e: MouseEvent) => {
@@ -91,18 +152,36 @@ export const GlobalTooltipProvider: React.FC = () => {
     };
   }, []);
 
+  useLayoutEffect(() => {
+    if (!tooltip.visible || !tooltipRef.current || !currentTargetRef.current) return;
+
+    const requestedPos = currentTargetRef.current.getAttribute('data-tooltip-pos') as
+      | 'top'
+      | 'bottom'
+      | 'left'
+      | 'right'
+      | null;
+
+    const { left, top } = computeClampedPosition(currentTargetRef.current, tooltipRef.current, requestedPos);
+
+    tooltipRef.current.style.left = `${left}px`;
+    tooltipRef.current.style.top = `${top}px`;
+    tooltipRef.current.style.opacity = '1';
+  }, [tooltip.visible, tooltip.text]);
+
   if (!tooltip.visible || !tooltip.text) return null;
 
   return createPortal(
     <div
-      className="fixed z-[999999] pointer-events-none transition-opacity duration-150 animate-in fade-in zoom-in-95"
+      ref={tooltipRef}
+      className="fixed z-[999999] pointer-events-none select-none transition-opacity duration-150"
       style={{
-        left: `${tooltip.x}px`,
-        top: `${tooltip.y}px`,
-        transform: tooltip.position === 'bottom' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+        left: '0px',
+        top: '0px',
+        opacity: 0,
       }}
     >
-      <div className="px-2.5 py-1.5 rounded-[9px] bg-theme-card/95 border border-theme text-theme-primary text-[11px] font-semibold tracking-wide whitespace-nowrap shadow-[0_8px_25px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-1.5">
+      <div className="px-2.5 py-1.5 rounded-lg bg-[#0e1219]/95 border border-white/10 text-white text-[11px] font-medium tracking-normal shadow-2xl backdrop-blur-md flex items-center gap-1.5 max-w-[280px] break-words text-left leading-snug">
         {tooltip.text}
       </div>
     </div>,
@@ -121,30 +200,18 @@ interface TooltipProps {
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
-  position = 'bottom',
-  delay = 200,
+  position,
+  delay = 180,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<any>(null);
 
   const showTooltip = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
-      if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect();
-        let x = rect.left + rect.width / 2;
-        let y = position === 'bottom' ? rect.bottom + 8 : rect.top - 8;
-        if (position === 'left') {
-          x = rect.left - 8;
-          y = rect.top + rect.height / 2;
-        } else if (position === 'right') {
-          x = rect.right + 8;
-          y = rect.top + rect.height / 2;
-        }
-        setCoords({ x, y });
-        setIsVisible(true);
-      }
+      setIsVisible(true);
     }, delay);
   };
 
@@ -153,12 +220,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
     setIsVisible(false);
   };
 
-  const getTransform = () => {
-    if (position === 'bottom') return 'translate(-50%, 0)';
-    if (position === 'top') return 'translate(-50%, -100%)';
-    if (position === 'left') return 'translate(-100%, -50%)';
-    return 'translate(0, -50%)';
-  };
+  useLayoutEffect(() => {
+    if (!isVisible || !tooltipRef.current || !triggerRef.current) return;
+
+    const { left, top } = computeClampedPosition(triggerRef.current, tooltipRef.current, position);
+
+    tooltipRef.current.style.left = `${left}px`;
+    tooltipRef.current.style.top = `${top}px`;
+    tooltipRef.current.style.opacity = '1';
+  }, [isVisible, content, position]);
 
   return (
     <div
@@ -170,17 +240,18 @@ export const Tooltip: React.FC<TooltipProps> = ({
       onBlur={hideTooltip}
     >
       {children}
-      {isVisible && coords && content &&
+      {isVisible && content &&
         createPortal(
           <div
-            className="fixed z-[999999] pointer-events-none transition-opacity duration-150 animate-in fade-in zoom-in-95"
+            ref={tooltipRef}
+            className="fixed z-[999999] pointer-events-none select-none transition-opacity duration-150"
             style={{
-              left: `${coords.x}px`,
-              top: `${coords.y}px`,
-              transform: getTransform(),
+              left: '0px',
+              top: '0px',
+              opacity: 0,
             }}
           >
-            <div className="px-2.5 py-1.5 rounded-[9px] bg-theme-card/95 border border-theme text-theme-primary text-[11px] font-semibold tracking-wide whitespace-nowrap shadow-[0_8px_25px_rgba(0,0,0,0.85)] backdrop-blur-md flex items-center gap-1.5">
+            <div className="px-2.5 py-1.5 rounded-lg bg-[#0e1219]/95 border border-white/10 text-white text-[11px] font-medium tracking-normal shadow-2xl backdrop-blur-md flex items-center gap-1.5 max-w-[280px] break-words text-left leading-snug">
               {content}
             </div>
           </div>,

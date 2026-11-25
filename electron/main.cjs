@@ -10,7 +10,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Tray, Menu, nativeImage, session, desktopCapturer, protocol } = require('electron');
-const { spawn, execFile } = require('child_process');
+const { spawn, execFile, spawnSync } = require('child_process');
 
 // Enable secure context privileges for file:// so WebCodecs (VideoEncoder, AudioEncoder) work in production
 try {
@@ -193,6 +193,7 @@ function hideOverlayWindow() {
   try {
     overlayWindow.setOpacity(0);
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    overlayWindow.hide();
   } catch (e) {}
 }
 
@@ -212,13 +213,17 @@ function showOverlayWindow() {
     const y = Math.round(bounds.y + (bounds.height - overlayHeight) / 2);
     overlayWindow.setBounds({ x, y, width: overlayWidth, height: overlayHeight });
 
+    overlayWindow.show();
     overlayWindow.setIgnoreMouseEvents(false);
     overlayWindow.setOpacity(1);
-    if (!overlayWindow.isVisible()) {
-      overlayWindow.show();
-    }
     overlayWindow.focus();
     overlayWindow.moveTop();
+    const isFrosted = storageManager.loadSettings().enableFrostedGlass !== false;
+    if (overlayWindow.setBackgroundMaterial) {
+      try {
+        overlayWindow.setBackgroundMaterial(isFrosted ? 'acrylic' : 'none');
+      } catch (e) {}
+    }
   } catch (e) {}
 
   try {
@@ -240,12 +245,13 @@ function createOverlayWindow() {
     width: 1480,
     height: 700,
     frame: false,
-    transparent: true,
+    transparent: false,
     backgroundColor: '#00000000',
+    backgroundMaterial: 'acrylic',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
-    hasShadow: false,
+    hasShadow: true,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -472,6 +478,25 @@ function getYtDlpPath() {
   return 'yt-dlp';
 }
 
+// Locate ffmpeg binary
+function getFfmpegPath() {
+  const localBin = path.join(__dirname, '../bin/ffmpeg.exe');
+  if (fs.existsSync(localBin)) {
+    return localBin;
+  }
+  const appBin = path.join(process.resourcesPath || '', 'bin/ffmpeg.exe');
+  if (fs.existsSync(appBin)) {
+    return appBin;
+  }
+  try {
+    const ffmpegStatic = require('ffmpeg-static');
+    if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+      return ffmpegStatic;
+    }
+  } catch (e) {}
+  return 'ffmpeg';
+}
+
 function normalizeAccelerator(key) {
   if (!key) return null;
   let str = key.trim();
@@ -562,7 +587,8 @@ function createWindow() {
     minHeight: 640,
     frame: false,
     titleBarStyle: 'hidden',
-    backgroundColor: '#181818',
+    backgroundColor: '#00000000',
+    backgroundMaterial: 'acrylic',
     icon: fs.existsSync(APP_ICON_PATH) ? APP_ICON_PATH : undefined,
     show: false,
     webPreferences: {
@@ -911,9 +937,36 @@ ipcMain.on('sync-toggle-pause-sound', (_event, soundId) => {
   }
 });
 
+function applyFrostedGlassSetting(enabled) {
+  const material = enabled ? 'acrylic' : 'none';
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      if (mainWindow.setBackgroundMaterial) {
+        mainWindow.setBackgroundMaterial(material);
+      }
+      mainWindow.setBackgroundColor(enabled ? '#00000000' : '#090b10');
+    } catch (e) {}
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    try {
+      if (overlayWindow.setBackgroundMaterial) {
+        overlayWindow.setBackgroundMaterial(material);
+      }
+      overlayWindow.setBackgroundColor(enabled ? '#00000000' : '#090b10');
+    } catch (e) {}
+  }
+}
+
+ipcMain.on('set-frosted-glass-enabled', (_event, enabled) => {
+  applyFrostedGlassSetting(enabled !== false);
+});
+
 ipcMain.on('sync-settings-changed', (event, newSettings) => {
   try {
     storageManager.saveSettings(newSettings);
+    if (typeof newSettings.enableFrostedGlass === 'boolean') {
+      applyFrostedGlassSetting(newSettings.enableFrostedGlass);
+    }
   } catch (err) {
     console.error('Failed to save settings on sync:', err);
   }
@@ -1176,6 +1229,9 @@ ipcMain.handle('load-settings', async () => {
 ipcMain.handle('save-settings', async (_event, settings) => {
   try {
     storageManager.saveSettings(settings);
+    if (typeof settings.enableFrostedGlass === 'boolean') {
+      applyFrostedGlassSetting(settings.enableFrostedGlass);
+    }
     if (settings.panicHotkey) {
       panicHotkey = settings.panicHotkey;
     }
@@ -1721,7 +1777,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.5';
+    let currentVersion = '1.5.6';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -1993,15 +2049,15 @@ ipcMain.handle('save-recorded-video-clip', async (_event, { base64, duration, ti
       ? base64.substring(markerIndex + base64Marker.length) 
       : (base64.includes(',') ? base64.substring(base64.lastIndexOf(',') + 1) : base64);
     const buffer = Buffer.from(cleanBase64, 'base64');
-    const fileName = `${clipId}.webm`;
-    const filePath = path.join(VIDEOS_DIR, fileName);
-    fs.writeFileSync(filePath, buffer);
 
-    const stats = fs.statSync(filePath);
+    const finalFilePath = path.join(VIDEOS_DIR, `${clipId}.webm`);
+    fs.writeFileSync(finalFilePath, buffer);
+
+    const stats = fs.statSync(finalFilePath);
     const newClip = {
       id: clipId,
       title: title || 'Untitled',
-      filePath,
+      filePath: finalFilePath,
       duration: duration || 15,
       fileSize: stats.size,
       dateAdded: Date.now(),

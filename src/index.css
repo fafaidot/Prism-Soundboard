@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --accent-color: #31C5F4;
-  --accent-hover: #38bdf8;
-  --accent-soft: rgba(49, 197, 244, 0.15);
+  --accent-color: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --accent-soft: rgba(56, 189, 248, 0.12);
 
-  --theme-bg-app: #090B10;
-  --theme-bg-surface: #0E131A;
-  --theme-bg-card: #151B25;
-  --theme-bg-card-hover: #1B2330;
-  --theme-bg-card-selected: #123244;
-  --theme-bg-sidebar: #10141C;
-  --theme-bg-header: #090B10;
-  --theme-bg-input: #0E131A;
+  --theme-bg-app: #090b10;
+  --theme-bg-surface: #0e1219;
+  --theme-bg-card: #131822;
+  --theme-bg-card-hover: #18202d;
+  --theme-bg-card-selected: #122538;
+  --theme-bg-sidebar: #0c1017;
+  --theme-bg-header: #090b10;
+  --theme-bg-input: #0e1219;
 
-  --theme-border: #1B222E;
-  --theme-border-hover: #232E3F;
-  --theme-border-highlight: #31C5F4;
+  --theme-border: rgba(255, 255, 255, 0.08);
+  --theme-border-hover: rgba(255, 255, 255, 0.14);
+  --theme-border-highlight: #38bdf8;
 
-  --theme-text-primary: #ffffff;
+  --theme-text-primary: #f8fafc;
   --theme-text-secondary: #94a3b8;
-  --theme-text-muted: #5a687c;
+  --theme-text-muted: #64748b;
 }
 
 .bg-accent {
@@ -28,7 +28,7 @@
 }
 
 .bg-accent-soft {
-  background-color: var(--accent-soft, rgba(56, 189, 248, 0.15)) !important;
+  background-color: var(--accent-soft, rgba(56, 189, 248, 0.12)) !important;
 }
 
 .text-accent {
@@ -45,51 +45,51 @@
 
 /* Theme background & border utilities */
 .bg-theme-app {
-  background-color: var(--theme-bg-app, #090B10);
+  background-color: var(--theme-bg-app, #090b10);
 }
 
 .bg-theme-surface {
-  background-color: var(--theme-bg-surface, #0E131A);
+  background-color: var(--theme-bg-surface, #0e1219);
 }
 
 .bg-theme-card {
-  background-color: var(--theme-bg-card, #151B25);
+  background-color: var(--theme-bg-card, #131822);
 }
 
 .bg-theme-card-hover:hover {
-  background-color: var(--theme-bg-card-hover, #1B2330);
+  background-color: var(--theme-bg-card-hover, #18202d);
 }
 
 .bg-theme-card-selected {
-  background-color: var(--theme-bg-card-selected, #123244);
+  background-color: var(--theme-bg-card-selected, #122538);
 }
 
 .bg-theme-sidebar {
-  background-color: var(--theme-bg-sidebar, #10141C);
+  background-color: var(--theme-bg-sidebar, #0c1017);
 }
 
 .bg-theme-header {
-  background-color: var(--theme-bg-header, #090B10);
+  background-color: var(--theme-bg-header, #090b10);
 }
 
 .bg-theme-input {
-  background-color: var(--theme-bg-input, #0E131A);
+  background-color: var(--theme-bg-input, #0e1219);
 }
 
 .border-theme {
-  border-color: var(--theme-border, #1B222E);
+  border-color: var(--theme-border, rgba(255, 255, 255, 0.08));
 }
 
 .border-theme-hover:hover {
-  border-color: var(--theme-border-hover, #232E3F);
+  border-color: var(--theme-border-hover, rgba(255, 255, 255, 0.14));
 }
 
 .border-theme-highlight {
-  border-color: var(--theme-border-highlight, #31C5F4);
+  border-color: var(--theme-border-highlight, #38bdf8);
 }
 
 .text-theme-primary {
-  color: var(--theme-text-primary, #ffffff);
+  color: var(--theme-text-primary, #f8fafc);
 }
 
 .text-theme-secondary {
@@ -97,7 +97,7 @@
 }
 
 .text-theme-muted {
-  color: var(--theme-text-muted, #5a687c);
+  color: var(--theme-text-muted, #64748b);
 }
 
 *, *::before, *::after {
@@ -108,9 +108,164 @@
   user-select: none !important;
 }
 
+/* Ensure stable pointer cursor across all interactive elements and prevent child element hover twitch */
+button, [role="button"], a, input[type="button"], input[type="submit"], .cursor-pointer {
+  cursor: pointer !important;
+}
+
+button *, [role="button"] *, a *, .cursor-pointer * {
+  cursor: inherit !important;
+}
+
+/* Crystal-Clear Frosted Glass Acrylic utilities */
+.frosted-glass {
+  background-color: rgba(9, 11, 16, 0.45) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.frosted-glass-surface {
+  background-color: rgba(14, 18, 25, 0.55) !important;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+
+.frosted-glass-subtle {
+  background-color: rgba(9, 11, 16, 0.35) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+.frosted-bottom-pill {
+  background-color: rgba(14, 18, 25, 0.50) !important;
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+
+/* Transparent Frosted Glass Submenus, Modals & Dropdowns */
+.frosted-backdrop {
+  background-color: rgba(4, 6, 10, 0.42) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.frosted-modal {
+  background: linear-gradient(180deg, rgba(26, 33, 46, 0.62) 0%, rgba(14, 18, 26, 0.54) 24%, rgba(11, 15, 22, 0.58) 100%) !important;
+  backdrop-filter: blur(32px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72), inset 0 1px 0 0 rgba(255, 255, 255, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+}
+
+.frosted-modal-chrome {
+  background-color: rgba(255, 255, 255, 0.035) !important;
+}
+
+.frosted-modal-panel {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.frosted-dropdown {
+  background: linear-gradient(180deg, rgba(26, 33, 46, 0.64) 0%, rgba(13, 17, 25, 0.56) 100%) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.68), inset 0 1px 0 0 rgba(255, 255, 255, 0.24) !important;
+}
+
+select option {
+  background-color: #0e1219;
+  color: #f8fafc;
+}
+
+/* Standalone transparent overlay mode support */
+html.is-overlay, html.is-overlay body, body.is-overlay {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* User preference: Disable frosted glass effects */
+html.no-frosted-glass *,
+html.no-frosted-glass *::before,
+html.no-frosted-glass *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.no-frosted-glass .ambient-glow {
+  display: none !important;
+}
+
+html.no-frosted-glass body {
+  background-color: #090b10 !important;
+}
+
+html.no-frosted-glass aside {
+  background-color: #0c1017 !important;
+}
+
+html.no-frosted-glass .frosted-bottom-pill {
+  background-color: #0e1219 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.no-frosted-glass .frosted-card {
+  background-color: #0e1219 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.no-frosted-glass .frosted-card:hover {
+  background-color: #131822 !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+html.no-frosted-glass .frosted-workspace {
+  background-color: #090b10 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.no-frosted-glass .is-overlay,
+html.no-frosted-glass [data-hud-pod="true"] {
+  background-color: #090b10 !important;
+}
+
+html.no-frosted-glass .frosted-backdrop {
+  background-color: rgba(0, 0, 0, 0.78) !important;
+}
+
+html.no-frosted-glass .frosted-modal {
+  background: #0e1219 !important;
+  background-color: #0e1219 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75) !important;
+}
+
+html.no-frosted-glass .frosted-modal-chrome {
+  background-color: #0c1017 !important;
+}
+
+html.no-frosted-glass .frosted-modal-panel {
+  background-color: #131822 !important;
+  box-shadow: none !important;
+}
+
+html.no-frosted-glass .frosted-dropdown {
+  background: #131822 !important;
+  background-color: #131822 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
+}
+
 input, textarea, select {
   -webkit-user-select: text !important;
   user-select: text !important;
+}
+
+::selection {
+  background-color: var(--accent-color, #38bdf8);
+  color: #000000;
 }
 
 @layer base {
@@ -123,11 +278,17 @@ input, textarea, select {
   body {
     margin: 0;
     padding: 0;
-    font-family: "Plus Jakarta Sans", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-    letter-spacing: -0.012em;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
+    letter-spacing: -0.011em;
     overflow: hidden;
-    background-color: var(--theme-bg-app, #0b0c0f);
-    color: var(--theme-text-primary, #ffffff);
+    background-color: transparent !important;
+    color: var(--theme-text-primary, #f8fafc);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-color, #38bdf8);
+    outline-offset: 1px;
   }
 }
 
@@ -142,20 +303,20 @@ input, textarea, select {
   scrollbar-width: none !important;
 }
 
-/* Windows 11 Fluent Scrollbar */
+/* Minimalist studio scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(140, 140, 140, 0.25);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(140, 140, 140, 0.45);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .drag-region {

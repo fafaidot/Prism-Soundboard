@@ -6,7 +6,7 @@ interface SoundCardProps {
   sound: SoundItem;
   isSelected: boolean;
   isPlaying: boolean;
-  playbackProgress?: number; // 0 to 1
+  playbackProgress?: number;
   accentColor: string;
   isListeningHotkey?: boolean;
   onSelect: () => void;
@@ -21,14 +21,11 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
   sound,
   isSelected,
   isPlaying,
-  playbackProgress = 0,
   accentColor,
   onSelect,
   onPlay,
 }) => {
-  const [isHoveringBtn, setIsHoveringBtn] = useState(false);
   const hasThumbnail = !!sound.thumbnail;
-  const accent = accentColor || 'var(--accent-color)';
 
   const formatDuration = (sec?: number) => {
     if (!sec) return '0:08';
@@ -45,85 +42,110 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
         onSelect();
         onPlay();
       }}
-      className={`group relative flex flex-col p-2.5 rounded-xl border transition-all duration-150 cursor-pointer select-none ${
-        isSelected
-          ? 'bg-theme-card-selected border-accent'
-          : 'bg-theme-card border-theme hover:border-accent/50 hover:bg-theme-card-hover'
-      }`}
+      className="group relative flex flex-col cursor-pointer select-none transition-all duration-200"
     >
-      {/* Artwork / Media Area */}
-      <div className="relative w-full aspect-[4/3] rounded-lg bg-theme-surface overflow-hidden flex items-center justify-center">
+      {/* Ambient Thumbnail Color Glow (Frosted & Spreaded past the card borders) */}
+      {hasThumbnail ? (
+        <div
+          className={`ambient-glow absolute -inset-3.5 rounded-3xl bg-cover bg-center blur-2xl pointer-events-none transition-opacity duration-300 ${
+            isSelected || isPlaying ? 'opacity-55' : 'opacity-35'
+          }`}
+          style={{ backgroundImage: `url(${sound.thumbnail})` }}
+          aria-hidden="true"
+        />
+      ) : (
+        <div
+          className={`ambient-glow absolute -inset-3.5 rounded-3xl bg-accent/20 blur-2xl pointer-events-none transition-opacity duration-300 ${
+            isSelected || isPlaying ? 'opacity-35' : 'opacity-15'
+          }`}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Frosted Glass Card Surface */}
+      <div
+        className={`frosted-card relative flex flex-col p-2.5 rounded-2xl border transition-all duration-200 overflow-hidden ${
+          isSelected
+            ? 'bg-[#122538]/75 border-accent/80 backdrop-blur-2xl shadow-[0_8px_28px_rgba(0,0,0,0.55)] ring-1 ring-accent/40'
+            : isPlaying
+            ? 'bg-[#102030]/70 border-accent/60 backdrop-blur-2xl shadow-[0_8px_24px_rgba(0,0,0,0.5)] ring-1 ring-accent/30'
+            : 'bg-[#0e1219]/70 hover:bg-[#131822]/80 border-white/[0.1] hover:border-white/[0.22] backdrop-blur-2xl shadow-[0_4px_16px_rgba(0,0,0,0.35)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
+        }`}
+      >
+        {/* Subtle Top Specular Sheen */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] to-transparent pointer-events-none" />
+
+        {/* Artwork / Media Area */}
+        <div className="relative z-10 w-full aspect-[4/3] rounded-xl bg-black/50 border border-white/[0.1] overflow-hidden flex items-center justify-center shadow-md">
         {hasThumbnail ? (
           <img
             src={sound.thumbnail}
             alt={sound.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 pointer-events-none"
+            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200 pointer-events-none"
           />
         ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
-          <Clapperboard size={30} className="text-accent group-hover:scale-110 transition-transform duration-150" />
+          <Clapperboard size={26} className="text-accent opacity-80 group-hover:scale-105 transition-transform duration-150" />
         ) : (
-          <Music size={30} className="text-accent group-hover:scale-110 transition-transform duration-150" />
+          <Music size={26} className="text-accent opacity-80 group-hover:scale-105 transition-transform duration-150" />
         )}
 
-        {/* Interactive Subtle & Soft Center Play / Pause Button */}
+        {/* Center Play / Pause Indicator */}
         <div
-          className={`absolute inset-0 transition-opacity duration-200 flex items-center justify-center z-20 ${
-            isPlaying ? 'bg-black/20 backdrop-blur-[1px] opacity-100' : 'bg-black/25 opacity-0 group-hover:opacity-100'
+          className={`absolute inset-0 transition-opacity duration-150 flex items-center justify-center z-20 ${
+            isPlaying ? 'bg-black/35 opacity-100' : 'bg-black/30 opacity-0 group-hover:opacity-100'
           }`}
         >
           <button
             type="button"
-            onMouseEnter={() => setIsHoveringBtn(true)}
-            onMouseLeave={() => setIsHoveringBtn(false)}
             onClick={(e) => {
               e.stopPropagation();
               onSelect();
               onPlay();
             }}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer shadow-lg backdrop-blur-md border ${
+            className={`group/playbtn w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow-md border ${
               isPlaying
-                ? 'bg-black/65 border-accent/50 text-accent hover:bg-black/80 hover:border-accent'
-                : 'bg-black/60 border-white/20 text-white/90 hover:border-accent/60 hover:text-accent hover:bg-black/80'
+                ? 'bg-black/80 border-accent text-accent'
+                : 'bg-black/75 border-white/20 text-white hover:border-accent hover:text-accent'
             }`}
-            title={isPlaying ? 'Stop Sound' : 'Play Sound'}
+            title={isPlaying ? 'Stop sound' : 'Play sound'}
           >
             {isPlaying ? (
-              isHoveringBtn ? (
-                <Square size={13} className="fill-accent text-accent rounded-[2px]" />
-              ) : (
-                <div className="flex items-end gap-[3px] h-3.5 w-3.5 justify-center pointer-events-none">
+              <>
+                <Square size={12} className="hidden group-hover/playbtn:block fill-current pointer-events-none" />
+                <div className="flex group-hover/playbtn:hidden items-end gap-[2.5px] h-3 w-3 justify-center pointer-events-none">
                   <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.6s_infinite_alternate]" style={{ height: '55%' }} />
                   <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.8s_infinite_alternate]" style={{ height: '100%' }} />
                   <span className="w-[2px] bg-accent rounded-full animate-[bounce_0.5s_infinite_alternate]" style={{ height: '75%' }} />
                 </div>
-              )
+              </>
             ) : (
-              <Play size={15} className="fill-current ml-0.5" />
+              <Play size={13} className="fill-current ml-0.5 pointer-events-none" />
             )}
           </button>
         </div>
 
-        {/* Sound Shortcut in Top-Left Corner (if set) */}
+        {/* Shortcut Badge (Top-Left) */}
         {sound.hotkey && (
-          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[10px] font-mono text-accent font-semibold border border-white/10 shadow-sm pointer-events-none z-20">
+          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[9.5px] font-mono text-slate-200 font-medium border border-white/10 pointer-events-none z-20">
             {sound.hotkey}
           </div>
         )}
 
-        {/* Duration badge at bottom right */}
-        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm text-[10px] font-mono text-white/90 font-medium z-20 pointer-events-none">
+        {/* Duration badge (Bottom-Right) */}
+        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[9.5px] font-mono text-slate-300 font-medium z-20 pointer-events-none tabular-nums">
           {formatDuration(sound.duration)}
         </div>
       </div>
 
       {/* Title */}
-      <div className="mt-2.5 px-1 text-center">
-        <h4 className="text-[12px] font-medium text-theme-primary truncate group-hover:text-accent transition-colors">
+      <div className="relative z-10 mt-2.5 px-1">
+        <h4 className="text-[12px] font-medium text-slate-100 truncate group-hover:text-white transition-colors">
           {sound.title}
         </h4>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export const SoundCard = React.memo(SoundCardComponent, (prev, next) => {

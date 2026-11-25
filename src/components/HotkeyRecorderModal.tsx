@@ -80,39 +80,27 @@ export const HotkeyRecorderModal: React.FC<HotkeyRecorderModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center frosted-backdrop bg-black/35 p-4 animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden transition-all duration-150"
+        className="w-full max-w-xl frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex flex-col overflow-hidden transition-all duration-150"
       >
         {/* Header */}
-        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center border shadow-sm"
-              style={{
-                backgroundColor: `${accent}15`,
-                borderColor: `${accent}35`,
-                color: accent,
-              }}
-            >
-              <Keyboard size={15} />
-            </div>
-            <div>
-              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide">
-                Record Global Hotkey
-              </h3>
-              <p className="text-[11px] text-theme-muted truncate max-w-sm">
-                {title || 'Assign keyboard key or combination'}
-              </p>
-            </div>
+        <header className="h-16 px-6 border-b border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
+          <div>
+            <h3 className="text-[15px] font-bold text-white tracking-tight">
+              Record Global Hotkey
+            </h3>
+            <p className="text-[11px] text-slate-400 truncate max-w-sm">
+              {title || 'Assign keyboard key or combination'}
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-muted hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Cancel (Esc)"
           >
             <X size={15} />
@@ -120,15 +108,15 @@ export const HotkeyRecorderModal: React.FC<HotkeyRecorderModalProps> = ({
         </header>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4 bg-theme-surface">
-          {/* Key Capture Card */}
-          <div className="p-6 bg-theme-card border border-theme rounded-2xl flex flex-col items-center justify-center gap-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">
-              Press any key on your keyboard
+        <div className="p-6 space-y-4 bg-transparent">
+          {/* Key Capture Area */}
+          <div className="flex flex-col items-center justify-center gap-3">
+            <span className="text-[11.5px] font-medium text-slate-400">
+              Press any key or combination on your keyboard
             </span>
 
             <div
-              className="w-full py-5 px-4 bg-theme-app border rounded-2xl flex items-center justify-center gap-2 text-center"
+              className="w-full py-5 px-4 bg-white/[0.04] border border-white/[0.1] rounded-xl flex items-center justify-center gap-2 text-center"
               style={{
                 borderColor: recordedKey ? `${accent}60` : undefined,
               }}
@@ -151,22 +139,22 @@ export const HotkeyRecorderModal: React.FC<HotkeyRecorderModalProps> = ({
               <button
                 type="button"
                 onClick={() => setRecordedKey('')}
-                className="text-[11px] font-bold text-theme-muted hover:text-red-400 transition-colors cursor-pointer flex items-center gap-1.5 pt-1"
+                className="text-[11px] font-semibold text-slate-400 hover:text-rose-400 transition-colors cursor-pointer flex items-center gap-1.5 pt-0.5"
               >
                 <Trash2 size={12} />
-                <span>Clear Keybind</span>
+                <span>Clear keybind</span>
               </button>
             )}
           </div>
 
-          {/* Tips Card */}
-          <div className="p-4 bg-theme-card/50 border border-theme rounded-2xl text-[11.5px] text-theme-secondary leading-relaxed">
-            Supports standard keys (<code className="text-theme-primary font-mono">F1-F12</code>, <code className="text-theme-primary font-mono">1-9</code>, <code className="text-theme-primary font-mono">A-Z</code>), Numpad keys (<code className="text-theme-primary font-mono">Num 1-9</code>), and modifier combinations (<code className="text-theme-primary font-mono">Ctrl+Alt+1</code>).
-          </div>
+          {/* Tips Line */}
+          <p className="pt-3.5 border-t border-white/[0.07] text-[11.5px] text-slate-400 leading-relaxed">
+            Supports standard keys (<code className="text-slate-200 font-mono">F1-F12</code>, <code className="text-slate-200 font-mono">1-9</code>, <code className="text-slate-200 font-mono">A-Z</code>), Numpad keys (<code className="text-slate-200 font-mono">Num 1-9</code>), and modifier combinations (<code className="text-slate-200 font-mono">Ctrl+Alt+1</code>).
+          </p>
         </div>
 
         {/* Footer */}
-        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
+        <footer className="h-16 px-6 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
           <span className="text-[11px] text-theme-muted">
             Triggers sound instantly even inside games
           </span>
@@ -175,7 +163,7 @@ export const HotkeyRecorderModal: React.FC<HotkeyRecorderModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-[12px] font-semibold text-theme-secondary hover:text-theme-primary bg-theme-card hover:bg-theme-card-hover border border-theme transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl text-[12px] font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors cursor-pointer"
             >
               Cancel
             </button>

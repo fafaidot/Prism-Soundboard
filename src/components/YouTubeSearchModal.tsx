@@ -41,7 +41,6 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isTrendingMode, setIsTrendingMode] = useState(true);
 
-  // Fetch real trending music on open
   useEffect(() => {
     if (!isOpen) return;
 
@@ -133,7 +132,6 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
     onClose();
   };
 
-  // Simultaneous download single sound
   const handleDownload = async (item: YouTubeSearchResult, openTrimmer = false) => {
     if (previewAudio) {
       previewAudio.pause();
@@ -149,14 +147,12 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
     }
   };
 
-  // Toggle selection for bulk download
   const handleToggleSelect = (item: YouTubeSearchResult) => {
     setSelectedIds((prev) =>
       prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
     );
   };
 
-  // Download all selected items simultaneously in parallel
   const handleDownloadSelected = async () => {
     if (selectedIds.length === 0) return;
     const itemsToDownload = results.filter((r) => selectedIds.includes(r.id));
@@ -171,59 +167,51 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none ${
-        isHUD ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-md'
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none frosted-backdrop ${
+        isHUD ? 'bg-black/30' : 'bg-black/35'
       }`}
     >
       <div
         data-hud-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
+        className="w-full max-w-3xl frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex flex-col overflow-hidden h-[640px] max-h-[90vh]"
       >
-        {/* Top Header */}
-        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-theme-card border border-theme flex items-center justify-center shadow-sm">
-              <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
-            </div>
-            <div>
-              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide flex items-center gap-2">
-                <span>YouTube Music & Downloader</span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-theme-card text-accent border border-theme">
-                  Lossless Audio
-                </span>
-              </h3>
-              <p className="text-[11px] text-theme-muted">
-                Search tracks, browse trending music hits, or paste direct YouTube URLs
-              </p>
-            </div>
+        {/* Header */}
+        <header className="h-16 px-6 border-b border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
+          <div>
+            <h3 className="text-[15px] font-bold text-white tracking-tight">
+              YouTube audio search
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Search songs, browse trending music, or paste a video link
+            </p>
           </div>
 
           <button
             type="button"
             onClick={handleClose}
-            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            title="Close YouTube Downloader (Esc)"
+            className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Close (Esc)"
           >
             <X size={15} />
           </button>
         </header>
 
-        {/* Search & URL Bar Header */}
-        <form onSubmit={handleSearch} className="px-6 py-3.5 bg-theme-header border-b border-theme shrink-0 space-y-3">
-          <div className="flex items-center gap-3">
+        {/* Search Bar & Sub-toolbar */}
+        <form onSubmit={handleSearch} className="px-6 py-3 bg-white/[0.015] border-b border-white/[0.08] shrink-0 space-y-2.5">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search
-                size={14}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-muted"
+                size={13}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
               />
               <input
                 type="text"
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search song, artist, video or paste URL (https://...)"
-                className="w-full pl-9 pr-8 py-2 bg-theme-card border border-theme rounded-xl text-[12px] text-theme-primary placeholder-theme-muted focus:outline-none focus:border-accent/50 transition-colors"
+                placeholder="Search song, artist, or paste YouTube link..."
+                className="w-full pl-8 pr-7 py-1.5 bg-white/[0.04] border border-white/[0.08] focus:border-accent rounded-lg text-[12px] text-white placeholder-slate-500 focus:outline-none transition-colors"
               />
               {query && (
                 <button
@@ -232,9 +220,9 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                     setQuery('');
                     loadTrendingMusic();
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
                 >
-                  <X size={13} />
+                  <X size={12} />
                 </button>
               )}
             </div>
@@ -242,19 +230,16 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
             <button
               type="submit"
               disabled={isSearching}
-              style={{
-                backgroundColor: accent,
-              }}
-              className="px-4 py-2 rounded-xl text-[12px] font-bold text-black flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-40"
+              className="px-3.5 py-1.5 rounded-lg text-[11.5px] font-medium text-slate-950 bg-accent hover:brightness-110 active:scale-95 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-40"
             >
               {isSearching ? (
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={13} className="animate-spin" />
               ) : isDirectUrl ? (
-                <Download size={14} />
+                <Download size={13} />
               ) : (
-                <Search size={14} />
+                <Search size={13} />
               )}
-              <span>{isDirectUrl ? 'Download URL' : 'Search'}</span>
+              <span>{isDirectUrl ? 'Download link' : 'Search'}</span>
             </button>
 
             <button
@@ -263,60 +248,58 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                 setQuery('');
                 loadTrendingMusic();
               }}
-              title="Refresh trending hits"
-              className="p-2 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white transition-colors cursor-pointer"
+              title="Refresh trending songs"
+              className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
-              <RefreshCw size={14} className={isSearching && isTrendingMode ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={isSearching && isTrendingMode ? 'animate-spin' : ''} />
             </button>
           </div>
 
-          {/* Sub-toolbar: Trending Indicator & Selection Toolbar */}
-          <div className="flex items-center justify-between text-[11px] px-0.5">
-            <div className="flex items-center gap-2">
+          {/* Sub-toolbar */}
+          <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setQuery('');
                   loadTrendingMusic();
                 }}
-                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                className={`py-0.5 font-medium flex items-center gap-1.5 border-b transition-colors cursor-pointer ${
                   isTrendingMode && !query
-                    ? 'bg-theme-card-selected text-accent border border-accent/40'
-                    : 'text-theme-secondary hover:text-white bg-theme-card border border-theme'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-slate-400 hover:text-white'
                 }`}
               >
-                <TrendingUp size={12} />
-                <span>Trending Hits</span>
+                <TrendingUp size={11} />
+                <span>Trending hits</span>
               </button>
 
               {!isTrendingMode && query && (
-                <span className="text-theme-secondary flex items-center gap-1">
-                  <span>Results for</span>
-                  <strong className="text-theme-primary font-semibold">"{query}"</strong>
+                <span className="text-slate-400">
+                  Results for <strong className="text-white font-medium">"{query}"</strong>
                 </span>
               )}
             </div>
 
             {selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
-                <span className="text-accent font-bold flex items-center gap-1">
-                  <Layers size={12} />
+                <span className="text-accent font-medium flex items-center gap-1 tabular-nums">
+                  <Layers size={11} />
                   <span>{selectedIds.length} selected</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setSelectedIds([])}
-                  className="text-theme-secondary hover:text-white cursor-pointer underline text-[10.5px]"
+                  className="text-slate-400 hover:text-white cursor-pointer underline text-[10.5px]"
                 >
-                  Deselect all
+                  Deselect
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadSelected}
-                  style={{ backgroundColor: accent }}
-                  className="px-3 py-1 rounded-lg font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 text-black"
+                  className="px-2.5 py-0.5 rounded-md font-medium hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-xs flex items-center gap-1 text-slate-950 bg-accent text-[11px]"
                 >
-                  <Download size={12} />
+                  <Download size={11} />
                   <span>Download ({selectedIds.length})</span>
                 </button>
               </div>
@@ -325,30 +308,20 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
         </form>
 
         {/* Scrollable Tracks List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 bg-theme-surface">
+        <div className="flex-1 overflow-y-auto px-3 py-2 divide-y divide-white/[0.06] bg-transparent">
           {isSearching ? (
-            <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
-              <Loader2 size={32} className="animate-spin" style={{ color: accent }} />
-              <div className="space-y-1">
-                <h4 className="text-[14px] font-bold text-theme-primary">
-                  {isTrendingMode ? 'Loading Trending Charts...' : 'Searching YouTube...'}
-                </h4>
-                <p className="text-[11.5px] text-theme-muted">
-                  Extracting audio streams directly from source
-                </p>
-              </div>
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-2.5">
+              <Loader2 size={24} className="animate-spin text-accent" />
+              <p className="text-[12px] text-slate-400">
+                {isTrendingMode ? 'Loading trending music...' : 'Searching YouTube...'}
+              </p>
             </div>
           ) : results.length === 0 ? (
-            <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-theme-card border border-theme flex items-center justify-center text-theme-muted">
-                <Music2 size={26} />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-[14px] font-bold text-theme-primary">No Songs Found</h4>
-                <p className="text-[12px] text-theme-muted max-w-sm">
-                  Try searching for an artist, song title, or paste a YouTube URL to download.
-                </p>
-              </div>
+            <div className="py-20 flex flex-col items-center justify-center text-center space-y-2">
+              <Music2 size={24} className="text-slate-500" />
+              <p className="text-[12px] text-slate-400">
+                No songs found. Try a song name or paste a YouTube URL.
+              </p>
             </div>
           ) : (
             results.map((item) => {
@@ -360,39 +333,30 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                 <div
                   key={item.id}
                   onClick={() => handleToggleSelect(item)}
-                  style={{
-                    borderColor: isSelected ? accent : undefined,
-                  }}
-                  className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-4 cursor-pointer group shadow-sm ${
+                  className={`px-2.5 py-2.5 rounded-lg transition-colors flex items-center justify-between gap-3 cursor-pointer group ${
                     isSelected
-                      ? 'bg-theme-card-selected border-accent'
-                      : 'bg-theme-sidebar hover:bg-theme-card border-theme hover:border-accent/40'
+                      ? 'bg-accent/10'
+                      : 'hover:bg-white/[0.05]'
                   }`}
                 >
-                  {/* Left: Checkbox + Thumbnail & Play Preview */}
+                  {/* Left: Checkbox + Thumbnail & Title */}
                   <div className="flex items-center gap-3 min-w-0">
-                    {/* Checkbox */}
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
                         handleToggleSelect(item);
                       }}
-                      style={{
-                        backgroundColor: isSelected ? accent : undefined,
-                        borderColor: isSelected ? accent : undefined,
-                      }}
-                      className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer ${
+                      className={`w-4 h-4 rounded flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
                         isSelected
-                          ? 'text-black'
-                          : 'bg-theme-card border-theme group-hover:border-accent/50'
+                          ? 'bg-accent text-slate-950 font-bold'
+                          : 'border border-white/20 bg-white/[0.03]'
                       }`}
                     >
-                      {isSelected && <Check size={12} className="stroke-[3.5]" />}
+                      {isSelected && <Check size={10} strokeWidth={3} />}
                     </div>
 
-                    {/* Thumbnail with Preview Play Button */}
                     <div
-                      className="relative w-14 h-11 rounded-xl overflow-hidden bg-theme-card border border-theme flex-shrink-0 group/thumb cursor-pointer"
+                      className="relative w-12 h-9 rounded-md overflow-hidden bg-[#0e1219] border border-white/[0.08] shrink-0 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleTogglePreview(item);
@@ -401,98 +365,69 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                       <img
                         src={item.thumbnail}
                         alt={item.title}
-                        className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform"
+                        className="w-full h-full object-cover"
                       />
                       <div
-                        style={isPreviewing ? { color: accent } : undefined}
-                        className={`absolute inset-0 flex items-center justify-center transition-all ${
+                        className={`absolute inset-0 flex items-center justify-center transition-opacity ${
                           isPreviewing
-                            ? 'bg-black/60'
-                            : 'bg-black/40 text-white opacity-0 group-hover/thumb:opacity-100'
+                            ? 'bg-black/60 text-accent opacity-100'
+                            : 'bg-black/40 text-white opacity-0 group-hover:opacity-100'
                         }`}
                       >
                         {isPreviewing ? (
-                          <Square size={14} className="fill-current" />
+                          <Square size={12} className="fill-current" />
                         ) : (
-                          <Play size={14} className="fill-current ml-0.5" />
+                          <Play size={12} className="fill-current ml-0.5" />
                         )}
                       </div>
                     </div>
 
-                    {/* Title & Channel */}
                     <div className="min-w-0">
                       <h4
-                        className="text-[12.5px] font-bold text-theme-primary truncate leading-snug"
+                        className="text-[12px] font-medium text-white truncate"
                         title={item.title}
                       >
                         {item.title}
                       </h4>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-theme-muted">
-                        <span className="truncate text-theme-secondary">@{item.channel || 'YouTube'}</span>
-                        {item.duration && (
-                          <>
-                            <span>•</span>
-                            <span className="font-mono text-white/70 text-[10.5px]">
-                              {item.duration}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5 tabular-nums">
+                        {item.channel || 'YouTube'} {item.duration ? `· ${item.duration}` : ''}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
+                  {/* Right Actions */}
                   <div
-                    className="flex items-center gap-2 flex-shrink-0"
+                    className="flex items-center gap-1.5 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Play Preview button */}
                     <button
                       type="button"
                       onClick={() => handleTogglePreview(item)}
-                      title={isPreviewing ? 'Stop Preview' : 'Listen Preview'}
-                      style={
+                      title={isPreviewing ? 'Stop preview' : 'Listen preview'}
+                      className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
                         isPreviewing
-                          ? {
-                              backgroundColor: `${accent}20`,
-                              borderColor: accent,
-                              color: accent,
-                            }
-                          : undefined
-                      }
-                      className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                        isPreviewing
-                          ? ''
-                          : 'bg-theme-card border-theme text-theme-secondary hover:text-white'
+                          ? 'bg-accent/20 border-accent/60 text-accent'
+                          : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:text-white'
                       }`}
                     >
-                      {isPreviewing ? (
-                        <Square size={12} className="fill-current" />
-                      ) : (
-                        <Play size={12} className="fill-current" />
-                      )}
+                      {isPreviewing ? <Square size={11} className="fill-current" /> : <Play size={11} className="fill-current ml-0.5" />}
                     </button>
 
-                    {/* Trim & Add */}
                     <button
                       type="button"
                       disabled={isDownloading}
                       onClick={() => handleDownload(item, true)}
-                      className="px-2.5 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-[11px] font-bold text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] font-medium text-slate-200 hover:text-white flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
                     >
-                      <Scissors size={11} style={{ color: accent }} />
+                      <Scissors size={11} className="text-accent" />
                       <span>Trim</span>
                     </button>
 
-                    {/* Direct Add to Board */}
                     <button
                       type="button"
                       disabled={isDownloading}
                       onClick={() => handleDownload(item, false)}
-                      style={{
-                        backgroundColor: accent,
-                      }}
-                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-md disabled:opacity-50 text-black"
+                      className="px-3 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer hover:brightness-110 active:scale-95 shadow-xs disabled:opacity-50 text-slate-950 bg-accent"
                     >
                       {isDownloading ? (
                         <>
@@ -501,7 +436,7 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
                         </>
                       ) : (
                         <>
-                          <Download size={11} className="stroke-[2.5]" />
+                          <Download size={11} />
                           <span>Add</span>
                         </>
                       )}
@@ -514,20 +449,15 @@ export const YouTubeSearchModal: React.FC<YouTubeSearchModalProps> = ({
         </div>
 
         {/* Footer */}
-        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
-          <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
-            <span>{results.length} songs loaded</span>
-            <span>•</span>
-            <span>Direct lossless audio extraction without ads</span>
-          </div>
+        <footer className="h-16 px-6 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
+          <span className="text-[11.5px] text-slate-400 tabular-nums">
+            {results.length} tracks loaded
+          </span>
 
           <button
             type="button"
             onClick={handleClose}
-            style={{
-              backgroundColor: accent,
-            }}
-            className="px-6 py-2 rounded-xl text-[12px] font-bold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+            className="px-6 py-2 rounded-xl text-[12px] font-bold text-slate-950 bg-accent hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
           >
             Done
           </button>

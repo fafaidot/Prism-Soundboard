@@ -60,7 +60,7 @@ const ToggleSwitch: React.FC<{
     onClick={() => !disabled && onChange(!checked)}
     style={checked ? { backgroundColor: accent } : undefined}
     className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0 disabled:opacity-40 select-none ${
-      checked ? '' : 'bg-theme-surface border border-theme'
+      checked ? '' : 'bg-white/[0.06] border border-white/[0.12]'
     }`}
   >
     <span
@@ -403,7 +403,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.5',
+        currentVersion: '1.5.6',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -425,11 +425,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleClose = () => {
-    const originalTheme = getTheme(settings.theme, settings.accentColor);
+    const originalTheme = getTheme(localSettings.theme, localSettings.accentColor);
     applyThemeToDom(originalTheme);
-    if (window.soundboardAPI?.sendIpcCommand) {
-      window.soundboardAPI.sendIpcCommand('sync-settings-changed', settings);
-    }
     onClose();
   };
 
@@ -445,25 +442,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center frosted-backdrop bg-black/35 p-4 animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
+        className="w-full max-w-4xl frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex overflow-hidden h-[680px] max-h-[92vh] transition-all duration-150"
       >
         {/* Left Navigation Sidebar */}
-        <aside className="w-64 min-w-[256px] bg-theme-sidebar border-r border-theme flex flex-col justify-between p-5 select-none">
+        <aside className="w-64 min-w-[256px] frosted-modal-chrome bg-white/[0.03] border-r border-white/[0.08] flex flex-col justify-between p-5 select-none">
           <div className="space-y-6">
             {/* Header: Logo and App Title */}
             <div className="flex items-center gap-3 px-2 py-1">
-              <div className="w-8 h-8 rounded-xl bg-theme-card border border-theme flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.1] flex items-center justify-center shadow-sm">
                 <img src={prismLogo} alt="Prism" className="w-5 h-5 object-contain" />
               </div>
               <div>
                 <h2 className="text-[14px] font-black tracking-wide text-theme-primary flex items-center gap-1.5">
                   PRISM <span style={{ color: accent }}>SETTINGS</span>
                 </h2>
-                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.5</span>
+                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.6</span>
               </div>
             </div>
 
@@ -479,7 +476,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => setActiveTab('devices')}
                   className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                     activeTab === 'devices'
-                      ? 'bg-theme-card text-theme-primary border border-theme shadow-sm'
+                      ? 'bg-white/[0.08] text-white'
                       : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
                   }`}
                 >
@@ -496,7 +493,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => setActiveTab('voice')}
                   className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                     activeTab === 'voice'
-                      ? 'bg-theme-card text-theme-primary border border-theme shadow-sm'
+                      ? 'bg-white/[0.08] text-white'
                       : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
                   }`}
                 >
@@ -519,7 +516,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => setActiveTab('hotkeys')}
                   className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                     activeTab === 'hotkeys'
-                      ? 'bg-theme-card text-theme-primary border border-theme shadow-sm'
+                      ? 'bg-white/[0.08] text-white'
                       : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
                   }`}
                 >
@@ -542,7 +539,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => setActiveTab('theme')}
                   className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                     activeTab === 'theme'
-                      ? 'bg-theme-card text-theme-primary border border-theme shadow-sm'
+                      ? 'bg-white/[0.08] text-white'
                       : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
                   }`}
                 >
@@ -565,7 +562,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => setActiveTab('backup')}
                   className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center gap-3 transition-all cursor-pointer ${
                     activeTab === 'backup'
-                      ? 'bg-theme-card text-theme-primary border border-theme shadow-sm'
+                      ? 'bg-white/[0.08] text-white'
                       : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
                   }`}
                 >
@@ -582,7 +579,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => setActiveTab('updates')}
                   className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center justify-between transition-all cursor-pointer ${
                     activeTab === 'updates'
-                      ? 'bg-theme-card text-theme-primary border border-theme shadow-sm'
+                      ? 'bg-white/[0.08] text-white'
                       : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
                   }`}
                 >
@@ -603,16 +600,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Sidebar Footer Info */}
-          <div className="px-3 pt-4 border-t border-theme flex flex-col gap-1">
+          <div className="px-3 pt-4 border-t border-white/[0.08] flex flex-col gap-1">
             <span className="text-[11px] font-medium text-theme-muted">Prism Soundboard</span>
             <span className="text-[10px] text-theme-muted/70">Production Release</span>
           </div>
         </aside>
 
         {/* Right Content Area */}
-        <main className="flex-1 flex flex-col bg-theme-surface overflow-hidden">
+        <main className="flex-1 flex flex-col bg-transparent overflow-hidden">
           {/* Main Top Header */}
-          <header className="h-16 px-8 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
+          <header className="h-16 px-8 border-b border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
             <div>
               <h3 className="text-[15px] font-bold text-theme-primary tracking-wide">
                 {activeTab === 'devices' && 'Audio Devices & Routing'}
@@ -635,7 +632,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-theme-secondary hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
               title="Close Settings (Esc)"
             >
               <X size={15} />
@@ -643,22 +640,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </header>
 
           {/* Scrollable Settings Panel */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-5 bg-theme-surface">
+          <div className="flex-1 overflow-y-auto p-8 space-y-5 bg-transparent">
             {/* TAB 1: AUDIO DEVICES */}
             {activeTab === 'devices' && (
-              <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
                 {/* Virtual Microphone Status Banner */}
                 {virtualOutput ? (
-                  <div className="p-4 rounded-2xl bg-theme-card border border-theme flex items-center justify-between shadow-sm">
+                  <div className="pb-5 flex items-center justify-between">
                     <div className="flex items-center gap-3.5">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
-                        <CheckCircle2 size={18} />
-                      </div>
+                      <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
                       <div>
                         <h4 className="text-[13px] font-bold text-theme-primary flex items-center gap-2">
                           <span>Virtual Microphone Ready</span>
-                          <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-bold uppercase tracking-wider">
-                            Connected
+                          <span className="text-[11px] text-emerald-400 font-medium">
+                            · Connected
                           </span>
                         </h4>
                         <p className="text-[11.5px] text-theme-muted mt-0.5">
@@ -670,13 +665,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="button"
                       onClick={refreshDevices}
                       title="Refresh audio devices"
-                      className="p-2 rounded-xl bg-theme-surface hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-theme-primary transition-colors cursor-pointer"
+                      className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-theme-secondary hover:text-theme-primary transition-colors cursor-pointer"
                     >
                       <RefreshCw size={14} />
                     </button>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-3 shadow-sm">
+                  <div className="pb-5 flex flex-col gap-3">
                     <div className="flex items-start gap-3.5">
                       <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500 flex-shrink-0 mt-0.5">
                         <AlertTriangle size={20} />
@@ -705,7 +700,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="button"
                         onClick={refreshDevices}
-                        className="px-3.5 py-2 rounded-xl text-[11.5px] font-semibold text-theme-secondary hover:text-theme-primary bg-theme-surface hover:bg-theme-card-hover border border-theme transition-colors cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl text-[11.5px] font-semibold text-theme-secondary hover:text-theme-primary bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] transition-colors cursor-pointer"
                       >
                         Refresh
                       </button>
@@ -714,14 +709,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
 
                 {/* 1. PHYSICAL MICROPHONE */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Mic size={17} style={{ color: accent }} />
                       <span className="text-[13.5px] font-bold">1. Physical Microphone (Voice Input)</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-[10.5px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/25">
+                      <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                         <ShieldCheck size={12} /> Anti-Loop Active
                       </span>
                       <div className="flex items-center gap-2 select-none">
@@ -748,7 +743,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onChange={(e) =>
                       setLocalSettings((prev) => ({ ...prev, inputDeviceId: e.target.value }))
                     }
-                    className="w-full p-3 bg-theme-surface border border-theme rounded-xl text-[12.5px] text-theme-primary focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
+                    className="w-full p-3 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12.5px] text-theme-primary focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
                   >
                     <option value="">Default Microphone (Windows System Default)</option>
                     {inputDevices.map((d) => (
@@ -760,7 +755,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* 2. HEADPHONES / MONITOR */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Headphones size={17} style={{ color: accent }} />
@@ -769,7 +764,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleTestAudio(localSettings.primaryDeviceId)}
-                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold bg-theme-surface hover:bg-theme-card-hover border border-theme text-theme-primary flex items-center gap-1.5 cursor-pointer transition-colors"
+                      className="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-theme-primary flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <Play size={11} className="fill-current" style={{ color: accent }} /> Test Audio
                     </button>
@@ -784,7 +779,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onChange={(e) =>
                       setLocalSettings((prev) => ({ ...prev, primaryDeviceId: e.target.value }))
                     }
-                    className="w-full p-3 bg-theme-surface border border-theme rounded-xl text-[12.5px] text-theme-primary focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
+                    className="w-full p-3 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12.5px] text-theme-primary focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
                   >
                     <option value="">Default Speakers (Windows System Default)</option>
                     {outputDevices.map((d) => (
@@ -796,7 +791,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* 3. VIRTUAL CABLE (MICROPHONE PROJECTION) */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Radio size={17} style={{ color: accent }} />
@@ -825,7 +820,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onChange={(e) =>
                       setLocalSettings((prev) => ({ ...prev, secondaryDeviceId: e.target.value }))
                     }
-                    className="w-full p-3 bg-theme-surface border border-theme rounded-xl text-[12.5px] text-theme-primary focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
+                    className="w-full p-3 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12.5px] text-theme-primary focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
                   >
                     <option value="">Select Virtual Output Cable...</option>
                     {outputDevices.map((d) => (
@@ -840,9 +835,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* TAB 2: VOICE & NOISE GATE */}
             {activeTab === 'voice' && (
-              <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
                 {/* Real-Time Microphone VU Meter Card */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary font-bold text-[13.5px]">
                       <Mic size={17} style={{ color: accent }} />
@@ -850,13 +845,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-                          isGateOpen
-                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                            : 'bg-amber-500/15 border-amber-500/40 text-amber-500'
+                        className={`text-[11px] font-mono font-semibold ${
+                          isGateOpen ? 'text-emerald-400' : 'text-amber-400'
                         }`}
                       >
-                        {isGateOpen ? 'GATE OPEN' : 'MUTED (GATE)'}
+                        {isGateOpen ? '● Gate open' : '● Gate muted'}
                       </span>
                       <span className="font-mono text-[11px] font-bold text-theme-secondary">
                         {rawDb > -99 ? `${Math.round(rawDb)} dB` : '-∞ dB'}
@@ -865,7 +858,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* VU Level Bar */}
-                  <div className="w-full h-3 bg-theme-app rounded-full overflow-hidden border border-theme relative p-0.5">
+                  <div className="w-full h-3 bg-black/35 rounded-full overflow-hidden border border-white/[0.08] relative p-0.5">
                     <div
                       className="h-full rounded-full transition-all duration-75"
                       style={{
@@ -880,15 +873,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Voice Volume Boost */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-theme-primary font-bold text-[13.5px]">
                       <Volume2 size={17} style={{ color: localSettings.micInputVolume > 100 ? '#f59e0b' : accent }} />
                       <span>Mic Gain & Projection</span>
                     </div>
                     <span
-                      className={`font-mono text-[11.5px] font-bold px-2 py-0.5 rounded-lg border ${
-                        localSettings.micInputVolume > 100 ? 'border-amber-500/40 text-amber-500 bg-amber-500/10' : 'border-accent/40 text-accent bg-accent-soft'
+                      className={`font-mono text-[12px] font-semibold tabular-nums ${
+                        localSettings.micInputVolume > 100 ? 'text-amber-400' : 'text-accent'
                       }`}
                     >
                       {localSettings.micInputVolume}%
@@ -912,7 +905,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Noise Gate */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-4">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-[13.5px] font-bold text-theme-primary">Microphone Noise Gate</h4>
@@ -955,9 +948,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* TAB 3: SHORTCUTS & HOTKEYS */}
             {activeTab === 'hotkeys' && (
-              <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
                 {/* Quick Instant Replay Audio Clip Recording */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Clapperboard size={17} style={{ color: accent }} />
@@ -984,7 +977,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
                         recordingRecordClip
                           ? 'animate-pulse font-extrabold shadow-md text-black'
-                          : 'bg-theme-surface text-theme-primary border-theme hover:border-accent/50'
+                          : 'bg-white/[0.04] text-theme-primary border-white/[0.1] hover:border-accent/50'
                       }`}
                     >
                       {recordingRecordClip ? 'Press any Key...' : localSettings.recordHotkey || 'F9'}
@@ -1007,7 +1000,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             recordDuration: parseInt(e.target.value) || 5,
                           }))
                         }
-                        className="w-full p-2.5 bg-theme-surface border border-theme rounded-xl text-[12px] text-theme-primary focus:outline-none focus:border-accent/50 cursor-pointer transition-colors"
+                        className="w-full p-2.5 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12px] text-theme-primary focus:outline-none focus:border-accent/50 cursor-pointer transition-colors"
                       >
                         <option value={3}>Last 3 Seconds</option>
                         <option value={5}>Last 5 Seconds</option>
@@ -1021,16 +1014,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-theme-muted mb-1.5">
                         Recording Source
                       </label>
-                      <div className="w-full p-2.5 bg-theme-surface border border-theme rounded-xl text-[12px] text-theme-primary flex items-center justify-between">
+                      <div className="w-full p-2.5 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12px] text-theme-primary flex items-center justify-between">
                         <span className="font-semibold text-theme-primary">Screen + Mic Combined</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-accent-soft text-accent font-medium border border-accent/30">Active</span>
+                        <span className="text-[11px] text-accent font-medium">Active</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Screen Video Clipping Shortcut */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Video size={17} style={{ color: accent }} />
@@ -1057,7 +1050,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
                         recordingVideoClip
                           ? 'animate-pulse font-extrabold shadow-md text-black'
-                          : 'bg-theme-surface text-theme-primary border-theme hover:border-accent/50'
+                          : 'bg-white/[0.04] text-theme-primary border-white/[0.1] hover:border-accent/50'
                       }`}
                     >
                       {recordingVideoClip ? 'Press any Key...' : localSettings.videoClipHotkey || 'F10'}
@@ -1081,7 +1074,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }));
                         videoClipper.setDuration(val);
                       }}
-                      className="w-full p-2.5 bg-theme-surface border border-theme rounded-xl text-[12px] text-theme-primary focus:outline-none focus:border-accent/50 cursor-pointer transition-colors"
+                      className="w-full p-2.5 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12px] text-theme-primary focus:outline-none focus:border-accent/50 cursor-pointer transition-colors"
                     >
                       <option value={15}>Last 15 Seconds</option>
                       <option value={30}>Last 30 Seconds</option>
@@ -1092,7 +1085,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Stop All Panic Hotkey */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Sliders size={17} style={{ color: accent }} />
@@ -1119,7 +1112,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
                         recordingPanic
                           ? 'animate-pulse font-extrabold shadow-md text-black'
-                          : 'bg-theme-surface text-theme-primary border-theme hover:border-accent/50'
+                          : 'bg-white/[0.04] text-theme-primary border-white/[0.1] hover:border-accent/50'
                       }`}
                     >
                       {recordingPanic ? 'Press any Key...' : localSettings.panicHotkey || 'Esc'}
@@ -1131,7 +1124,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Repeat Last Sound Hotkey */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <RotateCcw size={17} style={{ color: accent }} />
@@ -1158,7 +1151,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
                         recordingRepeatLast
                           ? 'animate-pulse font-extrabold shadow-md text-black'
-                          : 'bg-theme-surface text-theme-primary border-theme hover:border-accent/50'
+                          : 'bg-white/[0.04] text-theme-primary border-white/[0.1] hover:border-accent/50'
                       }`}
                     >
                       {recordingRepeatLast ? 'Press any Key...' : localSettings.repeatLastHotkey || 'F7'}
@@ -1170,7 +1163,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* In-Game Overlay HUD Hotkey */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Sliders size={17} style={{ color: accent }} />
@@ -1197,7 +1190,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`px-3.5 py-1.5 rounded-xl text-[12px] font-mono border transition-all cursor-pointer ${
                         recordingOverlay
                           ? 'animate-pulse font-extrabold shadow-md text-black'
-                          : 'bg-theme-surface text-theme-primary border-theme hover:border-accent/50'
+                          : 'bg-white/[0.04] text-theme-primary border-white/[0.1] hover:border-accent/50'
                       }`}
                     >
                       {recordingOverlay ? 'Press any Key...' : localSettings.overlayHotkey || 'F8'}
@@ -1209,7 +1202,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Startup & System Tray Behavior */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-4">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-4">
                   <div className="flex items-center gap-2.5 text-theme-primary">
                     <Power size={17} style={{ color: accent }} />
                     <span className="text-[13.5px] font-bold">Startup & Background Behavior</span>
@@ -1271,19 +1264,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* TAB: THEMES & COLOR PALETTES */}
             {activeTab === 'theme' && (
-              <div className="space-y-6 animate-in fade-in duration-100">
+              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
                 {/* Themes Grid */}
-                <div className="space-y-3">
+                <div className="pb-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h5 className="text-[12px] font-bold uppercase tracking-wider text-theme-muted">
-                      Available Palettes ({THEMES.length})
-                    </h5>
+                    <h4 className="text-[13.5px] font-bold text-theme-primary">
+                      Active Theme
+                    </h4>
                     <span className="text-[11px] text-theme-muted">
-                      Click any theme to preview live
+                      Slate Dark studio palette
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  <div className="space-y-2">
                     {THEMES.map((t) => {
                       const isSelected = (localSettings.theme || 'dark') === t.id;
                       return (
@@ -1302,66 +1295,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               window.soundboardAPI.sendIpcCommand('sync-settings-changed', updated);
                             }
                           }}
-                          className={`relative p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 select-none ${
-                            isSelected
-                              ? 'bg-theme-card-selected border-accent shadow-md ring-1 ring-accent/30'
-                              : 'bg-theme-sidebar border-theme hover:border-theme-hover hover:bg-theme-card'
-                          }`}
+                          className="py-2.5 px-3 -mx-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer flex items-center justify-between gap-4 select-none"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[13px] font-bold text-theme-primary">
-                                  {t.name}
-                                </span>
-                                {t.badge && (
-                                  <span className="text-[9.5px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-white/10 text-theme-secondary">
-                                    {t.badge}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-theme-muted mt-1 leading-relaxed">
-                                {t.description}
-                              </p>
+                          <div className="min-w-0">
+                            <span className="text-[13px] font-semibold text-theme-primary">
+                              {t.name}
+                            </span>
+                            <p className="text-[11.5px] text-theme-muted mt-0.5">
+                              {t.description}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="w-4 h-4 rounded border border-white/15"
+                                style={{ backgroundColor: t.bgApp }}
+                                title="Background"
+                              />
+                              <span
+                                className="w-4 h-4 rounded border border-white/15"
+                                style={{ backgroundColor: t.bgSurface }}
+                                title="Surface"
+                              />
+                              <span
+                                className="w-4 h-4 rounded border border-white/15"
+                                style={{ backgroundColor: t.bgCard }}
+                                title="Cards"
+                              />
                             </div>
 
                             <div
                               className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                                 isSelected
                                   ? 'border-accent bg-accent text-black'
-                                  : 'border-theme hover:border-white/40'
+                                  : 'border-white/20 hover:border-white/40'
                               }`}
                             >
                               {isSelected && <Check size={12} strokeWidth={3} />}
-                            </div>
-                          </div>
-
-                          {/* Palette Swatches Row */}
-                          <div className="flex items-center justify-between pt-2 border-t border-theme/60">
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className="w-5 h-5 rounded-md border border-white/10 shadow-sm"
-                                style={{ backgroundColor: t.bgApp }}
-                                title="Background"
-                              />
-                              <span
-                                className="w-5 h-5 rounded-md border border-white/10 shadow-sm"
-                                style={{ backgroundColor: t.bgSurface }}
-                                title="Surface"
-                              />
-                              <span
-                                className="w-5 h-5 rounded-md border border-white/10 shadow-sm"
-                                style={{ backgroundColor: t.bgCard }}
-                                title="Cards"
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10.5px] font-mono text-theme-muted">Accent</span>
-                              <span
-                                className="w-4 h-4 rounded-full border border-white/20 shadow-sm"
-                                style={{ backgroundColor: t.accent }}
-                              />
                             </div>
                           </div>
                         </div>
@@ -1371,7 +1342,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Accent Color Customization Card */}
-                <div className="p-5 bg-theme-sidebar rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-[13.5px] font-bold text-theme-primary">
@@ -1398,7 +1369,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           window.soundboardAPI.sendIpcCommand('sync-settings-changed', updated);
                         }
                       }}
-                      className="text-[11px] font-semibold text-theme-secondary hover:text-theme-primary px-2.5 py-1 rounded-lg border border-theme bg-theme-card hover:bg-theme-card-hover transition-colors cursor-pointer"
+                      className="text-[11px] font-semibold text-theme-secondary hover:text-theme-primary px-2.5 py-1 rounded-lg border border-theme bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer"
                     >
                       Reset Default Accent
                     </button>
@@ -1453,7 +1424,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Custom HTML Color Picker */}
                     <label
                       title="Choose Custom Color"
-                      className="h-9 px-3 rounded-xl border border-theme bg-theme-card hover:bg-theme-card-hover flex items-center gap-2 cursor-pointer transition-all text-[11.5px] font-medium text-theme-secondary hover:text-theme-primary"
+                      className="h-9 px-3 rounded-xl border border-theme bg-white/[0.04] hover:bg-white/[0.08] flex items-center gap-2 cursor-pointer transition-all text-[11.5px] font-medium text-theme-secondary hover:text-theme-primary"
                     >
                       <input
                         type="color"
@@ -1477,14 +1448,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </label>
                   </div>
                 </div>
+
+                {/* Frosted Glass Acrylic Toggle */}
+                <div className="py-5 first:pt-0 last:pb-0 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} style={{ color: accent }} />
+                      <span className="text-[13.5px] font-bold text-theme-primary">Frosted Glass Effects</span>
+                    </div>
+                    <p className="text-[11.5px] text-theme-muted">
+                      Enable translucent frosted glass and Windows 11 acrylic backdrop blur
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={localSettings.enableFrostedGlass !== false}
+                    onChange={(checked) => {
+                      const updated = { ...localSettings, enableFrostedGlass: checked };
+                      setLocalSettings(updated);
+                      document.documentElement.classList.toggle('no-frosted-glass', !checked);
+                      if (document.body) {
+                        document.body.style.backgroundColor = checked ? 'transparent' : '#090b10';
+                      }
+                      onSaveSettings(updated, true);
+                      if (window.soundboardAPI?.sendIpcCommand) {
+                        window.soundboardAPI.sendIpcCommand('sync-settings-changed', updated);
+                        window.soundboardAPI.sendIpcCommand('set-frosted-glass-enabled', checked);
+                      }
+                    }}
+                    accent={accent}
+                  />
+                </div>
               </div>
             )}
 
             {/* TAB 4: BACKUP & STORAGE */}
             {activeTab === 'backup' && (
-              <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
                 {/* Unified Media Storage Location */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <FolderOpen size={17} style={{ color: accent }} />
@@ -1505,7 +1506,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </p>
 
                   {storagePaths && (
-                    <div className="p-3 bg-theme-surface rounded-xl border border-theme space-y-1 font-mono text-[11.5px]">
+                    <div className="p-3 bg-white/[0.04] rounded-xl border border-white/[0.08] space-y-1 font-mono text-[11.5px]">
                       <div className="text-theme-primary truncate">
                         <span className="text-theme-muted">Root: </span>{storagePaths.root}
                       </div>
@@ -1530,7 +1531,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Soundboard Backup */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center gap-2.5 text-theme-primary">
                     <DownloadCloud size={17} style={{ color: accent }} />
                     <span className="text-[13.5px] font-bold">Soundboard Full Library Backup (.prism)</span>
@@ -1555,7 +1556,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="button"
                       onClick={handleBackupExport}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-theme-surface hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-theme-primary text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] hover:border-accent/40 text-theme-primary text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
                     >
                       <DownloadCloud size={15} style={{ color: accent }} />
                       <span>Export Backup Archive</span>
@@ -1564,7 +1565,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="button"
                       onClick={handleBackupImport}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-theme-surface hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-theme-primary text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] hover:border-accent/40 text-theme-primary text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
                     >
                       <UploadCloud size={15} style={{ color: accent }} />
                       <span>Import Backup Archive</span>
@@ -1573,7 +1574,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Deleted Sounds Archive */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center gap-2.5 text-theme-primary">
                     <FolderOpen size={17} style={{ color: accent }} />
                     <span className="text-[13.5px] font-bold">Recycle Bin & Archive Folder</span>
@@ -1590,7 +1591,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           window.soundboardAPI.openSoundsDirectory();
                         }
                       }}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-theme-surface hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-theme-primary text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] hover:border-accent/40 text-theme-primary text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
                     >
                       <FolderOpen size={14} style={{ color: accent }} />
                       <span>Open Sounds Folder in Explorer</span>
@@ -1612,15 +1613,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Library Clear */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3.5">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 text-theme-primary">
                       <Trash2 size={17} className="text-red-400" />
                       <span className="text-[13.5px] font-bold">Sound Library Management</span>
                     </div>
                     {sounds && sounds.length > 0 && (
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-theme-surface border border-theme text-theme-secondary">
-                        {sounds.length} {sounds.length === 1 ? 'sound' : 'sounds'} loaded
+                      <span className="text-[11.5px] font-mono text-slate-400 tabular-nums">
+                        {sounds.length} {sounds.length === 1 ? 'sound' : 'sounds'}
                       </span>
                     )}
                   </div>
@@ -1647,7 +1648,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* Danger Zone: Factory Reset */}
-                <div className="p-5 bg-red-500/5 rounded-2xl border border-red-500/20 space-y-3.5">
+                <div className="py-5 last:pb-0 space-y-3.5">
                   <div className="flex items-center gap-2.5 text-red-400">
                     <AlertTriangle size={17} />
                     <span className="text-[13.5px] font-bold">Danger Zone: Full Factory Reset</span>
@@ -1674,7 +1675,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="button"
                           onClick={() => setShowResetConfirm(false)}
                           disabled={isResettingApp}
-                          className="px-3.5 py-2 rounded-xl bg-theme-surface hover:bg-theme-card-hover border border-theme text-theme-primary text-[12px] font-medium transition-all cursor-pointer"
+                          className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-theme-primary text-[12px] font-medium transition-all cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -1696,18 +1697,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* TAB 5: UPDATES */}
             {activeTab === 'updates' && (
-              <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
                 {/* App Version & Checker Card */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-4">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-theme-surface border border-theme flex items-center justify-center shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.1] flex items-center justify-center shadow-sm">
                         <img src={prismLogo} alt="Prism" className="w-6 h-6 object-contain drop-shadow" />
                       </div>
                       <div>
                         <h4 className="text-[14px] font-bold text-theme-primary flex items-center gap-2">
                           <span>Prism Soundboard</span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-theme-surface border border-theme text-accent font-mono font-bold">v1.5.5</span>
+                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.6</span>
                         </h4>
                         <p className="text-[11.5px] text-theme-muted">
                           Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -1826,7 +1827,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 bg-theme-surface rounded-2xl border border-theme flex items-center justify-between">
+                        <div className="p-4 bg-white/[0.04] rounded-2xl border border-white/[0.08] flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <CheckCircle2 size={18} className="text-emerald-400" />
                             <div>
@@ -1864,7 +1865,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* GitHub Repository Settings Card */}
-                <div className="p-5 bg-theme-card rounded-2xl border border-theme space-y-3">
+                <div className="py-5 first:pt-0 last:pb-0 space-y-3">
                   <h4 className="text-[13px] font-bold text-theme-primary">GitHub Repository Source</h4>
                   <p className="text-[11.5px] text-theme-muted">
                     Target repository used to query GitHub Releases for new updates
@@ -1875,7 +1876,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="text"
                       disabled
                       value="fafaidot/Prism-Soundboard"
-                      className="w-full max-w-md px-3.5 py-2.5 bg-theme-surface border border-theme rounded-xl text-[12.5px] text-accent font-mono focus:outline-none cursor-default"
+                      className="w-full max-w-md px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.1] rounded-xl text-[12.5px] text-accent font-mono focus:outline-none cursor-default"
                     />
                     <p className="text-[10.5px] text-theme-muted mt-1.5">
                       Target repository: <code className="text-theme-primary/80">fafaidot/Prism-Soundboard</code>.
@@ -1887,9 +1888,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Clean Footer Bar */}
-          <footer className="h-16 px-8 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
+          <footer className="h-16 px-8 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
             <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
-              <span>Prism Soundboard v1.5.5</span>
+              <span>Prism Soundboard v1.5.6</span>
               <span>•</span>
               <button
                 type="button"
@@ -1908,7 +1909,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 rounded-xl text-[12px] font-semibold text-theme-secondary hover:text-theme-primary bg-theme-card hover:bg-theme-card-hover border border-theme transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-[12px] font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors cursor-pointer"
               >
                 Cancel
               </button>

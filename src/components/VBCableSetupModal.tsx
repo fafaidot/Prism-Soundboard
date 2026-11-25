@@ -11,16 +11,12 @@ interface VBCableSetupModalProps {
 export const VBCableSetupModal: React.FC<VBCableSetupModalProps> = ({
   isOpen,
   onComplete,
-  accentColor = 'var(--accent-color)',
 }) => {
   const [isInstalling, setIsInstalling] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isDetected, setIsDetected] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const accent = accentColor || 'var(--accent-color)';
-
-  // Check driver status
   const checkStatus = async () => {
     setIsVerifying(true);
     setErrorMessage('');
@@ -30,7 +26,6 @@ export const VBCableSetupModal: React.FC<VBCableSetupModalProps> = ({
         installed = await window.soundboardAPI.checkVirtualDriverInstalled();
       }
 
-      // Also cross check if audio output "cable input" exists in browser media devices
       const cableId = await audioEngine.findCableInputDeviceId();
       if (installed || !!cableId) {
         setIsDetected(true);
@@ -50,7 +45,6 @@ export const VBCableSetupModal: React.FC<VBCableSetupModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       checkStatus();
-      // Periodically poll every 3s in case user finished the installer in the background
       const interval = setInterval(() => {
         checkStatus();
       }, 3000);
@@ -78,35 +72,23 @@ export const VBCableSetupModal: React.FC<VBCableSetupModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
-      <div className="w-full max-w-xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden transition-all duration-150">
+    <div className="fixed inset-0 z-[99999] frosted-backdrop bg-black/35 flex items-center justify-center p-4 select-none animate-in fade-in duration-150">
+      <div className="w-full max-w-lg frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center border shadow-sm"
-              style={{
-                backgroundColor: `${accent}15`,
-                borderColor: `${accent}35`,
-                color: accent,
-              }}
-            >
-              <Volume2 size={16} />
-            </div>
-            <div>
-              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide">
-                Virtual Audio Cable Setup
-              </h3>
-              <p className="text-[11px] text-theme-muted">
-                Enables in-game and Discord voice chat projection
-              </p>
-            </div>
+        <header className="h-16 px-6 border-b border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
+          <div>
+            <h3 className="text-[15px] font-bold text-white tracking-tight">
+              Virtual audio cable setup
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Enables in-game and Discord voice chat projection
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onComplete}
-            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-muted hover:text-theme-primary flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Dismiss"
           >
             <X size={15} />
@@ -114,35 +96,27 @@ export const VBCableSetupModal: React.FC<VBCableSetupModalProps> = ({
         </header>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4 bg-theme-surface">
-          {/* Status Indicator Card */}
-          <div
-            className={`p-4 rounded-2xl border flex items-center justify-between transition-colors ${
-              isDetected
-                ? 'bg-emerald-500/10 border-emerald-500/30'
-                : 'bg-theme-card border-theme'
-            }`}
-          >
+        <div className="p-6 space-y-4 bg-transparent">
+          {/* Status Indicator */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {isVerifying ? (
-                <RefreshCw size={18} className="animate-spin" style={{ color: accent }} />
-              ) : isDetected ? (
-                <CheckCircle2 size={18} className="text-emerald-400" />
+              {isDetected ? (
+                <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+              ) : isVerifying ? (
+                <RefreshCw size={18} className="text-accent animate-spin shrink-0" />
               ) : (
-                <AlertTriangle size={18} className="text-amber-400" />
+                <AlertTriangle size={18} className="text-amber-400 shrink-0" />
               )}
               <div>
-                <h4 className="text-[13px] font-bold text-theme-primary">
-                  {isVerifying
-                    ? 'Verifying Audio Drivers...'
-                    : isDetected
-                    ? 'VB-CABLE Driver Detected & Active!'
-                    : 'Driver Not Detected Yet'}
-                </h4>
-                <p className="text-[11px] text-theme-muted">
+                <span className="text-[13px] font-medium text-white">
                   {isDetected
-                    ? 'Prism audio projection pipeline is fully operational'
-                    : 'Install the virtual audio pipe to bridge soundboard to games & Discord'}
+                    ? 'Virtual audio cable active'
+                    : 'Driver not detected'}
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  {isDetected
+                    ? 'Ready for Discord, TeamSpeak, and in-game voice chat'
+                    : 'Run the setup installer to install the virtual driver'}
                 </p>
               </div>
             </div>
@@ -151,102 +125,43 @@ export const VBCableSetupModal: React.FC<VBCableSetupModalProps> = ({
               type="button"
               onClick={checkStatus}
               disabled={isVerifying}
-              className="px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-muted hover:text-theme-primary text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Re-check driver status"
             >
-              <RefreshCw size={12} className={isVerifying ? 'animate-spin' : ''} />
-              <span>Refresh</span>
+              <RefreshCw size={13} className={isVerifying ? 'animate-spin' : ''} />
             </button>
           </div>
 
-          {/* Steps Card */}
-          <div className="p-5 bg-theme-card border border-theme rounded-2xl space-y-3.5 text-[12px] leading-relaxed">
-            <div className="flex items-start gap-3 text-theme-secondary">
-              <span
-                className="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[11px] flex-shrink-0 mt-0.5 border"
-                style={{
-                  backgroundColor: `${accent}15`,
-                  borderColor: `${accent}35`,
-                  color: accent,
-                }}
-              >
-                1
-              </span>
-              <span>
-                Click <strong className="text-theme-primary">"Install VB-CABLE Driver"</strong> below to run the bundled installer with Administrator rights.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-3 text-theme-secondary">
-              <span
-                className="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[11px] flex-shrink-0 mt-0.5 border"
-                style={{
-                  backgroundColor: `${accent}15`,
-                  borderColor: `${accent}35`,
-                  color: accent,
-                }}
-              >
-                2
-              </span>
-              <span>
-                In the driver setup window, click <strong className="text-theme-primary">"Install Driver"</strong> and approve the Windows prompt.
-              </span>
-            </div>
-
-            <div className="flex items-start gap-3 text-theme-secondary">
-              <span
-                className="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[11px] flex-shrink-0 mt-0.5 border"
-                style={{
-                  backgroundColor: `${accent}15`,
-                  borderColor: `${accent}35`,
-                  color: accent,
-                }}
-              >
-                3
-              </span>
-              <span>
-                Once installed, in Discord or your games, choose <strong className="text-theme-primary">CABLE Output</strong> as your microphone!
-              </span>
-            </div>
-          </div>
+          {/* Explanation */}
+          <p className="pt-3.5 border-t border-white/[0.07] text-[11.5px] text-slate-300 leading-relaxed">
+            Windows needs a virtual audio pipe to pass soundboard audio directly into Discord, Steam, and game microphones without loop feedback.
+          </p>
 
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[11.5px]">
+            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[11px]">
               {errorMessage}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
-          <span className="text-[11px] text-theme-muted">
-            Driver is digitally signed and 100% safe
-          </span>
-
-          <div className="flex items-center gap-2.5">
-            {isDetected ? (
-              <button
-                type="button"
-                onClick={onComplete}
-                className="px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[12px] flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
-              >
-                <span>Continue</span>
-                <ArrowRight size={14} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleRunInstaller}
-                disabled={isInstalling}
-                style={{
-                  backgroundColor: accent,
-                }}
-                className="px-6 py-2 rounded-xl text-[12px] font-bold text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md flex items-center gap-2 disabled:opacity-50"
-              >
-                <Download size={14} />
-                <span>{isInstalling ? 'Launching Installer...' : 'Install VB-CABLE Driver'}</span>
-              </button>
-            )}
-          </div>
+        <footer className="h-16 px-6 border-t border-white/[0.08] flex items-center justify-end gap-3 frosted-modal-chrome shrink-0">
+          <button
+            type="button"
+            onClick={onComplete}
+            className="px-4 py-2 rounded-xl text-[12px] font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors cursor-pointer"
+          >
+            Skip for now
+          </button>
+          <button
+            type="button"
+            onClick={handleRunInstaller}
+            disabled={isInstalling || isDetected}
+            className="px-5 py-2 rounded-xl text-[12px] font-bold text-slate-950 bg-accent hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Download size={13} />
+            <span>{isInstalling ? 'Launching setup...' : isDetected ? 'Installed' : 'Install driver'}</span>
+          </button>
         </footer>
       </div>
     </div>

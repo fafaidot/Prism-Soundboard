@@ -34,48 +34,49 @@ export const TitleBar: React.FC<TitleBarProps> = () => {
   };
 
   return (
-    <header className="h-[44px] w-full bg-theme-header text-theme-secondary flex items-center justify-between border-b border-theme select-none drag-region z-50 px-3.5 transition-colors duration-150">
-      {/* Left: App Icon + Title */}
-      <div className="flex items-center gap-3 no-drag-region">
-        <div className="flex items-center gap-2.5">
-          <img
-            src={prismLogo}
-            alt="Prism"
-            className="w-6 h-6 object-contain pointer-events-none"
-          />
-          <div className="flex items-baseline gap-2">
-            <span className="text-[14px] font-black tracking-wider text-theme-primary">
-              PRISM
-            </span>
-            <span className="text-[11px] font-bold text-theme-muted uppercase tracking-widest">
-              SOUNDBOARD
-            </span>
-          </div>
+    <header className="h-[38px] w-full bg-[#090b10]/45 backdrop-blur-xl text-slate-400 flex items-center justify-between border-b border-white/[0.08] select-none drag-region z-50 px-3 transition-colors duration-150">
+      {/* Left: App Logo + Title */}
+      <div className="flex items-center gap-2.5 no-drag-region">
+        <img
+          src={prismLogo}
+          alt="Prism"
+          className="w-4.5 h-4.5 object-contain pointer-events-none"
+        />
+        <div className="flex items-center gap-1.5">
+          <span className="text-[12.5px] font-semibold text-slate-200 tracking-tight">
+            Prism Soundboard
+          </span>
+          <span className="text-[10px] font-mono text-slate-500 font-medium">
+            v1.5.5
+          </span>
         </div>
       </div>
 
       {/* Right: Window Controls */}
-      <div className="flex items-center h-full no-drag-region pl-2">
+      <div className="flex items-center h-full no-drag-region">
         <button
+          type="button"
           onClick={handleMinimize}
           title="Minimize"
-          className="h-full w-[42px] flex items-center justify-center text-theme-secondary hover:text-theme-primary hover:bg-white/10 transition-colors cursor-pointer"
+          className="h-full w-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
         >
-          <Minus size={14} />
+          <Minus size={13} />
         </button>
         <button
+          type="button"
           onClick={handleMaximize}
           title={isMaximized ? 'Restore' : 'Maximize'}
-          className="h-full w-[42px] flex items-center justify-center text-theme-secondary hover:text-theme-primary hover:bg-white/10 transition-colors cursor-pointer"
+          className="h-full w-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
         >
-          <Square size={12} />
+          <Square size={11} />
         </button>
         <button
+          type="button"
           onClick={handleClose}
           title="Close"
-          className="h-full w-[42px] flex items-center justify-center text-theme-secondary hover:text-white hover:bg-red-600 transition-colors cursor-pointer"
+          className="h-full w-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-600 transition-colors cursor-pointer"
         >
-          <X size={14} />
+          <X size={13} />
         </button>
       </div>
     </header>

@@ -43,7 +43,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [showControls, setShowControls] = useState(true);
   const hideTimerRef = useRef<any>(null);
 
-  // Trimming Mode
   const [isTrimming, setIsTrimming] = useState(false);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(clip.duration || 15);
@@ -51,7 +50,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   const accent = accentColor || 'var(--accent-color)';
 
-  // Format mm:ss
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
@@ -119,7 +117,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const cur = videoRef.current.currentTime;
     setCurrentTime(cur);
 
-    // If trimming, loop inside the trim boundaries
     if (isTrimming && cur >= trimEnd) {
       videoRef.current.currentTime = trimStart;
       videoRef.current.play().catch(() => {});
@@ -161,8 +158,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   return (
     <div
       onMouseMove={handlePointerActivity}
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/95 select-none ${
-        isFullscreen ? 'p-0' : 'p-6 backdrop-blur-xl animate-in fade-in duration-150'
+      className={`fixed inset-0 z-[100] flex items-center justify-center select-none ${
+        isFullscreen ? 'p-0 bg-black' : 'p-6 frosted-backdrop bg-black/40 animate-in fade-in duration-150'
       }`}
     >
       <div
@@ -171,46 +168,49 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         className={`relative w-full flex flex-col shadow-2xl transition-all duration-150 ${
           isFullscreen
             ? 'w-screen h-screen max-w-none max-h-none rounded-none border-none p-0 m-0 bg-black'
-            : 'max-w-5xl bg-theme-surface border border-theme rounded-2xl overflow-hidden max-h-[92vh]'
+            : 'max-w-5xl frosted-modal bg-[#0e1219]/45 backdrop-blur-2xl border border-white/[0.14] rounded-3xl overflow-hidden max-h-[92vh] shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)]'
         }`}
       >
         {/* Top Header Bar */}
         <div
           className={`transition-opacity duration-200 z-30 flex items-center justify-between text-white ${
             isFullscreen
-              ? `absolute top-0 left-0 right-0 h-16 px-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent ${
+              ? `absolute top-0 left-0 right-0 h-14 px-6 bg-gradient-to-b from-black/90 to-transparent ${
                   showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                 }`
-              : 'h-14 px-6 bg-theme-header border-b border-theme relative z-20'
+              : 'h-16 px-6 frosted-modal-chrome border-b border-white/[0.08] relative z-20'
           }`}
         >
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-[14px] text-theme-primary truncate max-w-md tracking-wide">
+          <div className="flex items-center gap-2.5">
+            <span className="font-semibold text-[13.5px] text-white truncate max-w-md tracking-tight">
               {clip.title}
             </span>
-            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-accent-soft border border-accent/30 font-mono font-bold text-accent">
+            <span className="text-[11.5px] font-mono text-slate-400 tabular-nums">
               {formatTime(duration)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
+              type="button"
               onClick={onExtractToSoundboard}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover text-theme-primary text-[12px] font-bold border border-theme hover:border-accent/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 hover:text-white text-[11px] font-medium border border-white/[0.08] transition-colors cursor-pointer"
             >
-              <Music size={13} style={{ color: accent }} />
-              <span>Extract to Soundboard</span>
+              <Music size={12} className="text-accent" />
+              <span>Extract audio</span>
             </button>
 
             <button
+              type="button"
               onClick={onOpenFolder}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover text-theme-primary text-[12px] font-bold border border-theme hover:border-accent/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 hover:text-white text-[11px] font-medium border border-white/[0.08] transition-colors cursor-pointer"
             >
-              <FolderOpen size={13} style={{ color: accent }} />
-              <span>Open in Folder</span>
+              <FolderOpen size={12} className="text-accent" />
+              <span>Open folder</span>
             </button>
 
             <button
+              type="button"
               onClick={() => {
                 setIsTrimming(!isTrimming);
                 if (!isTrimming) {
@@ -218,18 +218,22 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                   setTrimEnd(duration);
                 }
               }}
-              style={isTrimming ? { backgroundColor: `${accent}25`, borderColor: accent, color: accent } : undefined}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-theme-card hover:bg-theme-card-hover text-theme-primary text-[12px] font-bold border border-theme hover:border-accent/40 transition-all cursor-pointer shadow-sm active:scale-95"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                isTrimming
+                  ? 'bg-accent/20 border-accent/60 text-accent'
+                  : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 hover:text-white border-white/[0.08]'
+              }`}
             >
-              <Scissors size={13} />
+              <Scissors size={12} />
               <span>Trim</span>
             </button>
 
             <button
+              type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-theme-muted hover:text-theme-primary hover:bg-white/5 transition-colors cursor-pointer ml-1"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer ml-1"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
         </div>
@@ -263,36 +267,31 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             }`}
           />
 
-          {/* Central Play/Pause Flash Overlay */}
           {!isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
-              <div className="w-16 h-16 rounded-full bg-black/70 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl">
-                <Play size={26} className="ml-1 fill-white" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none">
+              <div className="w-14 h-14 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-white shadow-2xl">
+                <Play size={22} className="ml-1 fill-white" />
               </div>
             </div>
           )}
         </div>
 
-        {/* Trimming Controls Pod (When Active) */}
+        {/* Trimming Bar */}
         {isTrimming && (
-          <div className="p-4 bg-theme-surface border-t border-theme space-y-3 animate-in fade-in duration-100 z-30">
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-theme-primary font-bold flex items-center gap-1.5">
-                <Scissors size={14} style={{ color: accent }} />
-                <span>Video Trimming Range</span>
+          <div className="p-3.5 frosted-modal-chrome bg-white/[0.03] border-t border-white/[0.08] space-y-2 z-30">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-white font-medium flex items-center gap-1.5">
+                <Scissors size={13} className="text-accent" />
+                <span>Video trimming range</span>
               </span>
-              <span className="text-accent font-mono font-bold">
-                {formatTime(trimStart)} - {formatTime(trimEnd)} (Length: {(trimEnd - trimStart).toFixed(1)}s)
+              <span className="text-accent font-mono font-medium tabular-nums">
+                {formatTime(trimStart)} – {formatTime(trimEnd)} ({(trimEnd - trimStart).toFixed(1)}s)
               </span>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className="flex-1 space-y-1">
-                <div className="flex justify-between text-[11px] text-theme-muted">
-                  <span>Start: {formatTime(trimStart)}</span>
-                  <span>End: {formatTime(trimEnd)}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <input
                     type="range"
                     min="0"
@@ -324,21 +323,22 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   disabled={isSavingTrim}
                   onClick={() => handleSaveTrim(false)}
-                  className="px-3.5 py-2 rounded-xl bg-theme-card hover:bg-theme-card-hover text-theme-primary font-bold text-[11.5px] border border-theme transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white font-medium text-[11px] border border-white/[0.08] transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  Save (Overwrite)
+                  Overwrite
                 </button>
                 <button
+                  type="button"
                   disabled={isSavingTrim}
                   onClick={() => handleSaveTrim(true)}
-                  style={{ backgroundColor: accent }}
-                  className="px-4 py-2 rounded-xl font-bold text-[11.5px] text-black hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg font-medium text-[11px] text-slate-950 bg-accent hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-xs disabled:opacity-50"
                 >
-                  Save as New Clip
+                  Save as new
                 </button>
               </div>
             </div>
@@ -347,16 +347,16 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
         {/* Video Scrubber & Playback Controls Bar */}
         <div
-          className={`transition-opacity duration-200 z-30 flex flex-col gap-2.5 ${
+          className={`transition-opacity duration-200 z-30 flex flex-col gap-2 ${
             isFullscreen
-              ? `absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent ${
+              ? `absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/95 to-transparent ${
                   showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                 }`
-              : 'p-4 bg-theme-header border-t border-theme'
+              : 'p-3.5 frosted-modal-chrome bg-white/[0.025] border-t border-white/[0.08]'
           }`}
         >
           {/* Progress Slider */}
-          <div className="relative flex items-center group">
+          <div className="relative flex items-center">
             <input
               type="range"
               min="0"
@@ -365,7 +365,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               value={currentTime}
               onChange={handleSeek}
               style={{ accentColor: accent }}
-              className="w-full h-1.5 bg-theme-card rounded-full appearance-none cursor-pointer focus:outline-none"
+              className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer focus:outline-none"
             />
           </div>
 
@@ -373,29 +373,31 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             {/* Left Controls: Play, Time, Volume */}
             <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={togglePlayPause}
-                className="w-9 h-9 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme flex items-center justify-center text-theme-primary transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-white transition-colors cursor-pointer"
               >
-                {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5 fill-current" />}
+                {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5 fill-current" />}
               </button>
 
-              <div className="flex items-center gap-1.5 font-mono text-[12px] font-bold text-theme-primary">
+              <div className="flex items-center gap-1 font-mono text-[11px] font-medium text-white tabular-nums">
                 <span>{formatTime(currentTime)}</span>
-                <span className="text-theme-muted">/</span>
-                <span className="text-theme-muted">{formatTime(duration)}</span>
+                <span className="text-slate-500">/</span>
+                <span className="text-slate-400">{formatTime(duration)}</span>
               </div>
 
               {/* Volume Slider */}
-              <div className="flex items-center gap-2 pl-3 border-l border-theme">
+              <div className="flex items-center gap-2 pl-3 border-l border-white/[0.08]">
                 <button
+                  type="button"
                   onClick={() => {
                     const newMuted = !isMuted;
                     setIsMuted(newMuted);
                     if (videoRef.current) videoRef.current.muted = newMuted;
                   }}
-                  className="text-theme-muted hover:text-theme-primary transition-colors cursor-pointer"
+                  className="text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  {isMuted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                  {isMuted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
                 </button>
                 <input
                   type="range"
@@ -413,31 +415,33 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     }
                   }}
                   style={{ accentColor: accent }}
-                  className="w-20 h-1 bg-theme-card rounded-full appearance-none cursor-pointer"
+                  className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer"
                 />
               </div>
             </div>
 
             {/* Right Controls: Fit/Fill Toggle & Fullscreen */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 onClick={() => setIsFillMode(!isFillMode)}
-                title={isFillMode ? 'Switch to Fit (Letterbox to keep aspect ratio)' : 'Switch to Fill (Edge-to-edge fill without black bars)'}
-                className={`px-2.5 h-9 rounded-xl border flex items-center justify-center gap-1 transition-all cursor-pointer text-[11px] font-bold ${
+                title={isFillMode ? 'Switch to fit' : 'Switch to fill'}
+                className={`px-2 h-7 rounded-md border flex items-center justify-center text-[10.5px] font-medium transition-colors cursor-pointer ${
                   isFillMode
-                    ? 'bg-accent-soft border-accent text-accent'
-                    : 'bg-theme-card hover:bg-theme-card-hover border-theme text-theme-secondary hover:text-theme-primary'
+                    ? 'bg-accent/20 border-accent/60 text-accent'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300 hover:text-white'
                 }`}
               >
                 <span>{isFillMode ? 'Fill' : 'Fit'}</span>
               </button>
 
               <button
+                type="button"
                 onClick={toggleFullscreen}
-                title={isFullscreen ? 'Exit Fullscreen (Esc / F)' : 'Fullscreen (F)'}
-                className="w-9 h-9 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme flex items-center justify-center text-theme-primary transition-colors cursor-pointer"
+                title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+                className="w-7 h-7 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
-                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
             </div>
           </div>

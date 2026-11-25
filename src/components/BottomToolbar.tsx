@@ -46,140 +46,135 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
     }
   };
 
-  const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    if (onSeekSound) {
-      onSeekSound(val);
-    } else if (activeSound) {
-      audioEngine.seekSound(activeSound.id, val);
-    }
-  };
-
   return (
-    <div className="w-full flex items-stretch justify-between gap-4 select-none px-6 pb-4">
-      {/* Left Pod: Stacked Speaker & Mic Volume */}
-      <div className="px-5 py-2.5 rounded-2xl bg-theme-card border border-theme flex flex-col justify-center gap-2 shadow-xl flex-shrink-0 min-w-[240px] h-[64px]">
-        {/* Speaker Volume */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleToggleMute}
-            className="flex items-center justify-center focus:outline-none cursor-pointer flex-shrink-0 text-accent hover:brightness-110"
-            title={isMuted ? 'Unmute Sounds' : 'Mute Sounds'}
-          >
-            {isMuted ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} />}
-          </button>
-          <Slider
-            min={0}
-            max={200}
-            step={1}
-            value={speakerVolume}
-            onChange={(val) => {
-              audioEngine.setMasterSpeakerVolume(val);
-              onSpeakerVolumeChange(val);
-            }}
-            className="w-32"
-          />
-          <span className="font-mono text-[11px] font-semibold text-accent w-9 text-right flex-shrink-0">
-            {speakerVolume}%
-          </span>
-        </div>
-
-        {/* Mic Volume */}
-        {onMicProjectionVolumeChange && (
-          <div className="flex items-center gap-3">
-            <Mic size={15} className="flex-shrink-0 text-accent" />
+    <div className="w-full px-6 pb-3 pt-1 select-none">
+      <div className="w-full bg-[#0e1219]/50 frosted-bottom-pill border border-white/[0.12] rounded-xl px-4 py-2 flex items-center justify-between gap-4 backdrop-blur-2xl shadow-[0_12px_36px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]">
+        {/* Left: Speaker and Microphone Volume Faders */}
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              className="text-accent hover:brightness-110 cursor-pointer flex-shrink-0"
+              title={isMuted ? 'Unmute sounds' : 'Mute sounds'}
+            >
+              {isMuted ? <VolumeX size={14} className="text-rose-400" /> : <Volume2 size={14} />}
+            </button>
             <Slider
               min={0}
               max={200}
               step={1}
-              value={micProjectionVolume}
+              value={speakerVolume}
               onChange={(val) => {
-                audioEngine.setMicInputVolume(val);
-                onMicProjectionVolumeChange(val);
+                audioEngine.setMasterSpeakerVolume(val);
+                onSpeakerVolumeChange(val);
               }}
-              className="w-32"
+              className="w-28"
             />
-            <span className="font-mono text-[11px] font-semibold text-accent w-9 text-right flex-shrink-0">
-              {micProjectionVolume}%
+            <span className="font-mono text-[11px] font-medium text-slate-300 w-9 text-right shrink-0 tabular-nums">
+              {speakerVolume}%
             </span>
           </div>
-        )}
-      </div>
 
-      {/* Right / Main Playback Pod - matched to h-[64px] */}
-      <div className="flex-1 px-5 py-2.5 rounded-2xl bg-theme-card border border-theme flex items-center justify-between gap-5 shadow-xl min-w-0 h-[64px]">
-        {/* Sound Cover & Name */}
-        <div className="flex items-center gap-3 min-w-0 max-w-xs">
-          <div className="w-10 h-10 rounded-lg bg-theme-surface border border-theme overflow-hidden flex items-center justify-center text-theme-muted flex-shrink-0 shadow-sm">
-            {activeSound?.thumbnail ? (
-              <img
-                src={activeSound.thumbnail}
-                alt={activeSound.title}
-                className="w-full h-full object-cover"
+          {onMicProjectionVolumeChange && (
+            <div className="flex items-center gap-2 pl-3 border-l border-white/[0.08]">
+              <Mic size={14} className="text-accent shrink-0" />
+              <Slider
+                min={0}
+                max={200}
+                step={1}
+                value={micProjectionVolume}
+                onChange={(val) => {
+                  audioEngine.setMicInputVolume(val);
+                  onMicProjectionVolumeChange(val);
+                }}
+                className="w-28"
               />
-            ) : (
-              <Music size={18} className="text-accent" />
-            )}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[12px] font-semibold text-theme-primary truncate">
-              {activeSound ? activeSound.title : 'No Sound Playing'}
-            </span>
-            <span className="text-[10px] text-theme-muted truncate">
-              {activeSound?.author || (activeSound ? 'Ready' : 'Select a sound to play')}
-            </span>
-          </div>
+              <span className="font-mono text-[11px] font-medium text-slate-300 w-9 text-right shrink-0 tabular-nums">
+                {micProjectionVolume}%
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Scrubber Timeline */}
-        <div className="flex-1 flex items-center min-w-0">
-          <Slider
-            min={0}
-            max={1}
-            step={0.002}
-            value={playbackProgress}
-            onChange={(val) => {
-              if (onSeekSound && activeSound) {
-                onSeekSound(val);
-              }
-            }}
-            disabled={!activeSound}
-            className="w-full"
-          />
-        </div>
+        {/* Right / Now Playing Console */}
+        <div className="flex-1 flex items-center justify-between gap-4 min-w-0 pl-3 border-l border-white/[0.08]">
+          {/* Sound Cover & Name */}
+          <div className="flex items-center gap-2.5 min-w-0 max-w-[220px]">
+            <div className="w-8 h-8 rounded-md bg-[#0e1219] border border-white/[0.08] overflow-hidden flex items-center justify-center text-slate-500 shrink-0">
+              {activeSound?.thumbnail ? (
+                <img
+                  src={activeSound.thumbnail}
+                  alt={activeSound.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Music size={14} className="text-accent opacity-80" />
+              )}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[12px] font-medium text-white truncate" title={activeSound?.title || 'No sound playing'}>
+                {activeSound ? activeSound.title : 'Ready'}
+              </span>
+              <span className="text-[10px] text-slate-400 truncate">
+                {activeSound?.author || (activeSound ? 'Playing' : 'Select a sound to play')}
+              </span>
+            </div>
+          </div>
 
-        {/* Transport Controls: Previous, Play/Pause, Next */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => onSkipSound && onSkipSound(-5)}
-            disabled={!activeSound}
-            title="Rewind 5s"
-            className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
-          >
-            <ChevronLeft size={16} />
-          </button>
+          {/* Timeline Scrubber */}
+          <div className="flex-1 flex items-center min-w-0 px-2">
+            <Slider
+              min={0}
+              max={1}
+              step={0.002}
+              value={playbackProgress}
+              onChange={(val) => {
+                if (onSeekSound && activeSound) {
+                  onSeekSound(val);
+                }
+              }}
+              disabled={!activeSound}
+              className="w-full"
+            />
+          </div>
 
-          <button
-            onClick={onTogglePause}
-            disabled={!activeSound}
-            title={isPaused ? 'Resume' : 'Pause'}
-            className="w-8 h-8 rounded-full border border-accent text-accent hover:bg-accent hover:text-black flex items-center justify-center transition-all cursor-pointer disabled:opacity-30"
-          >
-            {isPaused || !activeSound ? (
-              <Play size={13} className="fill-current ml-0.5" />
-            ) : (
-              <Pause size={13} className="fill-current" />
-            )}
-          </button>
+          {/* Transport Controls */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => onSkipSound && onSkipSound(-5)}
+              disabled={!activeSound}
+              title="Rewind 5s"
+              className="p-1 rounded-md text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+            >
+              <ChevronLeft size={16} />
+            </button>
 
-          <button
-            onClick={() => onSkipSound && onSkipSound(5)}
-            disabled={!activeSound}
-            title="Forward 5s"
-            className="p-1 rounded-lg text-theme-muted hover:text-theme-primary transition-colors cursor-pointer disabled:opacity-30"
-          >
-            <ChevronRight size={16} />
-          </button>
+            <button
+              type="button"
+              onClick={onTogglePause}
+              disabled={!activeSound}
+              title={isPaused ? 'Resume' : 'Pause'}
+              className="w-7 h-7 rounded-full bg-accent text-slate-950 flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 hover:brightness-110 active:scale-95"
+            >
+              {isPaused || !activeSound ? (
+                <Play size={11} className="fill-current ml-0.5" />
+              ) : (
+                <Pause size={11} className="fill-current" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSkipSound && onSkipSound(5)}
+              disabled={!activeSound}
+              title="Forward 5s"
+              className="p-1 rounded-md text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-30"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -70,6 +70,7 @@ export interface AudioSettings {
   sortBy?: 'newest' | 'oldest' | 'alphabetical' | 'most_played' | 'duration';
   activeFilter?: 'all' | 'clips' | 'youtube' | 'favorites';
   storageLocation?: string; // Unified root folder, e.g. "D:\Prism" -> contains /Sounds and /Videos
+  enableFrostedGlass?: boolean; // Translucent frosted glass and Windows 11 acrylic effects (default: true)
 }
 
 export interface VideoClipItem {

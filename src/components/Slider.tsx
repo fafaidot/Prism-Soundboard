@@ -39,7 +39,6 @@ export const Slider: React.FC<SliderProps> = ({
   const stepRef = useRef(step);
   stepRef.current = step;
 
-  // Compute percentage clamped between 0 and 100
   const range = max - min;
   const percentage = range > 0 ? Math.max(0, Math.min(100, ((value - min) / range) * 100)) : 0;
 
@@ -126,7 +125,6 @@ export const Slider: React.FC<SliderProps> = ({
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch (_) {}
 
-    // Final accurate dispatch
     if (trackRectRef.current) {
       const finalVal = computeValueFromClientX(e.clientX);
       onChange(finalVal);
@@ -151,26 +149,24 @@ export const Slider: React.FC<SliderProps> = ({
       } ${className}`}
     >
       {/* Background Track */}
-      <div className={`w-full h-1.5 rounded-full bg-theme-surface relative overflow-hidden ${trackClassName}`}>
+      <div className={`w-full h-1 rounded-full bg-white/[0.1] relative overflow-hidden ${trackClassName}`}>
         {/* Active Fill Track */}
         <div
           style={{
             width: `${percentage}%`,
             backgroundColor: fillColor,
-            transition: isDraggingState ? 'none' : 'width 75ms ease-out',
+            transition: isDraggingState ? 'none' : 'width 60ms ease-out',
           }}
           className="h-full rounded-full"
         />
       </div>
 
-      {/* Thumb Handle */}
+      {/* Modern Studio Thumb Handle */}
       <div
         style={{
           left: `${percentage}%`,
-          borderColor: fillColor,
-          transition: isDraggingState ? 'none' : 'transform 75ms ease-out',
         }}
-        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-theme-app border-2 shadow-md group-hover:scale-110 active:scale-125 pointer-events-none"
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-xs border border-black/20 group-hover:scale-120 active:scale-130 pointer-events-none transition-transform duration-75"
       />
     </div>
   );

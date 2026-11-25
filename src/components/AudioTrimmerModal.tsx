@@ -56,7 +56,6 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
 
   const accent = accentColor || 'var(--accent-color)';
 
-  // Decode audio peaks for the waveform & obtain high-precision duration
   useEffect(() => {
     if (!sound || !isOpen) return;
 
@@ -140,7 +139,6 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     };
   }, [sound, isOpen]);
 
-  // Audio element setup and playback sync
   useEffect(() => {
     if (!sound || !isOpen) return;
 
@@ -152,98 +150,82 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     const audio = new Audio(src);
     audioRef.current = audio;
 
-    const onLoaded = () => {
-      if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
-        setDuration((prev) => (prev > 0 ? prev : audio.duration));
-      }
-    };
+    const onAudioTimeUpdate = () => {
+      const cur = audio.currentTime;
+      setCurrentTime(cur);
 
-    const onTimeUpdate = () => {
-      if (audioRef.current) {
-        setCurrentTime(audioRef.current.currentTime);
-      }
-    };
-
-    audio.addEventListener('loadedmetadata', onLoaded);
-    audio.addEventListener('timeupdate', onTimeUpdate);
-
-    audio.onended = () => {
-      if (isLooping && !isPlayingFull) {
-        audio.currentTime = trimStart;
-        audio.play().catch(() => {});
+      if (!isPlayingFull) {
+        if (cur >= trimEnd) {
+          if (isLooping) {
+            audio.currentTime = trimStart;
+            audio.play().catch(() => {});
+          } else {
+            audio.pause();
+            audio.currentTime = trimStart;
+            setIsPlaying(false);
+            setCurrentTime(trimStart);
+          }
+        }
       } else {
-        setIsPlaying(false);
-        setIsPlayingFull(false);
-        setCurrentTime(trimStart);
+        if (cur >= duration) {
+          audio.pause();
+          setIsPlayingFull(false);
+          audio.currentTime = 0;
+          setCurrentTime(0);
+        }
       }
     };
+
+    const onAudioEnded = () => {
+      setIsPlaying(false);
+      setIsPlayingFull(false);
+      setCurrentTime(trimStart);
+    };
+
+    audio.addEventListener('timeupdate', onAudioTimeUpdate);
+    audio.addEventListener('ended', onAudioEnded);
 
     return () => {
       audio.pause();
-      audio.removeEventListener('loadedmetadata', onLoaded);
-      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('timeupdate', onAudioTimeUpdate);
+      audio.removeEventListener('ended', onAudioEnded);
       audioRef.current = null;
     };
-  }, [sound, isOpen, isLooping, isPlayingFull, trimStart]);
+  }, [sound, isOpen, trimStart, trimEnd, isLooping, isPlayingFull, duration]);
 
-  // Precision playhead animation loop
-  const checkPlayback = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio || audio.paused) return;
+  useEffect(() => {
+    if (!isOpen) return;
 
-    const time = audio.currentTime;
-    setCurrentTime(time);
-
-    // If auditing the trimmed range, stop or loop when trimEnd is reached
-    if (!isPlayingFull && trimEnd > 0 && time >= trimEnd) {
-      if (isLooping) {
-        audio.currentTime = trimStart;
-        setCurrentTime(trimStart);
-        animFrameRef.current = requestAnimationFrame(checkPlayback);
-        return;
-      } else {
-        audio.pause();
-        setIsPlaying(false);
-        audio.currentTime = trimStart;
-        setCurrentTime(trimStart);
-        return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (audioRef.current) audioRef.current.pause();
+        onClose();
       }
-    }
-
-    animFrameRef.current = requestAnimationFrame(checkPlayback);
-  }, [trimStart, trimEnd, isLooping, isPlayingFull]);
-
-  useEffect(() => {
-    if (isPlaying || isPlayingFull) {
-      animFrameRef.current = requestAnimationFrame(checkPlayback);
-    }
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (e.key === ' ') {
+        e.preventDefault();
+        handleTogglePlayTrim();
+      }
     };
-  }, [isPlaying, isPlayingFull, checkPlayback]);
 
-  // Drag logic for Start Handle, End Handle, and Middle Window
-  useEffect(() => {
-    if (!dragMode) return;
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isPlaying, trimStart]);
 
-    const onMouseMove = (e: MouseEvent) => {
-      if (!waveformRef.current || duration <= 0) return;
+  const handlePointerMove = useCallback(
+    (e: MouseEvent) => {
+      if (!dragMode || !waveformRef.current || duration <= 0) return;
       const rect = waveformRef.current.getBoundingClientRect();
       const deltaX = e.clientX - dragStartRef.current.clientX;
       const deltaTime = (deltaX / rect.width) * duration;
 
       if (dragMode === 'start') {
-        const newStart = Math.max(0, Math.min(dragStartRef.current.initialEnd - 0.1, dragStartRef.current.initialStart + deltaTime));
-        const rounded = Math.round(newStart * 100) / 100;
-        setTrimStart(rounded);
-        if (audioRef.current && !isPlaying) {
-          audioRef.current.currentTime = rounded;
-          setCurrentTime(rounded);
-        }
+        const newStart = Math.max(0, Math.min(trimEnd - 0.1, dragStartRef.current.initialStart + deltaTime));
+        setTrimStart(Math.round(newStart * 100) / 100);
+        setCurrentTime(newStart);
+        if (audioRef.current) audioRef.current.currentTime = newStart;
       } else if (dragMode === 'end') {
-        const newEnd = Math.min(duration, Math.max(dragStartRef.current.initialStart + 0.1, dragStartRef.current.initialEnd + deltaTime));
-        const rounded = Math.round(newEnd * 100) / 100;
-        setTrimEnd(rounded);
+        const newEnd = Math.min(duration, Math.max(trimStart + 0.1, dragStartRef.current.initialEnd + deltaTime));
+        setTrimEnd(Math.round(newEnd * 100) / 100);
       } else if (dragMode === 'window') {
         const span = dragStartRef.current.initialEnd - dragStartRef.current.initialStart;
         let newStart = dragStartRef.current.initialStart + deltaTime;
@@ -254,51 +236,44 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
           newEnd = span;
         } else if (newEnd > duration) {
           newEnd = duration;
-          newStart = Math.max(0, duration - span);
+          newStart = duration - span;
         }
 
         setTrimStart(Math.round(newStart * 100) / 100);
         setTrimEnd(Math.round(newEnd * 100) / 100);
+        setCurrentTime(newStart);
+        if (audioRef.current) audioRef.current.currentTime = newStart;
       }
-    };
+    },
+    [dragMode, duration, trimStart, trimEnd]
+  );
 
-    const onMouseUp = () => {
-      setDragMode(null);
-    };
+  const handlePointerUp = useCallback(() => {
+    setDragMode(null);
+  }, []);
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [dragMode, duration, isPlaying]);
-
-  if (!isOpen || !sound) return null;
-
-  // Formatting helpers
-  const formatTime = (secs: number): string => {
-    if (isNaN(secs) || secs < 0) secs = 0;
-    const mins = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    const ms = Math.floor((secs % 1) * 1000);
-    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-  };
+  useEffect(() => {
+    if (dragMode) {
+      window.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerUp);
+      return () => {
+        window.removeEventListener('mousemove', handlePointerMove);
+        window.removeEventListener('mouseup', handlePointerUp);
+      };
+    }
+  }, [dragMode, handlePointerMove, handlePointerUp]);
 
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (dragMode || !waveformRef.current || duration <= 0) return;
     const rect = waveformRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    const clickRatio = Math.max(0, Math.min(1, clickX / rect.width));
-    const seekTime = Math.round(clickRatio * duration * 100) / 100;
-
-    setCurrentTime(seekTime);
+    const clickTime = (clickX / rect.width) * duration;
+    setCurrentTime(clickTime);
     if (audioRef.current) {
-      audioRef.current.currentTime = seekTime;
+      audioRef.current.currentTime = clickTime;
     }
   };
 
-  // Play / Pause Trimmed Selection
   const handleTogglePlayTrim = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -314,7 +289,6 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     }
   };
 
-  // Play / Pause Full Audio
   const handleTogglePlayFull = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -351,12 +325,14 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
   };
 
   const handleSave = () => {
+    if (!sound) return;
     if (audioRef.current) audioRef.current.pause();
     onSaveTrim(sound.id, trimStart, trimEnd);
     onClose();
   };
 
   const handleSaveAsNew = () => {
+    if (!sound) return;
     if (audioRef.current) audioRef.current.pause();
     if (onSaveAsNewTrim) {
       onSaveAsNewTrim(sound.id, trimStart, trimEnd);
@@ -365,6 +341,15 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
     }
     onClose();
   };
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    const ms = Math.floor((sec % 1) * 100);
+    return `${m}:${s < 10 ? '0' : ''}${s}.${ms < 10 ? '0' : ''}${ms}`;
+  };
+
+  if (!isOpen || !sound) return null;
 
   const trimmedLength = Math.max(0, trimEnd - trimStart);
   const startPercent = duration > 0 ? (trimStart / duration) * 100 : 0;
@@ -380,35 +365,23 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
           onClose();
         }
       }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center frosted-backdrop bg-black/35 p-4 animate-in fade-in duration-150 select-none"
     >
       <div
         data-hud-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl bg-theme-surface border border-theme rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden select-none transition-all duration-150"
+        className="w-full max-w-2xl frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex flex-col overflow-hidden"
       >
-        {/* Modal Header */}
-        <header className="h-16 px-6 border-b border-theme flex items-center justify-between bg-theme-header/80 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center border shadow-sm"
-              style={{
-                backgroundColor: `${accent}15`,
-                borderColor: `${accent}35`,
-                color: accent,
-              }}
-            >
-              <Scissors size={15} />
-            </div>
-            <div>
-              <h3 className="text-[14px] font-bold text-theme-primary tracking-wide flex items-center gap-2">
-                <span>Audio Trimmer</span>
-                <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full bg-theme-card text-accent border border-theme">
-                  {formatTime(duration)}
-                </span>
-              </h3>
-              <p className="text-[11px] text-theme-muted truncate max-w-md">{sound.title}</p>
-            </div>
+        {/* Header */}
+        <header className="h-16 px-6 border-b border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
+          <div>
+            <h3 className="text-[15px] font-bold text-white tracking-tight flex items-center gap-2">
+              <span>Audio trimmer</span>
+              <span className="text-[12px] font-mono font-normal text-slate-400 tabular-nums">
+                ({formatTime(duration)})
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-400 truncate max-w-md">{sound.title}</p>
           </div>
           <button
             type="button"
@@ -416,7 +389,7 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
               if (audioRef.current) audioRef.current.pause();
               onClose();
             }}
-            className="w-8 h-8 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Close (Esc)"
           >
             <X size={15} />
@@ -424,25 +397,18 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
         </header>
 
         {/* Modal Body */}
-        <div className="p-6 flex flex-col gap-4 bg-theme-surface">
-          {/* Waveform Card */}
-          <div className="p-5 bg-theme-sidebar border border-theme rounded-2xl space-y-3.5">
-            {/* Top Info Badge Row */}
-            <div className="flex items-center justify-between text-xs font-mono">
-              <div className="flex items-center gap-2 text-theme-secondary">
-                <span>Current:</span>
-                <span className="text-theme-primary font-bold">{formatTime(currentTime)}</span>
+        <div className="p-6 flex flex-col gap-4 bg-transparent">
+          {/* Waveform Section */}
+          <div className="space-y-2.5">
+            {/* Time Readout */}
+            <div className="flex items-center justify-between text-[11px] font-mono">
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <span>Playhead:</span>
+                <span className="text-white font-medium tabular-nums">{formatTime(currentTime)}</span>
               </div>
-              <div
-                className="px-3 py-1 rounded-xl font-bold flex items-center gap-2 border"
-                style={{
-                  backgroundColor: `${accent}15`,
-                  borderColor: `${accent}35`,
-                  color: accent,
-                }}
-              >
-                <span>Trimmed Span:</span>
-                <span className="text-theme-primary font-mono">{trimmedLength.toFixed(2)}s</span>
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <span>Trim span:</span>
+                <span className="text-accent font-medium tabular-nums">{trimmedLength.toFixed(2)}s</span>
               </div>
             </div>
 
@@ -450,288 +416,257 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             <div
               ref={waveformRef}
               onClick={handleTrackClick}
-              className="relative w-full h-28 bg-theme-app rounded-2xl border border-theme overflow-hidden cursor-crosshair group flex items-center"
+              className="relative w-full h-24 bg-black/35 rounded-lg border border-white/[0.08] overflow-hidden cursor-crosshair flex items-center"
             >
-            {/* Waveform Bars (Clean flat rendering without fuzzy glows) */}
-            <div className="w-full h-full flex items-center justify-between gap-[2px] px-2 pointer-events-none">
-              {isLoadingWaveform ? (
-                <div className="w-full flex items-center justify-center text-theme-muted text-xs">
-                  <span>Analyzing audio waveform...</span>
-                </div>
-              ) : (
-                waveformData.map((peak, idx) => {
-                  const barPercent = (idx / TOTAL_BARS) * 100;
-                  const isInsideTrim = barPercent >= startPercent && barPercent <= endPercent;
+              {/* Bars */}
+              <div className="w-full h-full flex items-center justify-between gap-[2px] px-2 pointer-events-none">
+                {isLoadingWaveform ? (
+                  <div className="w-full flex items-center justify-center text-slate-500 text-[11.5px]">
+                    Analyzing waveform...
+                  </div>
+                ) : (
+                  waveformData.map((peak, idx) => {
+                    const barPercent = (idx / TOTAL_BARS) * 100;
+                    const isInsideTrim = barPercent >= startPercent && barPercent <= endPercent;
 
-                  return (
-                    <div
-                      key={idx}
-                      className="w-[3px] rounded-full flex-shrink-0"
-                      style={{
-                        height: `${Math.max(12, peak * 90)}%`,
-                        backgroundColor: isInsideTrim
-                          ? accent
-                          : 'rgba(255, 255, 255, 0.15)',
-                      }}
-                    />
-                  );
-                })
+                    return (
+                      <div
+                        key={idx}
+                        className="w-[2.5px] rounded-full flex-shrink-0"
+                        style={{
+                          height: `${Math.max(12, peak * 85)}%`,
+                          backgroundColor: isInsideTrim ? accent : 'rgba(255, 255, 255, 0.12)',
+                        }}
+                      />
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Shrouds */}
+              <div
+                className="absolute top-0 bottom-0 left-0 bg-black/65 pointer-events-none border-r border-white/10"
+                style={{ width: `${startPercent}%` }}
+              />
+              <div
+                className="absolute top-0 bottom-0 right-0 bg-black/65 pointer-events-none border-l border-white/10"
+                style={{ width: `${100 - endPercent}%` }}
+              />
+
+              {/* Draggable Selection Window */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  dragStartRef.current = {
+                    clientX: e.clientX,
+                    initialStart: trimStart,
+                    initialEnd: trimEnd,
+                  };
+                  setDragMode('window');
+                }}
+                title="Drag selection window"
+                className="absolute top-0 bottom-0 cursor-grab active:cursor-grabbing border-y border-transparent hover:border-accent/40"
+                style={{
+                  left: `${startPercent}%`,
+                  width: `${endPercent - startPercent}%`,
+                  backgroundColor: `${accent}18`,
+                }}
+              />
+
+              {/* Start Handle */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  dragStartRef.current = {
+                    clientX: e.clientX,
+                    initialStart: trimStart,
+                    initialEnd: trimEnd,
+                  };
+                  setDragMode('start');
+                }}
+                className="absolute top-0 bottom-0 w-3 -ml-1.5 cursor-ew-resize flex flex-col items-center justify-between z-20"
+                style={{ left: `${startPercent}%` }}
+              >
+                <div className="w-3 h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-slate-950" style={{ backgroundColor: accent }}>
+                  ◀
+                </div>
+                <div className="w-[2px] h-full" style={{ backgroundColor: accent }} />
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: accent }} />
+              </div>
+
+              {/* End Handle */}
+              <div
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  dragStartRef.current = {
+                    clientX: e.clientX,
+                    initialStart: trimStart,
+                    initialEnd: trimEnd,
+                  };
+                  setDragMode('end');
+                }}
+                className="absolute top-0 bottom-0 w-3 -ml-1.5 cursor-ew-resize flex flex-col items-center justify-between z-20"
+                style={{ left: `${endPercent}%` }}
+              >
+                <div className="w-3 h-4 rounded-sm flex items-center justify-center text-[8px] font-bold text-slate-950" style={{ backgroundColor: accent }}>
+                  ▶
+                </div>
+                <div className="w-[2px] h-full" style={{ backgroundColor: accent }} />
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: accent }} />
+              </div>
+
+              {/* Playhead */}
+              {(isPlaying || isPlayingFull) && (
+                <div
+                  className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none"
+                  style={{ left: `${playheadPercent}%` }}
+                />
               )}
             </div>
-
-            {/* Left Out-of-Bounds Shroud */}
-            <div
-              className="absolute top-0 bottom-0 left-0 bg-black/60 pointer-events-none border-r border-white/10"
-              style={{ width: `${startPercent}%` }}
-            />
-
-            {/* Right Out-of-Bounds Shroud */}
-            <div
-              className="absolute top-0 bottom-0 right-0 bg-black/60 pointer-events-none border-l border-white/10"
-              style={{ width: `${100 - endPercent}%` }}
-            />
-
-            {/* Middle Draggable Selection Window */}
-            <div
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                dragStartRef.current = {
-                  clientX: e.clientX,
-                  initialStart: trimStart,
-                  initialEnd: trimEnd,
-                };
-                setDragMode('window');
-              }}
-              title="Drag selection window"
-              className="absolute top-0 bottom-0 cursor-grab active:cursor-grabbing border-y border-transparent transition-colors hover:border-accent/40"
-              style={{
-                left: `${startPercent}%`,
-                width: `${endPercent - startPercent}%`,
-                backgroundColor: `${accent}15`,
-              }}
-            />
-
-            {/* Start Handle */}
-            <div
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                dragStartRef.current = {
-                  clientX: e.clientX,
-                  initialStart: trimStart,
-                  initialEnd: trimEnd,
-                };
-                setDragMode('start');
-              }}
-              title="Drag Start Point"
-              className="absolute top-0 bottom-0 w-4 -ml-2 cursor-ew-resize flex flex-col items-center justify-between z-20 group/handle"
-              style={{ left: `${startPercent}%` }}
-            >
-              <div
-                className="w-3.5 h-5 rounded-md flex items-center justify-center text-[8px] font-bold text-black"
-                style={{ backgroundColor: accent }}
-              >
-                ◀
-              </div>
-              <div className="w-[2px] h-full" style={{ backgroundColor: accent }} />
-              <div
-                className="w-3.5 h-3.5 rounded-md flex items-center justify-center"
-                style={{ backgroundColor: accent }}
-              />
-            </div>
-
-            {/* End Handle */}
-            <div
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                dragStartRef.current = {
-                  clientX: e.clientX,
-                  initialStart: trimStart,
-                  initialEnd: trimEnd,
-                };
-                setDragMode('end');
-              }}
-              title="Drag End Point"
-              className="absolute top-0 bottom-0 w-4 -ml-2 cursor-ew-resize flex flex-col items-center justify-between z-20 group/handle"
-              style={{ left: `${endPercent}%` }}
-            >
-              <div
-                className="w-3.5 h-5 rounded-md flex items-center justify-center text-[8px] font-bold text-black"
-                style={{ backgroundColor: accent }}
-              >
-                ▶
-              </div>
-              <div className="w-[2px] h-full" style={{ backgroundColor: accent }} />
-              <div
-                className="w-3.5 h-3.5 rounded-md flex items-center justify-center"
-                style={{ backgroundColor: accent }}
-              />
-            </div>
-
-            {/* Dynamic Playhead Line (Follows exact audio frame with 0ms lag, no glow) */}
-            {(isPlaying || isPlayingFull) && (
-              <div
-                className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none"
-                style={{ left: `${playheadPercent}%` }}
-              >
-                <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white rotate-45" />
-                <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white rotate-45" />
-              </div>
-            )}
           </div>
-        </div>
 
-          {/* Micro-Adjustment Fine-Tuning Pods */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Micro-Adjustment Fine-Tuning */}
+          <div className="grid grid-cols-2 gap-6 pt-3 border-t border-white/[0.07]">
             {/* Start Fine-Tuner */}
-            <div className="p-4 rounded-2xl bg-theme-sidebar border border-theme flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">Start Time</span>
+                <span className="text-[11px] font-medium text-slate-400">Start time</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setTrimStart(Math.round(currentTime * 100) / 100);
-                  }}
-                  className="text-[10.5px] font-semibold text-accent hover:underline cursor-pointer"
+                  onClick={() => setTrimStart(Math.round(currentTime * 100) / 100)}
+                  className="text-[10.5px] font-medium text-accent hover:underline cursor-pointer"
                 >
-                  Set to Playhead
+                  Set to playhead
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-base font-mono font-bold text-white">{formatTime(trimStart)}</span>
+                <span className="text-[14px] font-mono font-medium text-white tabular-nums">{formatTime(trimStart)}</span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setTrimStart((prev) => Math.max(0, Math.round((prev - 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
+                    className="p-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors cursor-pointer"
                     title="-0.1s"
                   >
-                    <Minus size={13} />
+                    <Minus size={12} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setTrimStart((prev) => Math.min(trimEnd - 0.1, Math.round((prev + 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
+                    className="p-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors cursor-pointer"
                     title="+0.1s"
                   >
-                    <Plus size={13} />
+                    <Plus size={12} />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* End Fine-Tuner */}
-            <div className="p-4 rounded-2xl bg-theme-sidebar border border-theme flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">End Time</span>
+                <span className="text-[11px] font-medium text-slate-400">End time</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setTrimEnd(Math.max(trimStart + 0.1, Math.round(currentTime * 100) / 100));
-                  }}
-                  className="text-[10.5px] font-semibold text-accent hover:underline cursor-pointer"
+                  onClick={() => setTrimEnd(Math.max(trimStart + 0.1, Math.round(currentTime * 100) / 100))}
+                  className="text-[10.5px] font-medium text-accent hover:underline cursor-pointer"
                 >
-                  Set to Playhead
+                  Set to playhead
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-base font-mono font-bold text-white">{formatTime(trimEnd)}</span>
+                <span className="text-[14px] font-mono font-medium text-white tabular-nums">{formatTime(trimEnd)}</span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setTrimEnd((prev) => Math.max(trimStart + 0.1, Math.round((prev - 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
+                    className="p-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors cursor-pointer"
                     title="-0.1s"
                   >
-                    <Minus size={13} />
+                    <Minus size={12} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setTrimEnd((prev) => Math.min(duration, Math.round((prev + 0.1) * 100) / 100))}
-                    className="p-1.5 rounded-lg bg-theme-card hover:bg-theme-card-hover border border-theme text-white hover:border-accent/40 transition-colors cursor-pointer"
+                    className="p-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors cursor-pointer"
                     title="+0.1s"
                   >
-                    <Plus size={13} />
+                    <Plus size={12} />
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Player & Audition Controls Bar */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-theme-sidebar border border-theme">
+          {/* Transport Controls */}
+          <div className="flex items-center justify-between pt-3 border-t border-white/[0.07]">
             <div className="flex items-center gap-2">
-              {/* Play / Pause Selection */}
               <button
                 type="button"
                 onClick={handleTogglePlayTrim}
-                className="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-md text-black"
-                style={{ backgroundColor: accent }}
+                className="px-3.5 py-1.5 rounded-lg font-medium text-[11.5px] flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs text-slate-950 bg-accent hover:brightness-110"
               >
-                {isPlaying ? <Pause size={15} /> : <Play size={15} className="fill-current" />}
-                <span>{isPlaying ? 'Pause' : 'Play Selection'}</span>
+                {isPlaying ? <Pause size={13} /> : <Play size={13} className="fill-current ml-0.5" />}
+                <span>{isPlaying ? 'Pause' : 'Play selection'}</span>
               </button>
 
-              {/* Loop Toggle */}
               <button
                 type="button"
                 onClick={() => setIsLooping(!isLooping)}
-                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
                   isLooping
-                    ? 'bg-theme-card-selected text-accent border-accent/60'
-                    : 'bg-theme-card border-theme text-theme-secondary hover:text-white'
+                    ? 'bg-accent/20 border-accent/60 text-accent'
+                    : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:text-white'
                 }`}
                 title={isLooping ? 'Looping enabled' : 'Enable loop'}
               >
-                <Repeat size={15} />
+                <Repeat size={13} />
               </button>
 
-              {/* Stop Playback */}
               <button
                 type="button"
                 onClick={handleStop}
-                className="p-2 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme text-theme-secondary hover:text-white transition-colors cursor-pointer"
-                title="Stop playback"
+                className="p-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 hover:text-white transition-colors cursor-pointer"
+                title="Stop"
               >
-                <Square size={15} />
+                <Square size={13} />
               </button>
 
-              {/* Play Full Audio */}
               <button
                 type="button"
                 onClick={handleTogglePlayFull}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium border flex items-center gap-1 transition-colors cursor-pointer ${
                   isPlayingFull
-                    ? 'bg-theme-card-selected border-accent/50 text-accent'
-                    : 'bg-theme-card border border-theme text-theme-secondary hover:text-white'
+                    ? 'bg-accent/20 border-accent/60 text-accent'
+                    : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:text-white'
                 }`}
                 title="Listen to full un-trimmed audio"
               >
-                <Volume2 size={14} />
-                <span>Play Full</span>
+                <Volume2 size={12} />
+                <span>Play full</span>
               </button>
             </div>
 
-            {/* Reset Button */}
             <button
               type="button"
               onClick={handleReset}
-              className="px-3 py-2 rounded-xl text-xs font-semibold text-theme-secondary hover:text-white hover:bg-white/5 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-400 hover:text-white hover:bg-white/[0.04] flex items-center gap-1 transition-colors cursor-pointer"
             >
-              <RotateCcw size={13} />
-              <span>Reset Range</span>
+              <RotateCcw size={11} />
+              <span>Reset range</span>
             </button>
           </div>
         </div>
 
-        {/* Modal Footer / Save Options */}
-        <footer className="h-16 px-6 border-t border-theme flex items-center justify-between bg-theme-header shrink-0">
+        {/* Footer */}
+        <footer className="h-16 px-6 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome shrink-0">
           <button
             type="button"
             onClick={() => {
               if (audioRef.current) audioRef.current.pause();
               onClose();
             }}
-            className="px-4 py-2 rounded-xl text-[12px] font-semibold text-theme-secondary hover:text-white bg-theme-card hover:bg-theme-card-hover border border-theme transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-[12px] font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -740,20 +675,19 @@ export const AudioTrimmerModal: React.FC<AudioTrimmerModalProps> = ({
             <button
               type="button"
               onClick={handleSaveAsNew}
-              className="px-4 py-2 rounded-xl bg-theme-card hover:bg-theme-card-hover border border-theme hover:border-accent/40 text-white text-[12px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
             >
-              <CopyPlus size={14} style={{ color: accent }} />
-              <span>Save as New Sound</span>
+              <CopyPlus size={13} className="text-accent" />
+              <span>Save as new</span>
             </button>
 
             <button
               type="button"
               onClick={handleSave}
-              className="px-5 py-2 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-md text-black"
-              style={{ backgroundColor: accent }}
+              className="px-5 py-2 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md text-slate-950 bg-accent hover:brightness-110"
             >
-              <Check size={14} className="stroke-[2.5]" />
-              <span>Save Trim</span>
+              <Check size={13} strokeWidth={2.5} />
+              <span>Save trim</span>
             </button>
           </div>
         </footer>

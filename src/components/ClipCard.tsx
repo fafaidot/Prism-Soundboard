@@ -30,21 +30,18 @@ export const ClipCard: React.FC<ClipCardProps> = ({
   const [titleInput, setTitleInput] = useState(clip.title);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Format seconds to mm:ss
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Format file size (e.g. 14.8 MB)
   const formatSize = (bytes: number) => {
     if (!bytes) return '14.8 MB';
     const mb = bytes / (1024 * 1024);
     return `${mb.toFixed(1)} MB`;
   };
 
-  // Format relative day (e.g. "Today", "Yesterday", "Tuesday")
   const formatDay = (timestamp: number) => {
     if (!timestamp) return 'Today';
     const d = new Date(timestamp);
@@ -52,10 +49,9 @@ export const ClipCard: React.FC<ClipCardProps> = ({
     const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
-    return d.toLocaleDateString(undefined, { weekday: 'long' });
+    return d.toLocaleDateString(undefined, { weekday: 'short' });
   };
 
-  // Hover: Plays video muted with no sound
   useEffect(() => {
     if (videoRef.current) {
       if (isHovered) {
@@ -88,12 +84,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({
         e.preventDefault();
         setShowMenu(true);
       }}
-      className="group relative bg-theme-card border border-theme hover:border-accent rounded-2xl overflow-hidden flex flex-col transition-all duration-200 select-none"
+      className="group relative bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.16] backdrop-blur-md shadow-xs rounded-xl overflow-hidden flex flex-col transition-colors select-none"
     >
-      {/* 16:9 Video Canvas Container */}
+      {/* 16:9 Video Canvas */}
       <div
         onClick={onClick}
-        className="relative w-full aspect-video bg-theme-surface cursor-pointer overflow-hidden"
+        className="relative w-full aspect-video bg-[#0e1219] cursor-pointer overflow-hidden"
       >
         <video
           ref={videoRef}
@@ -102,34 +98,35 @@ export const ClipCard: React.FC<ClipCardProps> = ({
           loop
           playsInline
           preload="metadata"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
         />
 
-        {/* Favorite Star Button (shows on hover or if favorited) */}
+        {/* Favorite Star Button */}
         {(isHovered || clip.isFavorite) && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleFavorite();
             }}
-            title={clip.isFavorite ? 'Remove Favorite' : 'Add to Favorites'}
-            className="absolute top-2.5 right-2.5 z-20 w-7 h-7 rounded-lg bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-yellow-400 transition-colors"
+            title={clip.isFavorite ? 'Remove favorite' : 'Add to favorites'}
+            className="absolute top-2 right-2 z-20 w-6 h-6 rounded-md bg-black/75 backdrop-blur-xs flex items-center justify-center text-slate-300 hover:text-amber-400 transition-colors"
           >
             <Star
-              size={14}
-              className={clip.isFavorite ? 'fill-yellow-400 text-yellow-400' : ''}
+              size={12}
+              className={clip.isFavorite ? 'fill-amber-400 text-amber-400' : ''}
             />
           </button>
         )}
 
-        {/* Duration badge at bottom right */}
-        <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[11px] font-mono text-white font-medium">
+        {/* Duration badge */}
+        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[10px] font-mono text-slate-300 font-medium tabular-nums">
           {formatDuration(clip.duration)}
         </div>
       </div>
 
-      {/* Card Footer / Metadata */}
-      <div className="p-3.5 flex flex-col gap-1">
+      {/* Metadata Footer */}
+      <div className="p-3 flex flex-col gap-1">
         <div className="flex items-center justify-between gap-2">
           {isEditingTitle ? (
             <input
@@ -145,109 +142,113 @@ export const ClipCard: React.FC<ClipCardProps> = ({
                   setTitleInput(clip.title);
                 }
               }}
-              className="flex-1 bg-theme-surface text-theme-primary text-[13px] font-semibold px-2 py-1 rounded outline-none border border-accent"
+              className="flex-1 bg-white/[0.06] text-white text-[12px] font-medium px-2 py-0.5 rounded outline-none border border-accent"
             />
           ) : (
             <h3
               onClick={onClick}
               title={clip.title}
-              className="text-[13px] font-semibold text-theme-primary truncate cursor-pointer hover:text-accent transition-colors"
+              className="text-[12px] font-medium text-slate-200 truncate cursor-pointer hover:text-white transition-colors"
             >
               {clip.title}
             </h3>
           )}
 
-          {/* More options 3 dots button */}
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="text-theme-muted hover:text-theme-primary p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
-            <MoreVertical size={14} />
+            <MoreVertical size={13} />
           </button>
         </div>
 
-        {/* Subtitle Row: ● On device  •  14.8 MB  •  Today */}
-        <div className="flex items-center gap-2 text-[11px] text-theme-muted font-medium">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>On device</span>
-          </div>
-          <span>•</span>
+        {/* Subtitle row */}
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium tabular-nums">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span>Local</span>
+          <span>·</span>
           <span>{formatSize(clip.fileSize)}</span>
-          <span>•</span>
+          <span>·</span>
           <span>{formatDay(clip.dateAdded)}</span>
         </div>
       </div>
 
-      {/* Right Click / More Menu Popup */}
+      {/* Context Menu Popup */}
       {showMenu && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-3 bottom-12 w-48 rounded-xl bg-theme-card border border-theme p-1.5 shadow-2xl z-50 flex flex-col gap-0.5 text-[12px]"
+          className="absolute right-2 bottom-12 w-44 rounded-lg frosted-dropdown bg-[#0e1219]/50 backdrop-blur-2xl border border-white/[0.14] p-1 shadow-xl z-50 flex flex-col gap-0.5 text-[11.5px]"
         >
           <button
+            type="button"
             onClick={() => {
               setShowMenu(false);
               onOpenFolder();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-300 hover:bg-white/[0.06] hover:text-white cursor-pointer"
           >
             <FolderOpen size={13} className="text-accent" />
             <span>Open in folder</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               setShowMenu(false);
               setIsEditingTitle(true);
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-300 hover:bg-white/[0.06] hover:text-white cursor-pointer"
           >
             <Edit2 size={13} className="text-accent" />
             <span>Rename</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               setShowMenu(false);
               onToggleFavorite();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-300 hover:bg-white/[0.06] hover:text-white cursor-pointer"
           >
-            <Star size={13} className="text-yellow-400" />
-            <span>{clip.isFavorite ? 'Remove Favorite' : 'Favorite'}</span>
+            <Star size={13} className="text-amber-400" />
+            <span>{clip.isFavorite ? 'Remove favorite' : 'Favorite'}</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               setShowMenu(false);
               onExtractToSoundboard();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-300 hover:bg-white/[0.06] hover:text-white cursor-pointer"
           >
             <Music size={13} className="text-accent" />
-            <span>Extract to Soundboard</span>
+            <span>Extract audio</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               setShowMenu(false);
               onTrim();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-theme-secondary hover:bg-white/5 hover:text-theme-primary cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-300 hover:bg-white/[0.06] hover:text-white cursor-pointer"
           >
             <Scissors size={13} className="text-accent" />
-            <span>Trim Clip</span>
+            <span>Trim clip</span>
           </button>
-          <div className="my-1 border-t border-theme" />
+          <div className="my-0.5 border-t border-white/[0.08]" />
           <button
+            type="button"
             onClick={() => {
               setShowMenu(false);
               onDelete();
             }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 cursor-pointer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-rose-400 hover:bg-rose-500/10 cursor-pointer"
           >
             <Trash2 size={13} />
-            <span>Delete Video</span>
+            <span>Delete video</span>
           </button>
         </div>
       )}

@@ -23,87 +23,37 @@ export interface ThemeDefinition {
   tagColor: string;
 }
 
-export const THEMES: ThemeDefinition[] = [
-  {
-    id: 'dark',
-    name: 'Prism Slate Dark',
-    description: 'Deep navy-slate dark tones with vibrant cyan highlights (Original)',
-    badge: 'Default',
-    accent: '#31C5F4',
-    accentHover: '#38bdf8',
-    accentSoft: 'rgba(49, 197, 244, 0.15)',
-    bgApp: '#090B10',
-    bgSurface: '#0E131A',
-    bgCard: '#151B25',
-    bgCardHover: '#1B2330',
-    bgCardSelected: '#123244',
-    bgSidebar: '#10141C',
-    bgHeader: '#090B10',
-    bgInput: '#0E131A',
-    border: '#1B222E',
-    borderHover: '#232E3F',
-    borderHighlight: '#31C5F4',
-    textPrimary: '#ffffff',
-    textSecondary: '#94a3b8',
-    textMuted: '#5a687c',
-    tagColor: '#31C5F4',
-  },
-  {
-    id: 'neutral-obsidian',
-    name: 'Obsidian Charcoal',
-    description: 'Deep neutral carbon & graphite palette with rich dark contrast',
-    accent: '#e4e4e7',
-    accentHover: '#f4f4f5',
-    accentSoft: 'rgba(228, 228, 231, 0.15)',
-    bgApp: '#0e0e11',
-    bgSurface: '#141417',
-    bgCard: '#1a1a1f',
-    bgCardHover: '#232329',
-    bgCardSelected: '#2c2c34',
-    bgSidebar: '#111114',
-    bgHeader: '#0e0e11',
-    bgInput: '#141417',
-    border: '#27272e',
-    borderHover: '#363640',
-    borderHighlight: '#e4e4e7',
-    textPrimary: '#fafafa',
-    textSecondary: '#a1a1aa',
-    textMuted: '#71717a',
-    tagColor: '#d4d4d8',
-  },
-  {
-    id: 'oled-stealth',
-    name: 'Pure OLED Black',
-    description: 'True pitch-black pixels (#000000) for OLED screens and stark contrast',
-    badge: 'True Black',
-    accent: '#ffffff',
-    accentHover: '#e2e8f0',
-    accentSoft: 'rgba(255, 255, 255, 0.12)',
-    bgApp: '#000000',
-    bgSurface: '#080808',
-    bgCard: '#121212',
-    bgCardHover: '#1c1c1c',
-    bgCardSelected: '#262626',
-    bgSidebar: '#040404',
-    bgHeader: '#000000',
-    bgInput: '#0d0d0d',
-    border: '#222222',
-    borderHover: '#333333',
-    borderHighlight: '#ffffff',
-    textPrimary: '#ffffff',
-    textSecondary: '#a3a3a3',
-    textMuted: '#666666',
-    tagColor: '#ffffff',
-  },
-];
+export const DARK_THEME: ThemeDefinition = {
+  id: 'dark',
+  name: 'Slate Dark',
+  description: 'Precision studio dark slate with cyan indicator highlights',
+  badge: 'Default',
+  accent: '#38bdf8',
+  accentHover: '#0ea5e9',
+  accentSoft: 'rgba(56, 189, 248, 0.12)',
+  bgApp: '#090b10',
+  bgSurface: '#0e1219',
+  bgCard: '#131822',
+  bgCardHover: '#18202d',
+  bgCardSelected: '#122538',
+  bgSidebar: '#0c1017',
+  bgHeader: '#090b10',
+  bgInput: '#0e1219',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderHover: 'rgba(255, 255, 255, 0.14)',
+  borderHighlight: '#38bdf8',
+  textPrimary: '#f8fafc',
+  textSecondary: '#94a3b8',
+  textMuted: '#64748b',
+  tagColor: '#38bdf8',
+};
 
-export const DARK_THEME: ThemeDefinition = THEMES[0];
+export const THEMES: ThemeDefinition[] = [DARK_THEME];
+
 export const DEFAULT_THEME = DARK_THEME;
 
-export function getTheme(idOrName?: string, customAccent?: string): ThemeDefinition {
-  const normalized = (idOrName || '').toLowerCase().trim();
-  const found = THEMES.find((t) => t.id === normalized || t.name.toLowerCase() === normalized);
-  const baseTheme = found || DARK_THEME;
+export function getTheme(_idOrName?: string, customAccent?: string): ThemeDefinition {
+  const baseTheme = DARK_THEME;
 
   if (!customAccent || customAccent === baseTheme.accent) {
     return baseTheme;
@@ -113,7 +63,7 @@ export function getTheme(idOrName?: string, customAccent?: string): ThemeDefinit
     ...baseTheme,
     accent: customAccent,
     accentHover: customAccent,
-    accentSoft: `${customAccent}26`,
+    accentSoft: `${customAccent}22`,
     borderHighlight: customAccent,
     tagColor: customAccent,
   };
