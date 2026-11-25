@@ -385,8 +385,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (window.soundboardAPI?.importSoundboardBackup) {
       const res = await window.soundboardAPI.importSoundboardBackup();
       if (res) {
-        setBackupMsg({ text: 'Backup imported successfully! Soundboard reloaded.' });
-        if (onReloadSounds) onReloadSounds();
+        if (res.settings) {
+          setLocalSettings(res.settings);
+          const restoredTheme = getTheme(res.settings.theme, res.settings.accentColor);
+          applyThemeToDom(restoredTheme);
+          const frostedEnabled = res.settings.enableFrostedGlass !== false;
+          document.documentElement.classList.toggle('no-frosted-glass', !frostedEnabled);
+          if (document.body) {
+            document.body.style.backgroundColor = frostedEnabled ? 'transparent' : '#090b10';
+          }
+        }
+        setBackupMsg({ text: 'Backup imported successfully! Manifest, media, and settings restored.' });
+        if (onReloadSounds) await onReloadSounds();
       } else {
         setBackupMsg({ text: 'Import cancelled or failed.', error: true });
       }
@@ -403,7 +413,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.6',
+        currentVersion: '1.5.7',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -460,7 +470,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h2 className="text-[14px] font-black tracking-wide text-theme-primary flex items-center gap-1.5">
                   PRISM <span style={{ color: accent }}>SETTINGS</span>
                 </h2>
-                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.6</span>
+                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.7</span>
               </div>
             </div>
 
@@ -1708,7 +1718,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <h4 className="text-[14px] font-bold text-theme-primary flex items-center gap-2">
                           <span>Prism Soundboard</span>
-                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.6</span>
+                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.7</span>
                         </h4>
                         <p className="text-[11.5px] text-theme-muted">
                           Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -1890,7 +1900,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Clean Footer Bar */}
           <footer className="h-16 px-8 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
             <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
-              <span>Prism Soundboard v1.5.6</span>
+              <span>Prism Soundboard v1.5.7</span>
               <span>•</span>
               <button
                 type="button"

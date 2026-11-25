@@ -791,6 +791,7 @@ public class CoreAudioHelper {
   });
 
   app.on('before-quit', () => {
+    app.isQuitting = true;
     storageManager.flushSync();
   });
 
@@ -1133,13 +1134,39 @@ ipcMain.handle('import-soundboard-backup', async (event) => {
     });
 
     if (res) {
+      // Re-register global hotkeys cleanly from imported sounds & settings
+      registeredHotkeys.clear();
+      if (Array.isArray(res.sounds)) {
+        for (const s of res.sounds) {
+          if (s && s.hotkey && s.id) {
+            const norm = normalizeKey(s.hotkey);
+            if (norm) registeredHotkeys.set(norm, s.id);
+          }
+        }
+      }
+
+      if (res.settings) {
+        if (res.settings.panicHotkey) panicHotkey = res.settings.panicHotkey;
+        if (res.settings.repeatLastHotkey) repeatLastHotkey = res.settings.repeatLastHotkey;
+        if (res.settings.overlayHotkey) overlayHotkey = res.settings.overlayHotkey;
+        if (res.settings.recordHotkey) recordHotkey = res.settings.recordHotkey;
+        if (res.settings.videoClipHotkey) videoClipHotkey = res.settings.videoClipHotkey;
+        if (typeof res.settings.enableFrostedGlass === 'boolean') {
+          applyFrostedGlassSetting(res.settings.enableFrostedGlass);
+        }
+      }
+
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('sounds-updated', res.sounds);
         if (res.videoClips) mainWindow.webContents.send('video-clips-updated', res.videoClips);
+        if (res.deletedSounds) mainWindow.webContents.send('deleted-sounds-updated', res.deletedSounds);
+        if (res.settings) mainWindow.webContents.send('settings-sync', res.settings);
       }
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.webContents.send('sounds-updated', res.sounds);
         if (res.videoClips) overlayWindow.webContents.send('video-clips-updated', res.videoClips);
+        if (res.deletedSounds) overlayWindow.webContents.send('deleted-sounds-updated', res.deletedSounds);
+        if (res.settings) overlayWindow.webContents.send('settings-sync', res.settings);
       }
     }
     return res;
@@ -1777,7 +1804,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.6';
+    let currentVersion = '1.5.7';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -1832,16 +1859,19 @@ function fetchLatestGitHubRelease() {
 
           const isNewer = compareSemver(latestTag, cleanCurrent) > 0;
 
-          // Prefer the Setup/Installer asset first so it updates installed shortcuts and files; fallback to any .exe
+          // Strictly prefer the NSIS Setup installer asset (.exe with 'setup' in name/URL); never pick standalone portable when Setup exists
           let downloadUrl = release.html_url;
           if (Array.isArray(release.assets)) {
-            const setupAsset = release.assets.find(
-              (a) => a.name && a.name.toLowerCase().includes('setup') && a.name.endsWith('.exe')
-            );
-            const anyExeAsset = release.assets.find(
-              (a) => a.name && (a.name.endsWith('.exe') || a.name.endsWith('.msi'))
-            );
-            const targetAsset = setupAsset || anyExeAsset;
+            const setupAsset = release.assets.find((a) => {
+              const name = (a.name || '').toLowerCase();
+              const url = (a.browser_download_url || '').toLowerCase();
+              return (
+                (name.includes('setup') && name.endsWith('.exe')) ||
+                (url.includes('setup') && url.endsWith('.exe'))
+              );
+            });
+            const msiAsset = release.assets.find((a) => (a.name || '').toLowerCase().endsWith('.msi'));
+            const targetAsset = setupAsset || msiAsset;
             if (targetAsset && targetAsset.browser_download_url) {
               downloadUrl = targetAsset.browser_download_url;
             }
@@ -1926,6 +1956,7 @@ ipcMain.handle('download-and-install-update', async (event, downloadUrl) => {
         const req = client.get(url, options, (res) => {
           // Follow HTTP redirects (GitHub asset releases redirect to AWS S3 CDN)
           if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+            res.resume();
             return downloadStream(res.headers.location, redirectCount + 1);
           }
 
@@ -1979,8 +2010,9 @@ ipcMain.handle('download-and-install-update', async (event, downloadUrl) => {
                   });
                   child.unref();
 
-                  // Safely quit running instance so the NSIS installer can update files smoothly
+                  // Safely quit running instance (bypassing minimize-to-tray) so NSIS Setup can overwrite files cleanly
                   setTimeout(() => {
+                    app.isQuitting = true;
                     app.quit();
                   }, 600);
 

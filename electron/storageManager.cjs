@@ -701,6 +701,9 @@ class StorageManager {
     try {
       if (onProgress) onProgress({ percent: 5, stage: 'preparing', detail: 'Reading library data...' });
 
+      // Flush any pending debounced metadata writes before archiving
+      this.flushSync();
+
       const sounds = Array.isArray(liveSounds) && liveSounds.length > 0
         ? liveSounds
         : this.loadSounds();
@@ -749,6 +752,25 @@ class StorageManager {
         }
       }
 
+      // Package deleted sounds archive audio files
+      const packagedDeleted = [];
+      if (Array.isArray(deletedSounds)) {
+        for (const delItem of deletedSounds) {
+          const item = { ...delItem };
+          delete item.audioData;
+          if (item.audioPath && fs.existsSync(item.audioPath)) {
+            try {
+              const fileName = path.basename(item.audioPath);
+              zip.addLocalFile(item.audioPath, 'recycle');
+              item.audioPath = `recycle/${fileName}`;
+            } catch (e) {
+              console.warn('[StorageManager] Failed to pack deleted audio:', item.audioPath, e);
+            }
+          }
+          packagedDeleted.push(item);
+        }
+      }
+
       // Package video files
       const totalClips = videoClips.length;
       const packagedClips = [];
@@ -776,15 +798,16 @@ class StorageManager {
       const manifest = {
         format: 'prism-backup',
         schemaVersion: 2,
-        prismVersion: this.app ? this.app.getVersion() : '1.5.1',
+        prismVersion: this.app ? this.app.getVersion() : '1.5.6',
         exportedAt: new Date().toISOString(),
         counts: {
           sounds: packagedSounds.length,
           videoClips: packagedClips.length,
+          deletedSounds: packagedDeleted.length,
         },
         sounds: packagedSounds,
         videoClips: packagedClips,
-        deletedSounds: Array.isArray(deletedSounds) ? deletedSounds : [],
+        deletedSounds: packagedDeleted,
         settings,
       };
 
@@ -803,9 +826,10 @@ class StorageManager {
 
   /**
    * Import a .prism or legacy .json backup with pre-flight check and safety snapshot.
+   * Restores sounds, videoClips, deletedSounds, and settings from the archive manifest.
    * @param {string} selectedFilePath
    * @param {(progress: { percent: number; stage: string; detail: string }) => void} [onProgress]
-   * @returns {Promise<{ sounds: any[]; videoClips: any[]; settings: any } | null>}
+   * @returns {Promise<{ sounds: any[]; videoClips: any[]; deletedSounds: any[]; settings: any } | null>}
    */
   async importBackup(selectedFilePath, onProgress) {
     try {
@@ -813,15 +837,28 @@ class StorageManager {
 
       if (onProgress) onProgress({ percent: 10, stage: 'validating', detail: 'Verifying backup archive...' });
 
-      // Handle .prism archive
-      if (selectedFilePath.endsWith('.prism') || selectedFilePath.endsWith('.zip')) {
+      // Cancel any pending debounced saves so they cannot overwrite restored manifest data
+      if (this.soundsTimer) { clearTimeout(this.soundsTimer); this.soundsTimer = null; this.pendingSounds = null; }
+      if (this.settingsTimer) { clearTimeout(this.settingsTimer); this.settingsTimer = null; this.pendingSettings = null; }
+      if (this.clipsTimer) { clearTimeout(this.clipsTimer); this.clipsTimer = null; this.pendingClips = null; }
+
+      const lowerPath = selectedFilePath.toLowerCase();
+
+      // Handle .prism / .zip archive
+      if (lowerPath.endsWith('.prism') || lowerPath.endsWith('.zip')) {
         const zip = new AdmZip(selectedFilePath);
-        const manifestEntry = zip.getEntry('manifest.json');
+        const entries = zip.getEntries();
+
+        const manifestEntry =
+          zip.getEntry('manifest.json') ||
+          entries.find((e) => !e.isDirectory && path.basename(e.entryName.replace(/\\/g, '/')).toLowerCase() === 'manifest.json');
+
         if (!manifestEntry) {
           throw new Error('Invalid .prism file: manifest.json not found in archive');
         }
 
-        const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'));
+        const rawManifest = manifestEntry.getData().toString('utf-8').replace(/^\uFEFF/, '');
+        const manifest = JSON.parse(rawManifest);
         if (!manifest.sounds || !Array.isArray(manifest.sounds)) {
           throw new Error('Invalid backup structure: missing sounds array');
         }
@@ -835,30 +872,35 @@ class StorageManager {
 
         if (onProgress) onProgress({ percent: 30, stage: 'extracting', detail: 'Extracting media files...' });
 
-        // Extract media entries
-        const entries = zip.getEntries();
+        // Extract media entries (supports root audio/videos/recycle or nested folder prefix)
         for (const entry of entries) {
           if (!entry.isDirectory) {
             const entryName = entry.entryName.replace(/\\/g, '/');
-            if (entryName.startsWith('audio/')) {
-              const fileName = path.basename(entryName);
+            const fileName = entryName.split('/').pop();
+            if (!fileName) continue;
+
+            if (entryName.startsWith('audio/') || entryName.includes('/audio/')) {
               const destPath = path.join(this.audioDir, fileName);
               fs.writeFileSync(destPath, entry.getData());
-            } else if (entryName.startsWith('videos/')) {
-              const fileName = path.basename(entryName);
+            } else if (entryName.startsWith('videos/') || entryName.includes('/videos/')) {
               const destPath = path.join(this.videosDir, fileName);
+              fs.writeFileSync(destPath, entry.getData());
+            } else if (entryName.startsWith('recycle/') || entryName.includes('/recycle/')) {
+              const destPath = path.join(this.recycleDir, fileName);
               fs.writeFileSync(destPath, entry.getData());
             }
           }
         }
 
-        if (onProgress) onProgress({ percent: 70, stage: 'mapping', detail: 'Restoring library indices...' });
+        if (onProgress) onProgress({ percent: 70, stage: 'mapping', detail: 'Restoring manifest, clips, and settings...' });
+
+        const extractFileName = (p) => String(p).replace(/\\/g, '/').split('/').pop() || '';
 
         // Re-point sounds to local absolute paths
         const restoredSounds = manifest.sounds.map((sound) => {
           const item = { ...sound };
           if (item.audioPath) {
-            const fileName = path.basename(item.audioPath);
+            const fileName = extractFileName(item.audioPath);
             const localAudioPath = path.join(this.audioDir, fileName);
             if (fs.existsSync(localAudioPath)) {
               item.audioPath = localAudioPath;
@@ -873,7 +915,7 @@ class StorageManager {
           restoredClips = manifest.videoClips.map((clip) => {
             const item = { ...clip };
             if (item.filePath) {
-              const fileName = path.basename(item.filePath);
+              const fileName = extractFileName(item.filePath);
               const localVideoPath = path.join(this.videosDir, fileName);
               if (fs.existsSync(localVideoPath)) {
                 item.filePath = localVideoPath;
@@ -883,42 +925,141 @@ class StorageManager {
           });
         }
 
-        // Atomically write restored databases
-        this.saveSounds(restoredSounds, true);
-        this.saveVideoClips(restoredClips, true);
+        // Re-point deleted sounds archive to local RecycleBin paths
+        let restoredDeleted = [];
         if (Array.isArray(manifest.deletedSounds)) {
-          this.atomicWriteJson(this.deletedSoundsFile, manifest.deletedSounds);
-          this.createSnapshot('deleted_sounds', manifest.deletedSounds);
-        }
-        if (manifest.settings) {
-          this.saveSettings({ ...manifest.settings, storageLocation: this.activeStorageRoot }, true);
+          restoredDeleted = manifest.deletedSounds.map((delSound) => {
+            const item = { ...delSound };
+            if (item.audioPath) {
+              const fileName = extractFileName(item.audioPath);
+              const localRecyclePath = path.join(this.recycleDir, fileName);
+              if (fs.existsSync(localRecyclePath)) {
+                item.audioPath = localRecyclePath;
+              }
+            }
+            return item;
+          });
         }
 
-        if (onProgress) onProgress({ percent: 100, stage: 'done', detail: 'Library successfully restored!' });
+        // Atomically write restored databases from manifest
+        this.saveSounds(restoredSounds, true, true);
+        this.saveVideoClips(restoredClips, true);
+        if (Array.isArray(manifest.deletedSounds)) {
+          this.atomicWriteJson(this.deletedSoundsFile, restoredDeleted);
+          this.createSnapshot('deleted_sounds', restoredDeleted);
+        }
+
+        let restoredSettings = null;
+        if (manifest.settings && typeof manifest.settings === 'object') {
+          const baseDefaults = this.loadSettings();
+          restoredSettings = {
+            ...baseDefaults,
+            ...manifest.settings,
+            storageLocation: this.activeStorageRoot,
+          };
+          this.saveSettings(restoredSettings, true);
+        }
+
+        if (onProgress) onProgress({ percent: 100, stage: 'done', detail: 'Library and manifest successfully restored!' });
 
         return {
           sounds: restoredSounds,
           videoClips: restoredClips,
-          settings: manifest.settings || null,
+          deletedSounds: restoredDeleted,
+          settings: restoredSettings,
         };
       }
 
-      // Fallback for legacy .json
-      const backupContent = fs.readFileSync(selectedFilePath, 'utf-8');
+      // Fallback for legacy .json or standalone manifest.json
+      const backupContent = fs.readFileSync(selectedFilePath, 'utf-8').replace(/^\uFEFF/, '');
       const parsed = JSON.parse(backupContent);
-      if (!parsed.sounds || !Array.isArray(parsed.sounds)) {
+      const rawSounds = Array.isArray(parsed) ? parsed : parsed.sounds;
+      if (!rawSounds || !Array.isArray(rawSounds)) {
         throw new Error('Invalid backup file structure: missing sounds array');
       }
 
-      this.saveSounds(parsed.sounds, true);
-      if (parsed.settings) {
-        this.saveSettings(parsed.settings, true);
+      const backupDir = path.dirname(selectedFilePath);
+      const extractFileName = (p) => String(p).replace(/\\/g, '/').split('/').pop() || '';
+
+      const restoredSounds = rawSounds.map((sound) => {
+        const item = { ...sound };
+        if (item.audioPath) {
+          const fileName = extractFileName(item.audioPath);
+          const localAudioPath = path.join(this.audioDir, fileName);
+          const adjacentAudioPath = path.join(backupDir, 'audio', fileName);
+          if (!fs.existsSync(localAudioPath) && fs.existsSync(adjacentAudioPath)) {
+            try { fs.copyFileSync(adjacentAudioPath, localAudioPath); } catch (_) {}
+          }
+          if (fs.existsSync(localAudioPath)) {
+            item.audioPath = localAudioPath;
+          }
+        }
+        return item;
+      });
+
+      const restoredClips = Array.isArray(parsed.videoClips)
+        ? parsed.videoClips.map((clip) => {
+            const item = { ...clip };
+            if (item.filePath) {
+              const fileName = extractFileName(item.filePath);
+              const localVideoPath = path.join(this.videosDir, fileName);
+              const adjacentVideoPath = path.join(backupDir, 'videos', fileName);
+              if (!fs.existsSync(localVideoPath) && fs.existsSync(adjacentVideoPath)) {
+                try { fs.copyFileSync(adjacentVideoPath, localVideoPath); } catch (_) {}
+              }
+              if (fs.existsSync(localVideoPath)) {
+                item.filePath = localVideoPath;
+              }
+            }
+            return item;
+          })
+        : [];
+
+      const restoredDeleted = Array.isArray(parsed.deletedSounds)
+        ? parsed.deletedSounds.map((delSound) => {
+            const item = { ...delSound };
+            if (item.audioPath) {
+              const fileName = extractFileName(item.audioPath);
+              const localRecyclePath = path.join(this.recycleDir, fileName);
+              const adjacentRecyclePath = path.join(backupDir, 'recycle', fileName);
+              if (!fs.existsSync(localRecyclePath) && fs.existsSync(adjacentRecyclePath)) {
+                try { fs.copyFileSync(adjacentRecyclePath, localRecyclePath); } catch (_) {}
+              }
+              if (fs.existsSync(localRecyclePath)) {
+                item.audioPath = localRecyclePath;
+              }
+            }
+            return item;
+          })
+        : [];
+
+      this.saveSounds(restoredSounds, true, true);
+      if (Array.isArray(parsed.videoClips)) {
+        this.saveVideoClips(restoredClips, true);
+      }
+      if (Array.isArray(parsed.deletedSounds)) {
+        this.atomicWriteJson(this.deletedSoundsFile, restoredDeleted);
+        this.createSnapshot('deleted_sounds', restoredDeleted);
       }
 
+      let restoredSettings = null;
+      if (parsed.settings && typeof parsed.settings === 'object') {
+        const baseDefaults = this.loadSettings();
+        restoredSettings = {
+          ...baseDefaults,
+          ...parsed.settings,
+          storageLocation: this.activeStorageRoot,
+        };
+        this.saveSettings(restoredSettings, true);
+      }
+
+      if (onProgress) onProgress({ percent: 100, stage: 'done', detail: 'Backup manifest restored!' });
+
       return {
-        sounds: parsed.sounds,
-        videoClips: [],
-        settings: parsed.settings || null,
+        sounds: restoredSounds,
+        videoClips: restoredClips,
+        deletedSounds: restoredDeleted,
+        settings: restoredSettings,
       };
     } catch (err) {
       console.error('[StorageManager] importBackup error:', err);

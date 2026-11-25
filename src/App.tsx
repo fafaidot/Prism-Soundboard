@@ -467,9 +467,20 @@ export const App: React.FC = () => {
     const cleanupSettingsSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('settings-sync', (newSettings: AudioSettings) => {
           setSettings(newSettings);
+          (window as any).__prismSettings = newSettings;
           const themeDef = getTheme(newSettings.theme, newSettings.accentColor);
           applyThemeToDom(themeDef);
+          const frostedEnabled = newSettings.enableFrostedGlass !== false;
+          document.documentElement.classList.toggle('no-frosted-glass', !frostedEnabled);
+          if (document.body && !isStandaloneOverlay) {
+            document.body.style.backgroundColor = frostedEnabled ? 'transparent' : '#090b10';
+          }
           audioEngine.updateSettings(newSettings);
+          audioEngine.setMasterSpeakerVolume(newSettings.masterSpeakerVolume ?? 100);
+          audioEngine.setMicInputVolume(newSettings.micInputVolume ?? 100);
+          if (newSettings.sortBy) setSortBy(newSettings.sortBy as SortOption);
+          if (newSettings.activeFilter) setActiveFilter(newSettings.activeFilter);
+          if (newSettings.videoClipDuration) videoClipper.setDuration(newSettings.videoClipDuration);
         })
       : () => {};
 
@@ -574,8 +585,15 @@ export const App: React.FC = () => {
         })
       : () => {};
 
+    const cleanupDeletedSync = window.soundboardAPI.onIpcCommand
+      ? window.soundboardAPI.onIpcCommand('deleted-sounds-updated', (deleted: SoundItem[]) => {
+          if (Array.isArray(deleted)) setDeletedSounds(deleted);
+        })
+      : () => {};
+
     return () => {
       cleanupVideoClipsSync();
+      cleanupDeletedSync();
       cleanupTriggerClip();
       cleanupTriggerVideoClip();
       cleanupHotkeys();
@@ -1815,17 +1833,62 @@ export const App: React.FC = () => {
         videoClips={videoClips}
         onOpenClearAllModal={() => setIsClearAllModalOpen(true)}
         onReloadSounds={async () => {
+          if (soundsDebounceTimerRef.current) {
+            clearTimeout(soundsDebounceTimerRef.current);
+            soundsDebounceTimerRef.current = null;
+          }
+          if (settingsDebounceTimerRef.current) {
+            clearTimeout(settingsDebounceTimerRef.current);
+            settingsDebounceTimerRef.current = null;
+          }
+
           if (window.soundboardAPI?.loadSounds) {
             const reloaded = await window.soundboardAPI.loadSounds();
             if (reloaded) {
               setSounds(reloaded);
-              if (reloaded.length > 0) setSelectedSoundId(reloaded[0].id);
+              setSelectedSoundId(reloaded.length > 0 ? reloaded[0].id : null);
+              if (window.soundboardAPI.unregisterAllHotkeys) {
+                await window.soundboardAPI.unregisterAllHotkeys();
+              }
+              reloaded.forEach((s) => {
+                if (s.hotkey) {
+                  window.soundboardAPI?.registerGlobalHotkey(s.hotkey, s.id);
+                }
+              });
             }
           }
           if (window.soundboardAPI?.loadVideoClips) {
             const reloadedClips = await window.soundboardAPI.loadVideoClips();
             if (reloadedClips) {
               setVideoClips(reloadedClips);
+            }
+          }
+          if (window.soundboardAPI?.loadDeletedSounds) {
+            const reloadedDeleted = await window.soundboardAPI.loadDeletedSounds();
+            if (reloadedDeleted) {
+              setDeletedSounds(reloadedDeleted);
+            }
+          }
+          if (window.soundboardAPI?.loadSettings) {
+            const reloadedSettings = await window.soundboardAPI.loadSettings();
+            if (reloadedSettings) {
+              setSettings(reloadedSettings);
+              (window as any).__prismSettings = reloadedSettings;
+              const themeDef = getTheme(reloadedSettings.theme, reloadedSettings.accentColor);
+              applyThemeToDom(themeDef);
+              const frostedEnabled = reloadedSettings.enableFrostedGlass !== false;
+              document.documentElement.classList.toggle('no-frosted-glass', !frostedEnabled);
+              if (document.body) {
+                document.body.style.backgroundColor = frostedEnabled ? 'transparent' : '#090b10';
+              }
+              audioEngine.updateSettings(reloadedSettings);
+              audioEngine.setMasterSpeakerVolume(reloadedSettings.masterSpeakerVolume ?? 100);
+              audioEngine.setMicInputVolume(reloadedSettings.micInputVolume ?? 100);
+              if (reloadedSettings.sortBy) setSortBy(reloadedSettings.sortBy as SortOption);
+              if (reloadedSettings.activeFilter) setActiveFilter(reloadedSettings.activeFilter);
+              if (reloadedSettings.videoClipDuration) {
+                videoClipper.setDuration(reloadedSettings.videoClipDuration);
+              }
             }
           }
         }}
