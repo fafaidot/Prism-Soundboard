@@ -28,6 +28,7 @@ import {
   Copy,
   Wifi,
   Lock,
+  Unlock,
 } from 'lucide-react';
 import { AudioSettings, RemoteServerStatus } from '../types';
 import { audioEngine } from '../services/audioEngine';
@@ -100,6 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [recordingVideoClip, setRecordingVideoClip] = useState(false);
   const [activeTab, setActiveTab] = useState<'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates' | 'remote'>('devices');
   const [remoteStatus, setRemoteStatus] = useState<RemoteServerStatus | null>(null);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [copiedRemoteUrl, setCopiedRemoteUrl] = useState(false);
   const [micLevel, setMicLevel] = useState<number>(0);
   const [rawDb, setRawDb] = useState<number>(-100);
@@ -209,11 +211,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    const syncRemoteStatus = (st: RemoteServerStatus) => {
+      setRemoteStatus(st);
+      const validIds = new Set((st.devices || []).map((d) => d.id));
+      setSelectedDeviceIds((prev) => prev.filter((id) => validIds.has(id)));
+    };
     if (window.soundboardAPI?.getRemoteServerStatus) {
-      window.soundboardAPI.getRemoteServerStatus().then(setRemoteStatus).catch(() => {});
+      window.soundboardAPI.getRemoteServerStatus().then(syncRemoteStatus).catch(() => {});
     }
     const unsub = window.soundboardAPI?.onRemoteServerStatusUpdated?.((st) => {
-      setRemoteStatus(st);
+      syncRemoteStatus(st);
     });
     return () => {
       if (unsub) unsub();
@@ -440,7 +447,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.8',
+        currentVersion: '1.5.9',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -497,7 +504,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h2 className="text-[14px] font-black tracking-wide text-theme-primary flex items-center gap-1.5">
                   PRISM <span style={{ color: accent }}>SETTINGS</span>
                 </h2>
-                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.8</span>
+                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.9</span>
               </div>
             </div>
 
@@ -1945,28 +1952,178 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Session Controls */}
-                      <div className="flex items-center justify-between pt-1">
+                      {/* Session & Temporary Lock Controls */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                         <span className="text-[11.5px] text-theme-muted">
                           {remoteStatus?.connectedClients
-                            ? `${remoteStatus.connectedClients} device stream${remoteStatus.connectedClients > 1 ? 's' : ''} connected live`
+                            ? `${remoteStatus.connectedClients} active session${remoteStatus.connectedClients > 1 ? 's' : ''}`
                             : 'No phones connected right now'}
                         </span>
-                        <button
-                          type="button"
-                          disabled={!remoteStatus?.connectedClients}
-                          onClick={async () => {
-                            if (window.soundboardAPI?.disconnectRemoteClients) {
-                              const st = await window.soundboardAPI.disconnectRemoteClients();
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={!remoteStatus?.devices?.length}
+                            onClick={async () => {
+                              if (!window.soundboardAPI?.setRemoteTempLock || !remoteStatus?.devices?.length) return;
+                              const anyUnlocked = remoteStatus.devices.some((d) => !d.tempLocked);
+                              const st = await window.soundboardAPI.setRemoteTempLock('all', anyUnlocked);
                               setRemoteStatus(st);
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 text-[11.5px] font-semibold disabled:opacity-40 cursor-pointer transition-colors"
-                        >
-                          Lock All Devices
-                        </button>
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11.5px] font-semibold disabled:opacity-40 cursor-pointer transition-colors"
+                          >
+                            {remoteStatus?.devices?.some((d) => !d.tempLocked)
+                              ? 'Temp Lock All'
+                              : remoteStatus?.devices?.length
+                              ? 'Unlock All'
+                              : 'Temp Lock All'}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!remoteStatus?.connectedClients}
+                            onClick={async () => {
+                              if (window.soundboardAPI?.disconnectRemoteClients) {
+                                const st = await window.soundboardAPI.disconnectRemoteClients();
+                                setRemoteStatus(st);
+                              }
+                            }}
+                            title="Disconnects all phones and requires PIN again"
+                            className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 text-[11.5px] font-semibold disabled:opacity-40 cursor-pointer transition-colors"
+                          >
+                            Revoke All (PIN)
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Connected Devices Selection & Per-Device Temporary Lock */}
+                {localSettings.remoteControlEnabled !== false && (
+                  <div className="py-5 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-[12.5px] font-bold text-theme-primary">
+                          Connected Devices ({remoteStatus?.devices?.length || 0})
+                        </h4>
+                        <p className="text-[11px] text-theme-muted">
+                          Temp Lock pauses selected devices until unlocked — reconnecting takes no PIN.
+                        </p>
+                      </div>
+
+                      {selectedDeviceIds.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.soundboardAPI?.setRemoteTempLock) return;
+                              const st = await window.soundboardAPI.setRemoteTempLock(selectedDeviceIds, true);
+                              setRemoteStatus(st);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Lock size={11} />
+                            <span>Temp Lock ({selectedDeviceIds.length})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.soundboardAPI?.setRemoteTempLock) return;
+                              const st = await window.soundboardAPI.setRemoteTempLock(selectedDeviceIds, false);
+                              setRemoteStatus(st);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Unlock size={11} />
+                            <span>Unlock ({selectedDeviceIds.length})</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {remoteStatus?.devices && remoteStatus.devices.length > 0 ? (
+                      <div className="rounded-2xl bg-white/[0.03] border border-white/[0.08] divide-y divide-white/[0.06]">
+                        {remoteStatus.devices.map((dev) => {
+                          const isSelected = selectedDeviceIds.includes(dev.id);
+                          return (
+                            <div
+                              key={dev.id}
+                              onClick={() => {
+                                setSelectedDeviceIds((prev) =>
+                                  prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
+                                );
+                              }}
+                              className={`px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                                isSelected ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedDeviceIds((prev) =>
+                                      prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
+                                    );
+                                  }}
+                                  className="w-4 h-4 rounded border-white/20 accent-sky-400 cursor-pointer shrink-0"
+                                />
+                                <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-theme-secondary shrink-0">
+                                  <Smartphone size={14} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[12.5px] font-semibold text-theme-primary truncate">
+                                      {dev.label}
+                                    </span>
+                                    {dev.tempLocked ? (
+                                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                        Temp Locked
+                                      </span>
+                                    ) : dev.online ? (
+                                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                        Live
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-white/[0.06] text-theme-muted border border-white/[0.1]">
+                                        Standby
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10.5px] font-mono text-theme-muted">
+                                    {dev.ip}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!window.soundboardAPI?.setRemoteTempLock) return;
+                                  const st = await window.soundboardAPI.setRemoteTempLock([dev.id], !dev.tempLocked);
+                                  setRemoteStatus(st);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors ${
+                                  dev.tempLocked
+                                    ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/35 text-emerald-300'
+                                    : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                }`}
+                              >
+                                {dev.tempLocked ? <Unlock size={12} /> : <Lock size={12} />}
+                                <span>{dev.tempLocked ? 'Unlock' : 'Temp Lock'}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.07] text-[11.5px] text-theme-muted text-center">
+                        Connected phones will appear here so you can select and temporarily lock individual devices.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1990,7 +2147,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <h4 className="text-[14px] font-bold text-theme-primary flex items-center gap-2">
                           <span>Prism Soundboard</span>
-                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.8</span>
+                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.9</span>
                         </h4>
                         <p className="text-[11.5px] text-theme-muted">
                           Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -2172,7 +2329,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Clean Footer Bar */}
           <footer className="h-16 px-8 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
             <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
-              <span>Prism Soundboard v1.5.8</span>
+              <span>Prism Soundboard v1.5.9</span>
               <span>•</span>
               <button
                 type="button"

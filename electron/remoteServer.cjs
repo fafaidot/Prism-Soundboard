@@ -45,7 +45,7 @@ class RemoteServer {
     this.qrCache = { url: '', dataUrl: '' };
 
     // Authenticated sessions (in-memory only -> PIN required on every fresh phone connection)
-    /** @type {Map<string, { id: string, createdAt: number, lastSeen: number, userAgent: string, ip: string }>} */
+    /** @type {Map<string, { id: string, createdAt: number, lastSeen: number, userAgent: string, label: string, ip: string, tempLocked: boolean }>} */
     this.sessions = new Map();
     /** @type {Map<string, Set<import('http').ServerResponse>>} */
     this.sseClients = new Map();
@@ -200,6 +200,47 @@ class RemoteServer {
     return total > 0 ? total : this.sessions.size;
   }
 
+  formatDeviceLabel(userAgent = '') {
+    const ua = String(userAgent);
+    let device = 'Phone';
+    if (/iphone/i.test(ua)) device = 'iPhone';
+    else if (/ipad/i.test(ua)) device = 'iPad';
+    else if (/samsung|sm-[a-z0-9]+/i.test(ua)) device = 'Samsung';
+    else if (/pixel/i.test(ua)) device = 'Pixel';
+    else if (/android/i.test(ua)) device = 'Android';
+    else if (/windows/i.test(ua)) device = 'Windows';
+    else if (/macintosh|mac os/i.test(ua)) device = 'Mac';
+
+    let browser = '';
+    if (/edg\//i.test(ua)) browser = 'Edge';
+    else if (/crios|chrome/i.test(ua)) browser = 'Chrome';
+    else if (/fxios|firefox/i.test(ua)) browser = 'Firefox';
+    else if (/safari/i.test(ua)) browser = 'Safari';
+
+    return browser ? `${device} • ${browser}` : device;
+  }
+
+  cleanIp(ip = '') {
+    return String(ip).replace(/^::ffff:/, '');
+  }
+
+  getConnectedDevices() {
+    const devices = [];
+    for (const [token, sess] of this.sessions.entries()) {
+      const online = (this.sseClients.get(token)?.size || 0) > 0;
+      devices.push({
+        id: sess.id,
+        label: sess.label || this.formatDeviceLabel(sess.userAgent),
+        ip: sess.ip,
+        connectedAt: sess.createdAt,
+        lastSeen: sess.lastSeen,
+        online,
+        tempLocked: !!sess.tempLocked,
+      });
+    }
+    return devices.sort((a, b) => a.connectedAt - b.connectedAt);
+  }
+
   async getStatus() {
     const urls = this.isRunning ? this.getLanUrls(this.port) : [];
     const primaryUrl = urls[0] || `http://127.0.0.1:${this.port}`;
@@ -222,6 +263,7 @@ class RemoteServer {
       }
     }
 
+    const devices = this.getConnectedDevices();
     return {
       enabled: this.enabled,
       running: this.isRunning,
@@ -231,6 +273,7 @@ class RemoteServer {
       primaryUrl,
       qrDataUrl,
       connectedClients: this.getConnectedClientCount(),
+      devices,
       error: this.lastError || undefined,
     };
   }
@@ -243,10 +286,29 @@ class RemoteServer {
     }
   }
 
+  sendSseToToken(token, eventName, payload) {
+    const clientSet = this.sseClients.get(token);
+    if (!clientSet || clientSet.size === 0) return;
+    const dataStr = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const res of clientSet) {
+      try {
+        res.write(dataStr);
+      } catch (_) {
+        clientSet.delete(res);
+        if (clientSet.size === 0) {
+          this.sseClients.delete(token);
+        }
+      }
+    }
+  }
+
   broadcastSse(eventName, payload) {
     if (!this.isRunning || this.sseClients.size === 0) return;
     const dataStr = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+    const bypassTempLock = eventName === 'locked' || eventName === 'temp_locked';
     for (const [token, clientSet] of this.sseClients.entries()) {
+      const sess = this.sessions.get(token);
+      if (!bypassTempLock && sess?.tempLocked) continue;
       for (const res of clientSet) {
         try {
           res.write(dataStr);
@@ -322,6 +384,43 @@ class RemoteServer {
     this.sseClients.clear();
     this.sessions.clear();
     this.notifyStatusChanged();
+  }
+
+  /**
+   * Temporarily lock or unlock selected device sessions without requiring a PIN to resume.
+   * @param {string[] | 'all'} deviceIds
+   * @param {boolean} locked
+   */
+  setTempLockForDevices(deviceIds, locked) {
+    const isAll = deviceIds === 'all';
+    const targetIds = Array.isArray(deviceIds) ? new Set(deviceIds) : null;
+    if (!isAll && (!targetIds || targetIds.size === 0)) return false;
+
+    const nextLocked = !!locked;
+    let changed = false;
+
+    for (const [token, sess] of this.sessions.entries()) {
+      if (!isAll && !targetIds.has(sess.id)) continue;
+      if (!!sess.tempLocked === nextLocked) continue;
+
+      sess.tempLocked = nextLocked;
+      changed = true;
+
+      if (nextLocked) {
+        this.sendSseToToken(token, 'temp_locked', {
+          locked: true,
+          reason: 'Temporarily locked from PC',
+        });
+      } else {
+        this.sendSseToToken(token, 'temp_locked', { locked: false });
+        this.sendSseToToken(token, 'state', this.getPublicStateSnapshot());
+      }
+    }
+
+    if (changed) {
+      this.notifyStatusChanged();
+    }
+    return changed;
   }
 
   setPin(newPin) {
@@ -483,7 +582,7 @@ class RemoteServer {
     return qToken ? qToken.trim() : '';
   }
 
-  requireAuth(req, res, parsedUrl) {
+  requireAuth(req, res, parsedUrl, allowWhenTempLocked = false) {
     const token = this.extractToken(req, parsedUrl);
     if (!token || !this.sessions.has(token)) {
       this.sendJson(res, 401, { error: 'PIN authentication required' });
@@ -491,6 +590,10 @@ class RemoteServer {
     }
     const sess = this.sessions.get(token);
     sess.lastSeen = Date.now();
+    if (!allowWhenTempLocked && sess.tempLocked) {
+      this.sendJson(res, 423, { error: 'Device is temporarily locked from PC', tempLocked: true });
+      return null;
+    }
     return { token, session: sess };
   }
 
@@ -550,12 +653,15 @@ class RemoteServer {
 
       this.failedAttempts.delete(clientIp);
       const token = crypto.randomBytes(32).toString('hex');
+      const ua = String(req.headers['user-agent'] || 'Phone');
       this.sessions.set(token, {
         id: crypto.randomBytes(6).toString('hex'),
         createdAt: now,
         lastSeen: now,
-        userAgent: String(req.headers['user-agent'] || 'Phone'),
-        ip: clientIp,
+        userAgent: ua,
+        label: this.formatDeviceLabel(ua),
+        ip: this.cleanIp(clientIp),
+        tempLocked: false,
       });
       this.notifyStatusChanged();
 
@@ -583,39 +689,46 @@ class RemoteServer {
       return this.sendJson(res, 200, { ok: true });
     }
 
-    // Authenticated Endpoints
-    const auth = this.requireAuth(req, res, parsedUrl);
-    if (!auth) return;
-
-    // Live SSE stream
+    // Live SSE stream (remains open while temporarily locked so unlock pushes automatically with no PIN)
     if (method === 'GET' && pathname === '/api/events') {
+      const sseAuth = this.requireAuth(req, res, parsedUrl, true);
+      if (!sseAuth) return;
+
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
       });
 
-      if (!this.sseClients.has(auth.token)) {
-        this.sseClients.set(auth.token, new Set());
+      if (!this.sseClients.has(sseAuth.token)) {
+        this.sseClients.set(sseAuth.token, new Set());
       }
-      this.sseClients.get(auth.token).add(res);
+      this.sseClients.get(sseAuth.token).add(res);
       this.notifyStatusChanged();
 
-      // Push initial snapshot
-      res.write(`event: state\ndata: ${JSON.stringify(this.getPublicStateSnapshot())}\n\n`);
+      if (sseAuth.session.tempLocked) {
+        res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: true, reason: 'Temporarily locked from PC' })}\n\n`);
+      } else {
+        res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: false })}\n\n`);
+        res.write(`event: state\ndata: ${JSON.stringify(this.getPublicStateSnapshot())}\n\n`);
+      }
 
       req.on('close', () => {
-        const set = this.sseClients.get(auth.token);
+        const set = this.sseClients.get(sseAuth.token);
         if (set) {
           set.delete(res);
           if (set.size === 0) {
-            this.sseClients.delete(auth.token);
+            this.sseClients.delete(sseAuth.token);
           }
         }
         this.notifyStatusChanged();
       });
       return;
     }
+
+    // Authenticated Endpoints (blocked with 423 while tempLocked)
+    const auth = this.requireAuth(req, res, parsedUrl, false);
+    if (!auth) return;
 
     if (method === 'GET' && pathname === '/api/state') {
       return this.sendJson(res, 200, this.getPublicStateSnapshot());

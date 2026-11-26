@@ -76,6 +76,16 @@ export interface AudioSettings {
   remoteControlPin?: string; // 4-6 digit PIN required on every phone connection
 }
 
+export interface RemoteConnectedDevice {
+  id: string;
+  label: string;
+  ip: string;
+  connectedAt: number;
+  lastSeen: number;
+  online: boolean;
+  tempLocked: boolean;
+}
+
 export interface RemoteServerStatus {
   enabled: boolean;
   running: boolean;
@@ -85,6 +95,7 @@ export interface RemoteServerStatus {
   primaryUrl: string;
   qrDataUrl: string;
   connectedClients: number;
+  devices?: RemoteConnectedDevice[];
   error?: string;
 }
 
@@ -222,6 +233,7 @@ export interface SoundboardAPI {
   getRemoteServerStatus?: () => Promise<RemoteServerStatus>;
   regenerateRemotePin?: () => Promise<RemoteServerStatus>;
   disconnectRemoteClients?: () => Promise<RemoteServerStatus>;
+  setRemoteTempLock?: (deviceIds: string[] | 'all', locked: boolean) => Promise<RemoteServerStatus>;
   onRemoteServerStatusUpdated?: (callback: (status: RemoteServerStatus) => void) => () => void;
 }
 

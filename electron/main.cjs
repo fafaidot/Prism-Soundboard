@@ -1883,7 +1883,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.8';
+    let currentVersion = '1.5.9';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -2678,6 +2678,11 @@ ipcMain.handle('regenerate-remote-pin', async () => {
 
 ipcMain.handle('disconnect-remote-clients', async () => {
   remoteServer.disconnectAllClients('Disconnected from desktop');
+  return remoteServer.getStatus();
+});
+
+ipcMain.handle('set-remote-temp-lock', async (_event, { deviceIds, locked }) => {
+  remoteServer.setTempLockForDevices(deviceIds, !!locked);
   return remoteServer.getStatus();
 });
 

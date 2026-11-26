@@ -149,6 +149,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   getRemoteServerStatus: () => ipcRenderer.invoke('get-remote-server-status'),
   regenerateRemotePin: () => ipcRenderer.invoke('regenerate-remote-pin'),
   disconnectRemoteClients: () => ipcRenderer.invoke('disconnect-remote-clients'),
+  setRemoteTempLock: (deviceIds, locked) => ipcRenderer.invoke('set-remote-temp-lock', { deviceIds, locked }),
   onRemoteServerStatusUpdated: (callback) => {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on('remote-server-status-updated', handler);

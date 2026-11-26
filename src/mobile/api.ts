@@ -177,6 +177,7 @@ export interface StreamCallbacks {
   onSettings: (settings: RemoteSettingsSnapshot) => void;
   onRecording: (isRecordingClip: boolean) => void;
   onToast: (toast: { message: string; kind?: string }) => void;
+  onTempLocked: (payload: { locked: boolean; reason?: string }) => void;
   onLocked: (reason: string) => void;
   onConnectionChange: (connected: boolean) => void;
 }
@@ -207,6 +208,7 @@ export function connectRemoteEvents(token: string, cb: StreamCallbacks): () => v
   bind<RemoteSettingsSnapshot>('settings', cb.onSettings);
   bind<{ isRecordingClip: boolean }>('recording', (d) => cb.onRecording(!!d.isRecordingClip));
   bind<{ message: string; kind?: string }>('toast', cb.onToast);
+  bind<{ locked: boolean; reason?: string }>('temp_locked', cb.onTempLocked);
   bind<{ reason?: string }>('locked', (d) => {
     es.close();
     cb.onLocked(d.reason || 'Disconnected');

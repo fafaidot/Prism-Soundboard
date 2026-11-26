@@ -22,6 +22,7 @@ import {
   Maximize2,
   Minimize2,
   Menu,
+  Wifi,
 } from 'lucide-react';
 import { SoundItem, VideoClipItem, YouTubeSearchResult } from '../types';
 import {
@@ -65,6 +66,8 @@ export const MobileApp: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [hostName, setHostName] = useState('Studio PC');
   const [lockMessage, setLockMessage] = useState<string | null>(null);
+  const [isTempLocked, setIsTempLocked] = useState(false);
+  const [tempLockReason, setTempLockReason] = useState<string>('Temporarily locked from PC');
   const [isStreamConnected, setIsStreamConnected] = useState(false);
 
   const [sounds, setSounds] = useState<SoundItem[]>([]);
@@ -165,8 +168,20 @@ export const MobileApp: React.FC = () => {
       onSettings: setSettings,
       onRecording: setIsRecordingClip,
       onToast: (t) => showToast(t.message, t.kind),
+      onTempLocked: (d) => {
+        setIsTempLocked(!!d.locked);
+        if (d.locked) {
+          setTempLockReason(d.reason || 'Temporarily locked from PC');
+          setEditingSoundId(null);
+          setIsAddOpen(false);
+          setPlayingClip(null);
+        } else {
+          showToast('Unlocked from PC', 'success');
+        }
+      },
       onLocked: (reason) => {
         setToken(null);
+        setIsTempLocked(false);
         setIsStreamConnected(false);
         setLockMessage(reason || 'Session locked on desktop');
       },
@@ -178,6 +193,7 @@ export const MobileApp: React.FC = () => {
   const handlePinSubmit = async (pin: string) => {
     const res = await verifyPin(pin);
     setLockMessage(null);
+    setIsTempLocked(false);
     applySnapshot(res.state);
     setToken(res.token);
   };
@@ -185,6 +201,7 @@ export const MobileApp: React.FC = () => {
   const handleLock = async () => {
     if (token) await logoutSession(token);
     setToken(null);
+    setIsTempLocked(false);
     setIsStreamConnected(false);
     setLockMessage(null);
   };
@@ -242,6 +259,59 @@ export const MobileApp: React.FC = () => {
     return <PinGate hostName={hostName} lockMessage={lockMessage} onSubmitPin={handlePinSubmit} />;
   }
 
+  if (isTempLocked) {
+    return (
+      <div className="min-h-[100dvh] w-full bg-[#07090e] flex flex-col items-center justify-between px-6 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] select-none relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[360px] h-[220px] rounded-full blur-[110px] opacity-20"
+          style={{ background: '#f59e0b' }}
+        />
+
+        <div className="w-full max-w-sm flex items-center justify-between pt-1 relative z-10">
+          <div className="flex items-center gap-2.5">
+            <img src={prismLogo} alt="Prism" className="w-6 h-6 object-contain" />
+            <span className="text-[15px] font-bold tracking-tight text-white">Prism Deck</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/[0.09] text-[11px] font-medium text-slate-300">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isStreamConnected ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
+            <Wifi size={12} className="text-amber-400" />
+            <span className="max-w-[130px] truncate">{hostName || 'Studio PC'}</span>
+          </div>
+        </div>
+
+        <div className="w-full max-w-xs flex flex-col items-center text-center gap-4 my-auto relative z-10">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/35 flex items-center justify-center text-amber-300 shadow-[0_0_28px_rgba(245,158,11,0.18)]">
+            <Lock size={24} />
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="text-[20px] font-bold tracking-tight text-white">
+              {tempLockReason}
+            </h1>
+            <p className="text-[13px] text-slate-400 leading-relaxed">
+              Your session is paused. When unlocked from your PC, this screen will reconnect automatically with no PIN needed.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11.5px] font-medium text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span>{isStreamConnected ? 'Waiting for PC unlock...' : 'Reconnecting stream...'}</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLock}
+          className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-[12px] font-semibold text-slate-300 cursor-pointer relative z-10"
+        >
+          Disconnect (Require PIN)
+        </button>
+      </div>
+    );
+  }
+
   const handleUploadAudioFile = async (file: File, customTitle?: string) => {
     if (file.size > 35 * 1024 * 1024) {
       throw new Error('File must be 35 MB or smaller');
@@ -261,9 +331,18 @@ export const MobileApp: React.FC = () => {
     showToast(`Added ${customTitle || file.name}`, 'success');
   };
 
+  const handleApiError = (err: any, fallback: string) => {
+    if (err?.status === 423) {
+      setIsTempLocked(true);
+      setTempLockReason(err.message || 'Temporarily locked from PC');
+      return;
+    }
+    showToast(err?.message || fallback, 'error');
+  };
+
   const handlePadTrigger = (soundId: string) => {
     navigator.vibrate?.(12);
-    triggerSound(token, soundId).catch((e) => showToast(e.message, 'error'));
+    triggerSound(token, soundId).catch((e) => handleApiError(e, 'Trigger failed'));
   };
 
   const handleTriggerAudioClip = async () => {
@@ -272,7 +351,7 @@ export const MobileApp: React.FC = () => {
       await triggerAudioClip(token, settings.recordDuration);
       showToast(`Capturing last ${settings.recordDuration}s audio clip...`);
     } catch (e: any) {
-      showToast(e.message || 'Audio clip failed', 'error');
+      handleApiError(e, 'Audio clip failed');
     }
   };
 
@@ -285,7 +364,7 @@ export const MobileApp: React.FC = () => {
       setTimeout(() => setIsTriggeringVideoClip(false), 6000);
     } catch (e: any) {
       setIsTriggeringVideoClip(false);
-      showToast(e.message || 'Video clip failed', 'error');
+      handleApiError(e, 'Video clip failed');
     }
   };
 
