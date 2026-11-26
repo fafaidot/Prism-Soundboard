@@ -15,12 +15,12 @@ import { InGameOverlayModal } from './components/InGameOverlayModal';
 import { VBCableSetupModal } from './components/VBCableSetupModal';
 import { audioEngine } from './services/audioEngine';
 import { videoClipper } from './services/videoClipper';
-import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem } from './types';
+import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem, RemoteServerStatus } from './types';
 import { ClipCard } from './components/ClipCard';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
-import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Music, Video, Settings, ChevronDown, Check, Trash2 } from 'lucide-react';
+import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Music, Video, Settings, ChevronDown, Check, Trash2, Smartphone } from 'lucide-react';
 import prismLogo from './assets/Prism.png';
 
 const DEFAULT_SETTINGS: AudioSettings = {
@@ -106,6 +106,8 @@ export const App: React.FC = () => {
   // Modals state
   const [isYouTubeModalOpen, setIsYouTubeModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates' | 'remote'>('devices');
+  const [remoteStatus, setRemoteStatus] = useState<RemoteServerStatus | null>(null);
   const [isTrimmerModalOpen, setIsTrimmerModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
@@ -492,6 +494,11 @@ export const App: React.FC = () => {
 
     const cleanupSoundsSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('sounds-updated', (newSounds: SoundItem[]) => {
+          if (soundsDebounceTimerRef.current) {
+            clearTimeout(soundsDebounceTimerRef.current);
+            soundsDebounceTimerRef.current = null;
+          }
+          pendingSoundsToPersistRef.current = newSounds;
           setSounds(newSounds);
           if (Array.isArray(newSounds)) {
             newSounds.forEach((s) => {
@@ -502,6 +509,30 @@ export const App: React.FC = () => {
           }
         })
       : () => {};
+
+    const cleanupRemoteTrigger = window.soundboardAPI.onIpcCommand
+      ? window.soundboardAPI.onIpcCommand('remote-trigger-sound', (soundId: string) => {
+          if (!isStandaloneOverlay) {
+            const currentList = soundsRef.current;
+            const target = currentList.find((s) => s.id === soundId);
+            if (target) {
+              setSelectedSoundId(target.id);
+              lastPlayedSoundIdRef.current = target.id;
+              audioEngine.triggerSound(target, currentList);
+            }
+          }
+        })
+      : () => {};
+
+    const cleanupRemoteStatus = window.soundboardAPI.onRemoteServerStatusUpdated
+      ? window.soundboardAPI.onRemoteServerStatusUpdated((status) => {
+          setRemoteStatus(status);
+        })
+      : () => {};
+
+    if (!isStandaloneOverlay && window.soundboardAPI.getRemoteServerStatus) {
+      window.soundboardAPI.getRemoteServerStatus().then(setRemoteStatus).catch(() => {});
+    }
 
     const cleanupLiveVolumeSync = window.soundboardAPI.onIpcCommand
       ? window.soundboardAPI.onIpcCommand('live-sound-volume-updated', ({ soundId, volume }: { soundId: string; volume: number }) => {
@@ -608,6 +639,8 @@ export const App: React.FC = () => {
       cleanupSettingsSync();
       cleanupProgressSync();
       cleanupSoundsSync();
+      cleanupRemoteTrigger();
+      cleanupRemoteStatus();
       cleanupLiveVolumeSync();
       cleanupLiveSpeedSync();
       cleanupLiveSeek();
@@ -853,11 +886,13 @@ export const App: React.FC = () => {
     if (isRecordingClip) return;
     const duration = settings.recordDuration || 5;
     setIsRecordingClip(true);
+    window.soundboardAPI?.sendIpcCommand?.('sync-recording-clip', true);
 
     try {
       // Instantly extracts the previous N seconds from the rolling PCM buffer
       const clip = await audioEngine.clipLastSeconds(duration);
       setIsRecordingClip(false);
+      window.soundboardAPI?.sendIpcCommand?.('sync-recording-clip', false);
 
       if (window.soundboardAPI?.saveRecordedAudio) {
         const title = `Clipped (${duration}s) ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
@@ -897,6 +932,7 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       setIsRecordingClip(false);
+      window.soundboardAPI?.sendIpcCommand?.('sync-recording-clip', false);
       console.error('Clip last seconds failed:', err);
     }
   };
@@ -1380,8 +1416,31 @@ export const App: React.FC = () => {
             </button>
           </div>
 
-          {/* Bottom Rail: Archive & Settings */}
+          {/* Bottom Rail: Phone Remote, Archive & Settings */}
           <div className="flex flex-col items-center gap-2">
+            {/* Phone Remote Deck */}
+            <button
+              onClick={() => {
+                setSettingsInitialTab('remote');
+                setIsSettingsModalOpen(true);
+              }}
+              title={
+                remoteStatus?.running
+                  ? `Phone Remote (${remoteStatus.connectedClients} connected) — ${remoteStatus.primaryUrl}`
+                  : 'Phone Remote Deck'
+              }
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer relative"
+            >
+              <Smartphone size={16} />
+              {remoteStatus?.running && (
+                <span
+                  className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-[#090b10] ${
+                    remoteStatus.connectedClients > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400/80'
+                  }`}
+                />
+              )}
+            </button>
+
             {/* Deleted Archive */}
             <button
               onClick={() => setIsRestoreModalOpen(true)}
@@ -1398,7 +1457,10 @@ export const App: React.FC = () => {
 
             {/* Settings */}
             <button
-              onClick={() => setIsSettingsModalOpen(true)}
+              onClick={() => {
+                setSettingsInitialTab('devices');
+                setIsSettingsModalOpen(true);
+              }}
               title="Settings"
               className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer"
             >
@@ -1824,6 +1886,7 @@ export const App: React.FC = () => {
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
+        initialTab={settingsInitialTab}
         settings={settings}
         onClose={() => setIsSettingsModalOpen(false)}
         onSaveSettings={handleSaveSettings}

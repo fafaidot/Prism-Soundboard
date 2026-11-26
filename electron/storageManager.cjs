@@ -499,10 +499,18 @@ class StorageManager {
       sortBy: 'newest',
       activeFilter: 'all',
       storageLocation: this.activeStorageRoot,
+      remoteControlEnabled: true,
+      remoteControlPort: 3940,
+      remoteControlPin: '',
     };
 
     const loaded = this.loadWithAutoRecovery(this.settingsFile, 'settings', defaults);
-    return { ...defaults, ...loaded };
+    const merged = { ...defaults, ...loaded };
+    if (!merged.remoteControlPin || !/^\d{4,6}$/.test(String(merged.remoteControlPin))) {
+      merged.remoteControlPin = String(Math.floor(1000 + Math.random() * 9000));
+      this.atomicWriteJson(this.settingsFile, merged);
+    }
+    return merged;
   }
 
   /**

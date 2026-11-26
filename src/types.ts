@@ -71,6 +71,21 @@ export interface AudioSettings {
   activeFilter?: 'all' | 'clips' | 'youtube' | 'favorites';
   storageLocation?: string; // Unified root folder, e.g. "D:\Prism" -> contains /Sounds and /Videos
   enableFrostedGlass?: boolean; // Translucent frosted glass and Windows 11 acrylic effects (default: true)
+  remoteControlEnabled?: boolean; // Enable local Wi-Fi mobile remote server
+  remoteControlPort?: number; // Default 3940
+  remoteControlPin?: string; // 4-6 digit PIN required on every phone connection
+}
+
+export interface RemoteServerStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  pin: string;
+  urls: string[];
+  primaryUrl: string;
+  qrDataUrl: string;
+  connectedClients: number;
+  error?: string;
 }
 
 export interface VideoClipItem {
@@ -202,6 +217,12 @@ export interface SoundboardAPI {
   getStorageDirectories?: () => Promise<{ root: string; sounds: string; videos: string }>;
   changeStorageLocation?: (newRootPath: string) => Promise<{ success: boolean; root: string; sounds: string; videos: string; error?: string }>;
   selectStorageFolderDialog?: () => Promise<string | null>;
+
+  // Mobile Remote Server (LAN Wi-Fi Deck)
+  getRemoteServerStatus?: () => Promise<RemoteServerStatus>;
+  regenerateRemotePin?: () => Promise<RemoteServerStatus>;
+  disconnectRemoteClients?: () => Promise<RemoteServerStatus>;
+  onRemoteServerStatusUpdated?: (callback: (status: RemoteServerStatus) => void) => () => void;
 }
 
 declare global {

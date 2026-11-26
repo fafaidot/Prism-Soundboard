@@ -144,5 +144,15 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   getStorageDirectories: () => ipcRenderer.invoke('get-storage-directories'),
   changeStorageLocation: (newRootPath) => ipcRenderer.invoke('change-storage-location', newRootPath),
   selectStorageFolderDialog: () => ipcRenderer.invoke('select-storage-folder-dialog'),
+
+  // Mobile Remote Server (LAN Wi-Fi Deck)
+  getRemoteServerStatus: () => ipcRenderer.invoke('get-remote-server-status'),
+  regenerateRemotePin: () => ipcRenderer.invoke('regenerate-remote-pin'),
+  disconnectRemoteClients: () => ipcRenderer.invoke('disconnect-remote-clients'),
+  onRemoteServerStatusUpdated: (callback) => {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on('remote-server-status-updated', handler);
+    return () => ipcRenderer.removeListener('remote-server-status-updated', handler);
+  },
 });
 

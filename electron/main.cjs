@@ -2,6 +2,38 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const AdmZip = require('adm-zip');
+const { RemoteServer } = require('./remoteServer.cjs');
+
+const remoteServer = new RemoteServer();
+let latestSoundsCache = null;
+
+function getEffectiveSounds() {
+  if (Array.isArray(latestSoundsCache)) return latestSoundsCache;
+  latestSoundsCache = storageManager.loadSounds();
+  return latestSoundsCache;
+}
+
+function broadcastVideoClipsUpdate(clips) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('video-clips-updated', clips);
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('video-clips-updated', clips);
+  }
+  remoteServer.updateVideoClips(clips);
+}
+
+function commitRemoteSoundsChange(updatedSounds) {
+  latestSoundsCache = updatedSounds;
+  storageManager.saveSounds(updatedSounds, true);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('sounds-updated', updatedSounds);
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('sounds-updated', updatedSounds);
+  }
+  remoteServer.updateSounds(updatedSounds);
+}
 
 process.on('uncaughtException', (err) => {
   try {
@@ -440,6 +472,7 @@ function startVideosDirectoryWatcher() {
               if (overlayWindow && !overlayWindow.isDestroyed()) {
                 overlayWindow.webContents.send('video-clips-updated', updated);
               }
+              remoteServer.updateVideoClips(updated);
               console.log(`[VideoWatch] Removed deleted clip from list: ${filename}`);
             }
           } catch (e) {
@@ -788,6 +821,7 @@ public class CoreAudioHelper {
     createTray();
     startGlobalKeyHook();
     startVideosDirectoryWatcher();
+    initRemoteServer().catch((err) => console.error('[RemoteServer] Init failed:', err));
   });
 
   app.on('before-quit', () => {
@@ -797,6 +831,7 @@ public class CoreAudioHelper {
 
   app.on('will-quit', () => {
     storageManager.flushSync();
+    remoteServer.stop();
     if (hookProcess) {
       try {
         hookProcess.kill();
@@ -873,27 +908,34 @@ ipcMain.on('sync-trigger-video-clip', () => {
 });
 
 ipcMain.on('sync-active-sounds', (_event, activeIds) => {
-  // Broadcast active playing sounds to overlay window so card badges light up
+  // Broadcast active playing sounds to overlay window & connected mobile clients
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('active-sounds-updated', activeIds);
   }
+  remoteServer.updateActiveSounds(activeIds);
 });
 
 ipcMain.on('sync-progress-map', (_event, progressMap) => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('progress-map-updated', progressMap);
   }
+  remoteServer.updateProgressMap(progressMap);
 });
 
 ipcMain.on('sync-paused-sounds', (_event, pausedIds) => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('paused-sounds-updated', pausedIds);
   }
+  remoteServer.updatePausedSounds(pausedIds);
 });
 
 ipcMain.on('sync-sounds-updated', (event, sounds) => {
   // Pure in-memory inter-window bridge: do NOT write to disk on sync events.
   // Disk persistence is strictly handled by the 'save-sounds' IPC handler.
+  if (Array.isArray(sounds)) {
+    latestSoundsCache = sounds;
+    remoteServer.updateSounds(sounds);
+  }
   if (overlayWindow && !overlayWindow.isDestroyed() && event.sender !== overlayWindow.webContents) {
     overlayWindow.webContents.send('sounds-updated', sounds);
   }
@@ -903,6 +945,10 @@ ipcMain.on('sync-sounds-updated', (event, sounds) => {
 });
 
 ipcMain.on('sync-sound-volume-live', (_event, { soundId, volume }) => {
+  if (Array.isArray(latestSoundsCache)) {
+    latestSoundsCache = latestSoundsCache.map((s) => (s.id === soundId ? { ...s, volume } : s));
+    remoteServer.updateSounds(latestSoundsCache);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('live-sound-volume-updated', { soundId, volume });
   }
@@ -912,12 +958,20 @@ ipcMain.on('sync-sound-volume-live', (_event, { soundId, volume }) => {
 });
 
 ipcMain.on('sync-sound-speed-live', (_event, { soundId, speed }) => {
+  if (Array.isArray(latestSoundsCache)) {
+    latestSoundsCache = latestSoundsCache.map((s) => (s.id === soundId ? { ...s, speed } : s));
+    remoteServer.updateSounds(latestSoundsCache);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('live-sound-speed-updated', { soundId, speed });
   }
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('live-sound-speed-updated', { soundId, speed });
   }
+});
+
+ipcMain.on('sync-recording-clip', (_event, isRecording) => {
+  remoteServer.updateRecordingClip(!!isRecording);
 });
 
 ipcMain.on('sync-seek-sound', (_event, { soundId, progress }) => {
@@ -968,6 +1022,7 @@ ipcMain.on('sync-settings-changed', (event, newSettings) => {
     if (typeof newSettings.enableFrostedGlass === 'boolean') {
       applyFrostedGlassSetting(newSettings.enableFrostedGlass);
     }
+    remoteServer.applySettings(newSettings).catch(() => {});
   } catch (err) {
     console.error('Failed to save settings on sync:', err);
   }
@@ -1038,11 +1093,16 @@ ipcMain.handle('get-desktop-screen-sources', async () => {
 
 // Storage handlers
 ipcMain.handle('load-sounds', async () => {
-  return storageManager.loadSounds();
+  const loaded = storageManager.loadSounds();
+  latestSoundsCache = loaded;
+  remoteServer.updateSounds(loaded);
+  return loaded;
 });
 
 ipcMain.handle('save-sounds', async (_event, sounds) => {
+  latestSoundsCache = sounds;
   storageManager.saveSounds(sounds);
+  remoteServer.updateSounds(sounds);
   return true;
 });
 
@@ -1168,6 +1228,12 @@ ipcMain.handle('import-soundboard-backup', async (event) => {
         if (res.deletedSounds) overlayWindow.webContents.send('deleted-sounds-updated', res.deletedSounds);
         if (res.settings) overlayWindow.webContents.send('settings-sync', res.settings);
       }
+      if (Array.isArray(res.sounds)) {
+        latestSoundsCache = res.sounds;
+        remoteServer.updateSounds(res.sounds);
+      }
+      if (res.videoClips) remoteServer.updateVideoClips(res.videoClips);
+      if (res.settings) remoteServer.applySettings(res.settings).catch(() => {});
     }
     return res;
   } catch (err) {
@@ -1180,6 +1246,9 @@ ipcMain.handle('reset-all-app-data', async () => {
   try {
     const success = storageManager.resetAllAppData();
     if (success) {
+      latestSoundsCache = [];
+      remoteServer.updateSounds([]);
+      remoteServer.updateVideoClips([]);
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('sounds-updated', []);
         mainWindow.webContents.send('video-clips-updated', []);
@@ -1302,6 +1371,7 @@ ipcMain.handle('save-settings', async (_event, settings) => {
     if (overlayWindow && !overlayWindow.isDestroyed() && _event.sender !== overlayWindow.webContents) {
       overlayWindow.webContents.send('settings-sync', settings);
     }
+    remoteServer.applySettings(settings).catch(() => {});
 
     return true;
   } catch (err) {
@@ -1310,8 +1380,7 @@ ipcMain.handle('save-settings', async (_event, settings) => {
   }
 });
 
-// YouTube In-App Search
-ipcMain.handle('search-youtube', async (_event, query) => {
+function performYouTubeSearch(query) {
   return new Promise((resolve) => {
     if (!query || !query.trim()) {
       return resolve([]);
@@ -1375,13 +1444,11 @@ ipcMain.handle('search-youtube', async (_event, query) => {
       resolve([]);
     });
   });
-});
+}
 
-// YouTube Trending Music Fetcher (Pulls real trending music from YouTube's Top Songs chart)
-ipcMain.handle('get-trending-music', async () => {
+function performTrendingYouTube() {
   return new Promise((resolve) => {
     const ytDlp = getYtDlpPath();
-    // YouTube Top Songs & Music Hits chart playlist
     const trendingSource = 'https://www.youtube.com/playlist?list=PLDIoUOhQQPlXr63I_vwF9GD8sAKh77dWU';
 
     const args = [
@@ -1432,12 +1499,10 @@ ipcMain.handle('get-trending-music', async () => {
         } catch (err) {}
       }
 
-      // If playlist returned items, resolve them
       if (results.length > 0) {
         return resolve(results);
       }
 
-      // Fallback query if playlist was unavailable
       const fallbackTarget = 'ytsearch12:top music hits official audio';
       execFile(ytDlp, [fallbackTarget, '--flat-playlist', '--dump-json', '--no-playlist', '--ignore-errors'], { windowsHide: true }, (_err, fallbackOut) => {
         if (!fallbackOut) return resolve([]);
@@ -1478,27 +1543,11 @@ ipcMain.handle('get-trending-music', async () => {
       resolve([]);
     });
   });
-});
+}
 
-// YouTube Audio Preview (instant stream URL)
-ipcMain.handle('get-youtube-preview-url', async (_event, url) => {
-  return new Promise((resolve) => {
-    const ytDlp = getYtDlpPath();
-    const args = ['-g', '-f', 'ba/b', '--no-playlist', url];
-
-    execFile(ytDlp, args, { windowsHide: true }, (error, stdout) => {
-      if (error || !stdout) {
-        return resolve(null);
-      }
-      const streamUrl = stdout.trim().split('\n')[0];
-      resolve(streamUrl || null);
-    });
-  });
-});
-
-// YouTube Audio Download
-ipcMain.handle('download-youtube-audio', async (_event, { url, title: customTitle }) => {
+function performDownloadYouTubeAudio(url, customTitle) {
   return new Promise((resolve, reject) => {
+    ensureStorageDirectories();
     const ytDlp = getYtDlpPath();
     const fileId = `yt_${Date.now()}`;
     const outputTemplate = path.join(AUDIO_DIR, `${fileId}.%(ext)s`);
@@ -1542,7 +1591,6 @@ ipcMain.handle('download-youtube-audio', async (_event, { url, title: customTitl
           }
         }
 
-        // Find the saved audio file
         const files = fs.readdirSync(AUDIO_DIR).filter((f) => f.startsWith(fileId));
         if (files.length === 0) {
           return reject(new Error('Audio file not found after download.'));
@@ -1558,14 +1606,12 @@ ipcMain.handle('download-youtube-audio', async (_event, { url, title: customTitl
         else if (ext === 'ogg') mime = 'ogg';
         const audioData = `data:audio/${mime};base64,${audioBuffer.toString('base64')}`;
 
-        // Get thumbnail base64 if available
         let thumbUrl = meta.thumbnail || (meta.thumbnails && meta.thumbnails.length ? meta.thumbnails[meta.thumbnails.length - 1].url : '');
-        let thumbBase64 = thumbUrl;
 
         resolve({
           filePath: audioFilePath,
           audioData,
-          thumbnail: thumbBase64,
+          thumbnail: thumbUrl,
           duration: meta.duration || 0,
           title: customTitle || meta.title || 'Downloaded Sound',
           author: meta.channel || meta.uploader || 'YouTube',
@@ -1580,6 +1626,37 @@ ipcMain.handle('download-youtube-audio', async (_event, { url, title: customTitl
       reject(err);
     });
   });
+}
+
+// YouTube In-App Search
+ipcMain.handle('search-youtube', async (_event, query) => {
+  return performYouTubeSearch(query);
+});
+
+// YouTube Trending Music Fetcher (Pulls real trending music from YouTube's Top Songs chart)
+ipcMain.handle('get-trending-music', async () => {
+  return performTrendingYouTube();
+});
+
+// YouTube Audio Preview (instant stream URL)
+ipcMain.handle('get-youtube-preview-url', async (_event, url) => {
+  return new Promise((resolve) => {
+    const ytDlp = getYtDlpPath();
+    const args = ['-g', '-f', 'ba/b', '--no-playlist', url];
+
+    execFile(ytDlp, args, { windowsHide: true }, (error, stdout) => {
+      if (error || !stdout) {
+        return resolve(null);
+      }
+      const streamUrl = stdout.trim().split('\n')[0];
+      resolve(streamUrl || null);
+    });
+  });
+});
+
+// YouTube Audio Download
+ipcMain.handle('download-youtube-audio', async (_event, { url, title: customTitle }) => {
+  return performDownloadYouTubeAudio(url, customTitle);
 });
 
 // Process dropped or selected audio file paths into SoundItem imported format
@@ -1647,11 +1724,13 @@ ipcMain.handle('save-recorded-audio', async (_event, { base64, duration, title }
     fs.writeFileSync(destPath, buffer);
 
     const audioData = `data:${mime};base64,${buffer.toString('base64')}`;
+    const savedTitle = title || `Recorded Clip ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    remoteServer.broadcastToast(`Saved audio clip: ${savedTitle}`, 'success');
     return {
       filePath: destPath,
       audioData,
       duration: duration || 0,
-      title: title || `Recorded Clip ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      title: savedTitle,
     };
   } catch (err) {
     console.error('Error saving recorded audio:', err);
@@ -1804,7 +1883,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.7';
+    let currentVersion = '1.5.8';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -2057,12 +2136,7 @@ ipcMain.handle('load-video-clips', async () => {
 ipcMain.handle('save-video-clips', async (_event, clips) => {
   try {
     storageManager.saveVideoClips(clips);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('video-clips-updated', clips);
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('video-clips-updated', clips);
-    }
+    broadcastVideoClipsUpdate(clips);
     return true;
   } catch (err) {
     console.error('Failed to save video clips:', err);
@@ -2103,12 +2177,8 @@ ipcMain.handle('save-recorded-video-clip', async (_event, { base64, duration, ti
     const updated = [newClip, ...existingClips];
     storageManager.saveVideoClips(updated, true);
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('video-clips-updated', updated);
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('video-clips-updated', updated);
-    }
+    broadcastVideoClipsUpdate(updated);
+    remoteServer.broadcastToast(`Saved video clip: ${newClip.title}`, 'success');
 
     return newClip;
   } catch (err) {
@@ -2129,12 +2199,7 @@ ipcMain.handle('delete-video-clip', async (_event, clipId) => {
     const updated = clips.filter((c) => c.id !== clipId);
     storageManager.saveVideoClips(updated, true);
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('video-clips-updated', updated);
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('video-clips-updated', updated);
-    }
+    broadcastVideoClipsUpdate(updated);
     return true;
   } catch (err) {
     console.error('Error deleting video clip:', err);
@@ -2148,12 +2213,7 @@ ipcMain.handle('rename-video-clip', async (_event, { clipId, newTitle }) => {
     const updated = clips.map((c) => (c.id === clipId ? { ...c, title: newTitle } : c));
     storageManager.saveVideoClips(updated, true);
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('video-clips-updated', updated);
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('video-clips-updated', updated);
-    }
+    broadcastVideoClipsUpdate(updated);
     return true;
   } catch (err) {
     console.error('Error renaming video clip:', err);
@@ -2167,12 +2227,7 @@ ipcMain.handle('toggle-favorite-video-clip', async (_event, clipId) => {
     const updated = clips.map((c) => (c.id === clipId ? { ...c, isFavorite: !c.isFavorite } : c));
     storageManager.saveVideoClips(updated, true);
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('video-clips-updated', updated);
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('video-clips-updated', updated);
-    }
+    broadcastVideoClipsUpdate(updated);
     return true;
   } catch (err) {
     console.error('Error toggling favorite video clip:', err);
@@ -2228,16 +2283,9 @@ ipcMain.handle('extract-audio-from-video-clip', async (_event, clip) => {
     };
 
     // Append to sounds library using storageManager
-    const currentSounds = storageManager.loadSounds();
+    const currentSounds = getEffectiveSounds();
     const updatedSounds = [soundItem, ...currentSounds];
-    storageManager.saveSounds(updatedSounds, true);
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('sounds-updated', updatedSounds);
-    }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send('sounds-updated', updatedSounds);
-    }
+    commitRemoteSoundsChange(updatedSounds);
 
     return soundItem;
   } catch (err) {
@@ -2283,6 +2331,9 @@ ipcMain.handle('change-storage-location', async (event, newRootPath) => {
 
       const sounds = storageManager.loadSounds();
       const clips = storageManager.loadVideoClips();
+      latestSoundsCache = sounds;
+      remoteServer.updateSounds(sounds);
+      remoteServer.updateVideoClips(clips);
 
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('sounds-updated', sounds);
@@ -2299,6 +2350,335 @@ ipcMain.handle('change-storage-location', async (event, newRootPath) => {
     console.error('Error changing storage location:', err);
     return { success: false, error: err.message || 'Failed to move storage files.' };
   }
+});
+
+function pushRemoteServerStatus(status) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('remote-server-status-updated', status);
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('remote-server-status-updated', status);
+  }
+}
+
+async function initRemoteServer() {
+  const initialSettings = storageManager.loadSettings();
+  const initialSounds = storageManager.loadSounds();
+  const initialClips = storageManager.loadVideoClips();
+
+  latestSoundsCache = initialSounds;
+  remoteServer.updateSounds(initialSounds);
+  remoteServer.updateVideoClips(initialClips);
+
+  remoteServer.configure({
+    distDir: path.join(__dirname, '../dist'),
+    devServerUrl: process.env.VITE_DEV_SERVER_URL || '',
+    appVersion: app.getVersion(),
+    handlers: {
+      onStatusChanged: (status) => {
+        pushRemoteServerStatus(status);
+      },
+      triggerSound: async (soundId) => {
+        const sounds = getEffectiveSounds();
+        const exists = sounds.some((s) => s.id === soundId);
+        if (!exists) return false;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('remote-trigger-sound', soundId);
+          return true;
+        }
+        return false;
+      },
+      stopAll: async () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('panic-hotkey-triggered');
+        }
+      },
+      togglePauseSound: async (soundId) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('live-toggle-pause-sound', soundId);
+        }
+      },
+      seekSound: async (soundId, progress) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('live-seek-sound', { soundId, progress });
+        }
+      },
+      skipSound: async (soundId, deltaSeconds) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('live-skip-sound', { soundId, deltaSeconds });
+        }
+      },
+      triggerAudioClip: async (duration) => {
+        const currentSettings = storageManager.loadSettings();
+        if (typeof duration === 'number' && duration >= 3 && duration <= 60 && duration !== currentSettings.recordDuration) {
+          const nextSettings = { ...currentSettings, recordDuration: duration };
+          storageManager.saveSettings(nextSettings, true);
+          remoteServer.updateSettings(nextSettings);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('settings-sync', nextSettings);
+          }
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.webContents.send('settings-sync', nextSettings);
+          }
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('trigger-record-clip');
+        }
+      },
+      triggerVideoClip: async (duration) => {
+        const currentSettings = storageManager.loadSettings();
+        if (typeof duration === 'number' && duration >= 5 && duration <= 120 && duration !== currentSettings.videoClipDuration) {
+          const nextSettings = { ...currentSettings, videoClipDuration: duration };
+          storageManager.saveSettings(nextSettings, true);
+          remoteServer.updateSettings(nextSettings);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('settings-sync', nextSettings);
+          }
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.webContents.send('settings-sync', nextSettings);
+          }
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('trigger-video-clip');
+        }
+      },
+      updateSound: async (soundId, patch) => {
+        const current = getEffectiveSounds();
+        const idx = current.findIndex((s) => s.id === soundId);
+        if (idx === -1) return null;
+
+        const target = current[idx];
+        const allowedPatch = {};
+        if (typeof patch.title === 'string' && patch.title.trim()) allowedPatch.title = patch.title.trim().slice(0, 140);
+        if (typeof patch.volume === 'number') allowedPatch.volume = Math.max(0, Math.min(200, Math.round(patch.volume)));
+        if (typeof patch.speed === 'number') allowedPatch.speed = Math.max(0.5, Math.min(2.0, Math.round(patch.speed * 100) / 100));
+        if (typeof patch.pitch === 'number') allowedPatch.pitch = Math.max(-12, Math.min(12, patch.pitch));
+        if (typeof patch.isFavorite === 'boolean') allowedPatch.isFavorite = patch.isFavorite;
+        if (['overlap', 'pause', 'stop', 'restart', 'push_loop'].includes(patch.reproductionMode)) {
+          allowedPatch.reproductionMode = patch.reproductionMode;
+        }
+        if (patch.reproductionOptions && typeof patch.reproductionOptions === 'object') {
+          allowedPatch.reproductionOptions = {
+            stopOtherSounds: !!patch.reproductionOptions.stopOtherSounds,
+            muteOtherSounds: !!patch.reproductionOptions.muteOtherSounds,
+            muteVoice: !!patch.reproductionOptions.muteVoice,
+            loop: !!patch.reproductionOptions.loop,
+            ...(target.reproductionOptions || {}),
+            ...patch.reproductionOptions,
+          };
+        }
+        if (typeof patch.trimStart === 'number') allowedPatch.trimStart = Math.max(0, patch.trimStart);
+        if (typeof patch.trimEnd === 'number') allowedPatch.trimEnd = Math.max(0, patch.trimEnd);
+
+        const updatedSound = { ...target, ...allowedPatch };
+        const updatedList = current.map((s) => (s.id === soundId ? updatedSound : s));
+        commitRemoteSoundsChange(updatedList);
+
+        if (typeof allowedPatch.volume === 'number') {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('live-sound-volume-updated', { soundId, volume: allowedPatch.volume });
+          }
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.webContents.send('live-sound-volume-updated', { soundId, volume: allowedPatch.volume });
+          }
+        }
+        if (typeof allowedPatch.speed === 'number') {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('live-sound-speed-updated', { soundId, speed: allowedPatch.speed });
+          }
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.webContents.send('live-sound-speed-updated', { soundId, speed: allowedPatch.speed });
+          }
+        }
+
+        return updatedSound;
+      },
+      deleteSound: async (soundId) => {
+        const current = getEffectiveSounds();
+        const target = current.find((s) => s.id === soundId);
+        if (!target) return false;
+
+        if (target.hotkey) {
+          const norm = normalizeKey(target.hotkey);
+          if (norm) registeredHotkeys.delete(norm);
+        }
+
+        storageManager.moveToDeleted(target);
+        const filtered = current.filter((s) => s.id !== soundId);
+        commitRemoteSoundsChange(filtered);
+
+        const deletedList = storageManager.loadDeletedSounds();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('deleted-sounds-updated', deletedList);
+        }
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send('deleted-sounds-updated', deletedList);
+        }
+        return true;
+      },
+      uploadSound: async ({ fileName, mimeType, base64, title, duration }) => {
+        ensureStorageDirectories();
+        const allowedExts = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.webm'];
+        const rawExt = path.extname(String(fileName || 'sound.mp3')).toLowerCase();
+        const safeExt = allowedExts.includes(rawExt) ? rawExt : '.mp3';
+        const cleanBase = path.basename(String(fileName || 'sound'), rawExt).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Phone Upload';
+        const destFileName = `mobile_${Date.now()}_${cleanBase}${safeExt}`;
+        const destPath = path.join(AUDIO_DIR, destFileName);
+
+        const stripped = String(base64 || '').replace(/^data:[^;]+;base64,/, '');
+        const buffer = Buffer.from(stripped, 'base64');
+        fs.writeFileSync(destPath, buffer);
+
+        const extKey = safeExt.replace('.', '');
+        let mime = mimeType || `audio/${extKey}`;
+        if (extKey === 'm4a') mime = 'audio/mp4';
+        else if (extKey === 'mp3') mime = 'audio/mpeg';
+
+        const newSound = {
+          id: `sound_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+          title: (title && String(title).trim()) || cleanBase,
+          author: 'Phone Upload',
+          source: 'local',
+          audioPath: destPath,
+          audioData: `data:${mime};base64,${buffer.toString('base64')}`,
+          thumbnail: '',
+          duration: Number(duration) || 0,
+          hotkey: '',
+          volume: 100,
+          reproductionMode: 'stop',
+          reproductionOptions: {
+            stopOtherSounds: true,
+            muteOtherSounds: false,
+            muteVoice: false,
+            loop: false,
+          },
+          playCount: 0,
+          isFavorite: false,
+          dateAdded: Date.now(),
+        };
+
+        const current = getEffectiveSounds();
+        const updatedList = [newSound, ...current];
+        commitRemoteSoundsChange(updatedList);
+        remoteServer.broadcastToast(`Added ${newSound.title}`, 'success');
+        return newSound;
+      },
+      searchYouTube: async (query) => performYouTubeSearch(query),
+      getTrendingYouTube: async () => performTrendingYouTube(),
+      downloadYouTubeSound: async ({ url, title, thumbnail, durationSec }) => {
+        const downloaded = await performDownloadYouTubeAudio(url, title);
+        const newSound = {
+          id: `sound_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+          title: downloaded.title,
+          author: downloaded.author,
+          source: 'youtube',
+          audioPath: downloaded.filePath,
+          audioData: downloaded.audioData,
+          thumbnail: downloaded.thumbnail || thumbnail || '',
+          duration: downloaded.duration || durationSec || 0,
+          hotkey: '',
+          volume: 100,
+          reproductionMode: 'stop',
+          reproductionOptions: {
+            stopOtherSounds: true,
+            muteOtherSounds: false,
+            muteVoice: false,
+            loop: false,
+          },
+          playCount: 0,
+          isFavorite: false,
+          dateAdded: Date.now(),
+        };
+
+        const current = getEffectiveSounds();
+        const updatedList = [newSound, ...current];
+        commitRemoteSoundsChange(updatedList);
+        remoteServer.broadcastToast(`Added ${newSound.title}`, 'success');
+        return newSound;
+      },
+      updateSettings: async (patch) => {
+        const current = storageManager.loadSettings();
+        const next = { ...current };
+        if (typeof patch.masterSpeakerVolume === 'number') {
+          const vol = Math.max(0, Math.min(100, Math.round(patch.masterSpeakerVolume)));
+          next.masterSpeakerVolume = vol;
+          next.masterMicVolume = vol;
+        }
+        if (typeof patch.micInputVolume === 'number') {
+          next.micInputVolume = Math.max(0, Math.min(200, Math.round(patch.micInputVolume)));
+        }
+        if (typeof patch.hearMyself === 'boolean') next.hearMyself = patch.hearMyself;
+        if (typeof patch.isMicPassThroughEnabled === 'boolean') next.isMicPassThroughEnabled = patch.isMicPassThroughEnabled;
+        if (typeof patch.recordDuration === 'number') next.recordDuration = Math.max(3, Math.min(60, patch.recordDuration));
+        if (typeof patch.videoClipDuration === 'number') next.videoClipDuration = Math.max(5, Math.min(120, patch.videoClipDuration));
+
+        storageManager.saveSettings(next, true);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('settings-sync', next);
+        }
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send('settings-sync', next);
+        }
+        remoteServer.updateSettings(next);
+        return next;
+      },
+      updateVideoClip: async (clipId, patch) => {
+        const clips = storageManager.loadVideoClips();
+        const idx = clips.findIndex((c) => c.id === clipId);
+        if (idx === -1) return null;
+        const target = clips[idx];
+        const nextClip = {
+          ...target,
+          ...(typeof patch.title === 'string' && patch.title.trim() ? { title: patch.title.trim().slice(0, 140) } : {}),
+          ...(typeof patch.isFavorite === 'boolean' ? { isFavorite: patch.isFavorite } : {}),
+        };
+        const updated = clips.map((c) => (c.id === clipId ? nextClip : c));
+        storageManager.saveVideoClips(updated, true);
+        broadcastVideoClipsUpdate(updated);
+        return nextClip;
+      },
+      deleteVideoClip: async (clipId) => {
+        const clips = storageManager.loadVideoClips();
+        const target = clips.find((c) => c.id === clipId);
+        if (!target) return false;
+        if (target.filePath && fs.existsSync(target.filePath)) {
+          try {
+            fs.unlinkSync(target.filePath);
+          } catch (_) {}
+        }
+        const updated = clips.filter((c) => c.id !== clipId);
+        storageManager.saveVideoClips(updated, true);
+        broadcastVideoClipsUpdate(updated);
+        return true;
+      },
+    },
+  });
+
+  await remoteServer.applySettings(initialSettings);
+}
+
+ipcMain.handle('get-remote-server-status', async () => {
+  return remoteServer.getStatus();
+});
+
+ipcMain.handle('regenerate-remote-pin', async () => {
+  const newPin = RemoteServer.generatePin();
+  const current = storageManager.loadSettings();
+  const next = { ...current, remoteControlPin: newPin };
+  storageManager.saveSettings(next, true);
+  remoteServer.setPin(newPin);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('settings-sync', next);
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('settings-sync', next);
+  }
+  return remoteServer.getStatus();
+});
+
+ipcMain.handle('disconnect-remote-clients', async () => {
+  remoteServer.disconnectAllClients('Disconnected from desktop');
+  return remoteServer.getStatus();
 });
 
 function compareSemver(v1, v2) {
