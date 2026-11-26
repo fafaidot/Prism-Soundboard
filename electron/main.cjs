@@ -1883,7 +1883,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.9';
+    let currentVersion = '1.5.10';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -2604,11 +2604,8 @@ async function initRemoteServer() {
           next.masterSpeakerVolume = vol;
           next.masterMicVolume = vol;
         }
-        if (typeof patch.micInputVolume === 'number') {
-          next.micInputVolume = Math.max(0, Math.min(200, Math.round(patch.micInputVolume)));
-        }
-        if (typeof patch.hearMyself === 'boolean') next.hearMyself = patch.hearMyself;
-        if (typeof patch.isMicPassThroughEnabled === 'boolean') next.isMicPassThroughEnabled = patch.isMicPassThroughEnabled;
+        // Microphone / voice volume controls (micInputVolume, hearMyself, isMicPassThroughEnabled)
+        // are intentionally disabled for remote clients to prevent tampering with host voice.
         if (typeof patch.recordDuration === 'number') next.recordDuration = Math.max(3, Math.min(60, patch.recordDuration));
         if (typeof patch.videoClipDuration === 'number') next.videoClipDuration = Math.max(5, Math.min(120, patch.videoClipDuration));
 
@@ -2683,6 +2680,11 @@ ipcMain.handle('disconnect-remote-clients', async () => {
 
 ipcMain.handle('set-remote-temp-lock', async (_event, { deviceIds, locked }) => {
   remoteServer.setTempLockForDevices(deviceIds, !!locked);
+  return remoteServer.getStatus();
+});
+
+ipcMain.handle('remove-remote-devices', async (_event, deviceIds) => {
+  remoteServer.disconnectDevices(deviceIds, 'Removed from desktop');
   return remoteServer.getStatus();
 });
 

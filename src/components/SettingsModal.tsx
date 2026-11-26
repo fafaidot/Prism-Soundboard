@@ -447,7 +447,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.9',
+        currentVersion: '1.5.10',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -504,7 +504,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h2 className="text-[14px] font-black tracking-wide text-theme-primary flex items-center gap-1.5">
                   PRISM <span style={{ color: accent }}>SETTINGS</span>
                 </h2>
-                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.9</span>
+                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.10</span>
               </div>
             </div>
 
@@ -2037,6 +2037,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <Unlock size={11} />
                             <span>Unlock ({selectedDeviceIds.length})</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.soundboardAPI?.removeRemoteDevices) return;
+                              const st = await window.soundboardAPI.removeRemoteDevices(selectedDeviceIds);
+                              setRemoteStatus(st);
+                              setSelectedDeviceIds([]);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 size={11} />
+                            <span>Remove ({selectedDeviceIds.length})</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2098,23 +2111,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </div>
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!window.soundboardAPI?.setRemoteTempLock) return;
-                                  const st = await window.soundboardAPI.setRemoteTempLock([dev.id], !dev.tempLocked);
-                                  setRemoteStatus(st);
-                                }}
-                                className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors ${
-                                  dev.tempLocked
-                                    ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/35 text-emerald-300'
-                                    : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
-                                }`}
-                              >
-                                {dev.tempLocked ? <Unlock size={12} /> : <Lock size={12} />}
-                                <span>{dev.tempLocked ? 'Unlock' : 'Temp Lock'}</span>
-                              </button>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!window.soundboardAPI?.setRemoteTempLock) return;
+                                    const st = await window.soundboardAPI.setRemoteTempLock([dev.id], !dev.tempLocked);
+                                    setRemoteStatus(st);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                                    dev.tempLocked
+                                      ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/35 text-emerald-300'
+                                      : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
+                                  }`}
+                                >
+                                  {dev.tempLocked ? <Unlock size={12} /> : <Lock size={12} />}
+                                  <span>{dev.tempLocked ? 'Unlock' : 'Temp Lock'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title="Remove device (requires PIN to reconnect)"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!window.soundboardAPI?.removeRemoteDevices) return;
+                                    const st = await window.soundboardAPI.removeRemoteDevices([dev.id]);
+                                    setRemoteStatus(st);
+                                    setSelectedDeviceIds((prev) => prev.filter((id) => id !== dev.id));
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg border bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/25 text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Remove</span>
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
@@ -2147,7 +2178,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <h4 className="text-[14px] font-bold text-theme-primary flex items-center gap-2">
                           <span>Prism Soundboard</span>
-                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.9</span>
+                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.10</span>
                         </h4>
                         <p className="text-[11.5px] text-theme-muted">
                           Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -2329,7 +2360,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Clean Footer Bar */}
           <footer className="h-16 px-8 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
             <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
-              <span>Prism Soundboard v1.5.9</span>
+              <span>Prism Soundboard v1.5.10</span>
               <span>•</span>
               <button
                 type="button"

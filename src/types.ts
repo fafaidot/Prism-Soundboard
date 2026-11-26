@@ -234,6 +234,7 @@ export interface SoundboardAPI {
   regenerateRemotePin?: () => Promise<RemoteServerStatus>;
   disconnectRemoteClients?: () => Promise<RemoteServerStatus>;
   setRemoteTempLock?: (deviceIds: string[] | 'all', locked: boolean) => Promise<RemoteServerStatus>;
+  removeRemoteDevices?: (deviceIds: string[] | 'all') => Promise<RemoteServerStatus>;
   onRemoteServerStatusUpdated?: (callback: (status: RemoteServerStatus) => void) => () => void;
 }
 

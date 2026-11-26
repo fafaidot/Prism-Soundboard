@@ -9,8 +9,6 @@ import {
   Lock,
   Star,
   Volume2,
-  Mic,
-  Headphones,
   Play,
   Pause,
   SlidersHorizontal,
@@ -80,9 +78,6 @@ export const MobileApp: React.FC = () => {
     theme: 'dark',
     masterSpeakerVolume: 100,
     masterMicVolume: 100,
-    micInputVolume: 100,
-    hearMyself: false,
-    isMicPassThroughEnabled: true,
     recordDuration: 5,
     videoClipDuration: 30,
     recordSource: 'all',
@@ -584,77 +579,31 @@ export const MobileApp: React.FC = () => {
           </div>
         )}
 
-        {/* Collapsible PC Master Mixer Drawer */}
+        {/* Collapsible Soundboard Volume Drawer (Host mic/voice controls disabled remotely) */}
         {showMixer && (
-          <div className="mt-2 p-3 rounded-2xl bg-[#10141f] border border-white/[0.12] shadow-2xl space-y-2.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11.5px]">
-                  <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                    <Volume2 size={13} style={{ color: 'var(--accent)' }} />
-                    PC Output & Virtual Mic
-                  </span>
-                  <span className="font-mono-tabular font-bold text-white">
-                    {settings.masterSpeakerVolume}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={settings.masterSpeakerVolume}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setSettings((prev) => ({ ...prev, masterSpeakerVolume: val, masterMicVolume: val }));
-                    updateSettings(token, { masterSpeakerVolume: val }).catch(() => {});
-                  }}
-                  className="prism-range w-full"
-                />
+          <div className="mt-2 p-3 rounded-2xl bg-[#10141f] border border-white/[0.12] shadow-2xl space-y-2">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11.5px]">
+                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <Volume2 size={13} style={{ color: 'var(--accent)' }} />
+                  Soundboard Output Volume
+                </span>
+                <span className="font-mono-tabular font-bold text-white">
+                  {settings.masterSpeakerVolume}%
+                </span>
               </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11.5px]">
-                  <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                    <Mic size={13} style={{ color: 'var(--accent)' }} />
-                    Mic Projection Gain
-                  </span>
-                  <span className="font-mono-tabular font-bold text-white">
-                    {settings.micInputVolume}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={200}
-                  value={settings.micInputVolume}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setSettings((prev) => ({ ...prev, micInputVolume: val }));
-                    updateSettings(token, { micInputVolume: val }).catch(() => {});
-                  }}
-                  className="prism-range w-full"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !settings.hearMyself;
-                  setSettings((prev) => ({ ...prev, hearMyself: next }));
-                  updateSettings(token, { hearMyself: next }).catch(() => {});
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={settings.masterSpeakerVolume}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setSettings((prev) => ({ ...prev, masterSpeakerVolume: val, masterMicVolume: val }));
+                  updateSettings(token, { masterSpeakerVolume: val }).catch(() => {});
                 }}
-                style={settings.hearMyself ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
-                className={`h-8 px-3 rounded-lg border text-[11.5px] font-semibold flex items-center gap-1.5 cursor-pointer ${
-                  settings.hearMyself
-                    ? 'bg-white/[0.08]'
-                    : 'bg-white/[0.04] border-white/[0.09] text-slate-300'
-                }`}
-              >
-                <Headphones size={13} />
-                <span>Hear Myself: {settings.hearMyself ? 'On' : 'Off'}</span>
-              </button>
+                className="prism-range w-full"
+              />
             </div>
           </div>
         )}

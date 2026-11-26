@@ -5,9 +5,6 @@ export interface RemoteSettingsSnapshot {
   theme: string;
   masterSpeakerVolume: number;
   masterMicVolume: number;
-  micInputVolume: number;
-  hearMyself: boolean;
-  isMicPassThroughEnabled: boolean;
   recordDuration: number;
   videoClipDuration: number;
   recordSource: 'all' | 'screen' | 'mic';

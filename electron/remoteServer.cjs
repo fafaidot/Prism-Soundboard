@@ -169,9 +169,6 @@ class RemoteServer {
       theme: s.theme || 'dark',
       masterSpeakerVolume: typeof s.masterSpeakerVolume === 'number' ? s.masterSpeakerVolume : 100,
       masterMicVolume: typeof s.masterMicVolume === 'number' ? s.masterMicVolume : 100,
-      micInputVolume: typeof s.micInputVolume === 'number' ? s.micInputVolume : 100,
-      hearMyself: !!s.hearMyself,
-      isMicPassThroughEnabled: s.isMicPassThroughEnabled !== false,
       recordDuration: s.recordDuration || 5,
       videoClipDuration: s.videoClipDuration || 30,
       recordSource: s.recordSource || 'all',
@@ -384,6 +381,39 @@ class RemoteServer {
     this.sseClients.clear();
     this.sessions.clear();
     this.notifyStatusChanged();
+  }
+
+  /**
+   * Disconnect and remove specific or all device sessions (requires PIN to reconnect).
+   * @param {string[] | 'all'} deviceIds
+   * @param {string} [reason]
+   */
+  disconnectDevices(deviceIds, reason = 'Removed from desktop') {
+    const isAll = deviceIds === 'all';
+    const targetIds = Array.isArray(deviceIds) ? new Set(deviceIds) : null;
+    if (!isAll && (!targetIds || targetIds.size === 0)) return false;
+
+    let changed = false;
+    for (const [token, sess] of [...this.sessions.entries()]) {
+      if (!isAll && !targetIds.has(sess.id)) continue;
+      changed = true;
+      this.sendSseToToken(token, 'locked', { reason });
+      const clientSet = this.sseClients.get(token);
+      if (clientSet) {
+        for (const res of clientSet) {
+          try {
+            res.end();
+          } catch (_) {}
+        }
+        this.sseClients.delete(token);
+      }
+      this.sessions.delete(token);
+    }
+
+    if (changed) {
+      this.notifyStatusChanged();
+    }
+    return changed;
   }
 
   /**
@@ -849,10 +879,14 @@ class RemoteServer {
       return this.sendJson(res, 201, { sound: this.sanitizeSound(created) });
     }
 
-    // Remote mixer / recorder settings
+    // Remote soundboard volume / clip duration settings (host mic/voice volume stripped)
     if (method === 'PATCH' && pathname === '/api/settings') {
-      const patch = await this.readJsonBody(req);
-      const updated = await this.handlers.updateSettings?.(patch);
+      const rawPatch = await this.readJsonBody(req);
+      const safePatch = {};
+      if (typeof rawPatch.masterSpeakerVolume === 'number') safePatch.masterSpeakerVolume = rawPatch.masterSpeakerVolume;
+      if (typeof rawPatch.recordDuration === 'number') safePatch.recordDuration = rawPatch.recordDuration;
+      if (typeof rawPatch.videoClipDuration === 'number') safePatch.videoClipDuration = rawPatch.videoClipDuration;
+      const updated = await this.handlers.updateSettings?.(safePatch);
       return this.sendJson(res, 200, { settings: this.sanitizeSettings(updated) });
     }
 
