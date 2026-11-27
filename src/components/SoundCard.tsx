@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Music, Clapperboard, Play, Square } from 'lucide-react';
-import { SoundItem } from '../types';
+import { SoundItem, ActivePlaybackEntry } from '../types';
 
 interface SoundCardProps {
   sound: SoundItem;
   isSelected: boolean;
   isPlaying: boolean;
+  playingActor?: ActivePlaybackEntry | null;
   playbackProgress?: number;
   accentColor: string;
   isListeningHotkey?: boolean;
@@ -21,6 +22,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
   sound,
   isSelected,
   isPlaying,
+  playingActor,
   accentColor,
   onSelect,
   onPlay,
@@ -131,6 +133,17 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
           </div>
         )}
 
+        {/* Active Player Initials Badge (Top-Right) */}
+        {isPlaying && playingActor && (
+          <div
+            style={{ backgroundColor: playingActor.color }}
+            title={`Playing: ${playingActor.actorName}`}
+            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full border-2 border-[#090b10] shadow-lg flex items-center justify-center text-[9.5px] font-black text-slate-950 tracking-tight z-30 pointer-events-none"
+          >
+            {playingActor.initials}
+          </div>
+        )}
+
         {/* Duration badge (Bottom-Right) */}
         <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[9.5px] font-mono text-slate-300 font-medium z-20 pointer-events-none tabular-nums">
           {formatDuration(sound.duration)}
@@ -158,6 +171,9 @@ export const SoundCard = React.memo(SoundCardComponent, (prev, next) => {
     prev.sound.isFavorite === next.sound.isFavorite &&
     prev.isSelected === next.isSelected &&
     prev.isPlaying === next.isPlaying &&
+    prev.playingActor?.actorId === next.playingActor?.actorId &&
+    prev.playingActor?.initials === next.playingActor?.initials &&
+    prev.playingActor?.color === next.playingActor?.color &&
     prev.playbackProgress === next.playbackProgress &&
     prev.accentColor === next.accentColor
   );

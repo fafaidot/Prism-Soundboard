@@ -34,12 +34,24 @@ const MAX_JSON_BODY_BYTES = 40 * 1024 * 1024; // 40 MB (supports phone audio upl
 
 const DEFAULT_GUEST_PERMISSIONS = {
   canStopAll: false,
+  canControlVolume: false,
   canEditSounds: false,
   canDeleteSounds: false,
   canAddSounds: false,
   canAudioClip: false,
   canVideoClip: false,
 };
+
+const FRIEND_COLORS = [
+  '#fb7185', // rose
+  '#fbbf24', // amber
+  '#34d399', // emerald
+  '#a78bfa', // violet
+  '#f472b6', // pink
+  '#22d3ee', // cyan
+  '#fb923c', // orange
+  '#a3e635', // lime
+];
 
 class RemoteServer {
   constructor() {
@@ -71,15 +83,124 @@ class RemoteServer {
       activeSoundIds: [],
       pausedSoundIds: [],
       progressMap: {},
+      activePlaybacks: [],
       settings: {},
       isRecordingClip: false,
       appVersion: '1.5.7',
     };
 
+    // Rolling live activity log (newest first, max 150)
+    this.activityLog = [];
+
     // Callbacks supplied by electron/main.cjs
     this.handlers = {};
     this.heartbeatTimer = null;
     this.lastProgressBroadcastAt = 0;
+  }
+
+  computeInitials(name = '', fallback = 'FR') {
+    const clean = String(name || '').trim();
+    if (!clean) return fallback;
+    const words = clean.split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return clean.slice(0, 2).toUpperCase();
+  }
+
+  pickFriendColor() {
+    const counts = new Map();
+    for (const c of FRIEND_COLORS) counts.set(c, 0);
+    for (const sess of this.sessions.values()) {
+      if (sess.role === 'guest' && sess.color && counts.has(sess.color)) {
+        counts.set(sess.color, counts.get(sess.color) + 1);
+      }
+    }
+    let best = FRIEND_COLORS[0];
+    let minCount = Infinity;
+    for (const c of FRIEND_COLORS) {
+      const n = counts.get(c) || 0;
+      if (n < minCount) {
+        minCount = n;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  getActorFromSession(sess) {
+    if (!sess) {
+      return {
+        id: 'host-pc',
+        name: 'Host (PC)',
+        initials: 'PC',
+        color: this.state.settings?.accentColor || '#38bdf8',
+        role: 'owner',
+      };
+    }
+    if (sess.role === 'owner') {
+      return {
+        id: sess.id,
+        name: sess.label || 'Host Phone',
+        initials: sess.initials || 'HP',
+        color: sess.color || this.state.settings?.accentColor || '#38bdf8',
+        role: 'owner',
+      };
+    }
+    const name = sess.friendName || sess.label || 'Friend';
+    return {
+      id: sess.id,
+      name,
+      initials: sess.initials || this.computeInitials(name, 'FR'),
+      color: sess.color || '#a78bfa',
+      role: 'guest',
+    };
+  }
+
+  recordActivity({ type, actor, action, detail = '', soundId = '' }) {
+    const who = actor || this.getActorFromSession(null);
+    const entry = {
+      id: crypto.randomBytes(6).toString('hex'),
+      timestamp: Date.now(),
+      type: type || 'play',
+      actorId: who.id || 'host-pc',
+      actorName: who.name || 'Host (PC)',
+      initials: who.initials || this.computeInitials(who.name, 'PC'),
+      color: who.color || '#38bdf8',
+      actorRole: who.role === 'guest' ? 'guest' : 'owner',
+      action: String(action || ''),
+      detail: detail ? String(detail) : undefined,
+      soundId: soundId ? String(soundId) : undefined,
+    };
+    this.activityLog.unshift(entry);
+    if (this.activityLog.length > 150) {
+      this.activityLog.length = 150;
+    }
+    this.notifyStatusChanged();
+    return entry;
+  }
+
+  clearActivityLog() {
+    this.activityLog = [];
+    this.notifyStatusChanged();
+  }
+
+  recordDesktopActivity(evt) {
+    if (!evt || !evt.action) return;
+    const hostActor = {
+      id: 'host-pc',
+      name: 'Host (PC)',
+      initials: 'PC',
+      color: this.state.settings?.accentColor || '#38bdf8',
+      role: 'owner',
+    };
+    this.recordActivity({
+      type: evt.type || 'play',
+      actor: hostActor,
+      action: evt.action,
+      detail: evt.detail || '',
+      soundId: evt.soundId || '',
+    });
   }
 
   /**
@@ -193,6 +314,7 @@ class RemoteServer {
         role: 'owner',
         permissions: {
           canStopAll: true,
+          canControlVolume: true,
           canEditSounds: true,
           canDeleteSounds: true,
           canAddSounds: true,
@@ -204,8 +326,10 @@ class RemoteServer {
     return {
       role: 'guest',
       name: sess.friendName || '',
+      initials: sess.initials || this.computeInitials(sess.friendName || sess.label, 'FR'),
+      color: sess.color || '#a78bfa',
       requiresName: !sess.friendName,
-      permissions: { ...(sess.permissions || this.guestPermissions) },
+      permissions: { ...DEFAULT_GUEST_PERMISSIONS, ...(sess.permissions || this.guestPermissions) },
     };
   }
 
@@ -216,6 +340,7 @@ class RemoteServer {
       activeSoundIds: this.state.activeSoundIds || [],
       pausedSoundIds: this.state.pausedSoundIds || [],
       progressMap: this.state.progressMap || {},
+      activePlaybacks: this.state.activePlaybacks || [],
       settings: this.sanitizeSettings(this.state.settings),
       isRecordingClip: !!this.state.isRecordingClip,
       hostName: os.hostname(),
@@ -294,6 +419,8 @@ class RemoteServer {
         id: sess.id,
         role: sess.role || 'owner',
         name: sess.friendName || '',
+        initials: sess.initials || (sess.role === 'owner' ? 'HP' : this.computeInitials(sess.friendName || sess.label, 'FR')),
+        color: sess.color || (sess.role === 'owner' ? this.state.settings?.accentColor || '#38bdf8' : '#a78bfa'),
         label: sess.label || this.formatDeviceLabel(sess.userAgent),
         ip: sess.ip,
         connectedAt: sess.createdAt,
@@ -343,6 +470,8 @@ class RemoteServer {
       qrDataUrl,
       connectedClients: this.getConnectedClientCount(),
       devices,
+      activePlaybacks: this.state.activePlaybacks || [],
+      activityLog: this.activityLog.slice(0, 100),
       error: this.lastError || undefined,
     };
   }
@@ -362,6 +491,7 @@ class RemoteServer {
     for (const res of clientSet) {
       try {
         res.write(dataStr);
+        if (typeof res.flush === 'function') res.flush();
       } catch (_) {
         clientSet.delete(res);
         if (clientSet.size === 0) {
@@ -381,6 +511,7 @@ class RemoteServer {
       for (const res of clientSet) {
         try {
           res.write(dataStr);
+          if (typeof res.flush === 'function') res.flush();
         } catch (_) {
           clientSet.delete(res);
           if (clientSet.size === 0) {
@@ -407,6 +538,13 @@ class RemoteServer {
   updateActiveSounds(activeIds) {
     this.state.activeSoundIds = Array.isArray(activeIds) ? activeIds : [];
     this.broadcastSse('active', this.state.activeSoundIds);
+  }
+
+  updateActivePlaybacks(playbacks) {
+    const clean = Array.isArray(playbacks) ? playbacks : [];
+    this.state.activePlaybacks = clean;
+    this.broadcastSse('playbacks', clean);
+    this.notifyStatusChanged();
   }
 
   updatePausedSounds(pausedIds) {
@@ -443,6 +581,12 @@ class RemoteServer {
    */
   disconnectAllClients(reason = 'Session ended on desktop') {
     this.broadcastSse('locked', { reason });
+    for (const sess of this.sessions.values()) {
+      if (sess.disconnectTimer) {
+        clearTimeout(sess.disconnectTimer);
+        sess.disconnectTimer = null;
+      }
+    }
     for (const clientSet of this.sseClients.values()) {
       for (const res of clientSet) {
         try {
@@ -489,7 +633,7 @@ class RemoteServer {
   }
 
   /**
-   * Temporarily lock or unlock selected device sessions without requiring a PIN to resume.
+   * Put selected device sessions in Timeout or end Timeout without requiring a PIN to resume.
    * @param {string[] | 'all'} deviceIds
    * @param {boolean} locked
    */
@@ -511,12 +655,20 @@ class RemoteServer {
       if (nextLocked) {
         this.sendSseToToken(token, 'temp_locked', {
           locked: true,
-          reason: 'Temporarily locked from PC',
+          reason: 'Timed out from PC',
         });
       } else {
         this.sendSseToToken(token, 'temp_locked', { locked: false });
         this.sendSseToToken(token, 'state', this.getPublicStateSnapshot(sess));
       }
+
+      const actor = this.getActorFromSession(sess);
+      this.recordActivity({
+        type: 'timeout',
+        actor,
+        action: nextLocked ? 'Put in timeout' : 'Timeout ended',
+        detail: sess.label,
+      });
     }
 
     if (changed) {
@@ -587,6 +739,12 @@ class RemoteServer {
       if (!sess.tempLocked) {
         this.sendSseToToken(token, 'permissions', this.getSessionRoleState(sess));
       }
+      this.recordActivity({
+        type: 'permission',
+        actor: this.getActorFromSession(sess),
+        action: 'Updated permissions',
+        detail: sess.label,
+      });
       this.notifyStatusChanged();
       return true;
     }
@@ -712,14 +870,43 @@ class RemoteServer {
   startHeartbeat() {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = setInterval(() => {
+      const now = Date.now();
+      let pruned = false;
+
+      // Lock out abandoned sessions (left website: no open SSE and no status poll for >12s)
+      for (const [token, sess] of [...this.sessions.entries()]) {
+        const hasSse = (this.sseClients.get(token)?.size || 0) > 0;
+        if (hasSse) continue;
+        const staleMs = now - (sess.lastSeen || sess.createdAt || now);
+        if (staleMs > 12000) {
+          if (sess.disconnectTimer) {
+            clearTimeout(sess.disconnectTimer);
+            sess.disconnectTimer = null;
+          }
+          const actor = this.getActorFromSession(sess);
+          this.sessions.delete(token);
+          this.recordActivity({
+            type: 'leave',
+            actor,
+            action: 'Left website',
+          });
+          pruned = true;
+        }
+      }
+
       for (const clientSet of this.sseClients.values()) {
         for (const res of clientSet) {
           try {
             res.write(': ping\n\n');
+            if (typeof res.flush === 'function') res.flush();
           } catch (_) {}
         }
       }
-    }, 15000);
+
+      if (pruned) {
+        this.notifyStatusChanged();
+      }
+    }, 10000);
   }
 
   stop() {
@@ -805,8 +992,12 @@ class RemoteServer {
     }
     const sess = this.sessions.get(token);
     sess.lastSeen = Date.now();
+    if (sess.disconnectTimer) {
+      clearTimeout(sess.disconnectTimer);
+      sess.disconnectTimer = null;
+    }
     if (!allowWhenTempLocked && sess.tempLocked) {
-      this.sendJson(res, 423, { error: 'Device is temporarily locked from PC', tempLocked: true });
+      this.sendJson(res, 423, { error: 'Timed out from PC', tempLocked: true });
       return null;
     }
     return { token, session: sess };
@@ -878,11 +1069,17 @@ class RemoteServer {
       const ua = String(req.headers['user-agent'] || 'Phone');
       const baseDevice = this.formatDeviceLabel(ua);
       const submittedName = role === 'guest' && body.name ? String(body.name).trim().slice(0, 36) : '';
+      const assignedColor =
+        role === 'owner' ? this.state.settings?.accentColor || '#38bdf8' : this.pickFriendColor();
+      const assignedInitials =
+        role === 'owner' ? 'HP' : this.computeInitials(submittedName || baseDevice, 'FR');
       const sess = {
         id: crypto.randomBytes(6).toString('hex'),
         role,
         friendName: submittedName,
         baseLabel: baseDevice,
+        color: assignedColor,
+        initials: assignedInitials,
         createdAt: now,
         lastSeen: now,
         userAgent: ua,
@@ -893,6 +1090,12 @@ class RemoteServer {
         hasCustomPermissions: false,
       };
       this.sessions.set(token, sess);
+      this.recordActivity({
+        type: 'join',
+        actor: this.getActorFromSession(sess),
+        action: role === 'guest' ? 'Joined as Friend' : 'Connected as Owner',
+        detail: `${sess.label} (${clientIp})`,
+      });
       this.notifyStatusChanged();
 
       return this.sendJson(res, 200, {
@@ -910,10 +1113,17 @@ class RemoteServer {
         return this.sendJson(res, 400, { error: 'Please enter your name' });
       }
       auth.session.friendName = cleanName;
+      auth.session.initials = this.computeInitials(cleanName, 'FR');
       const base = auth.session.baseLabel || this.formatDeviceLabel(auth.session.userAgent);
       auth.session.label = `${cleanName} (${base})`;
       const roleState = this.getSessionRoleState(auth.session);
       this.sendSseToToken(auth.token, 'permissions', roleState);
+      this.recordActivity({
+        type: 'join',
+        actor: this.getActorFromSession(auth.session),
+        action: 'Set display name',
+        detail: cleanName,
+      });
       this.notifyStatusChanged();
       return this.sendJson(res, 200, { ok: true, session: roleState });
     }
@@ -921,6 +1131,12 @@ class RemoteServer {
     if (method === 'POST' && pathname === '/api/auth/logout') {
       const token = this.extractToken(req, parsedUrl);
       if (token) {
+        const sess = this.sessions.get(token);
+        if (sess?.disconnectTimer) {
+          clearTimeout(sess.disconnectTimer);
+          sess.disconnectTimer = null;
+        }
+        const actor = sess ? this.getActorFromSession(sess) : null;
         const clientSet = this.sseClients.get(token);
         if (clientSet) {
           for (const clientRes of clientSet) {
@@ -931,12 +1147,33 @@ class RemoteServer {
           this.sseClients.delete(token);
         }
         this.sessions.delete(token);
+        if (actor) {
+          this.recordActivity({
+            type: 'leave',
+            actor,
+            action: 'Left website',
+          });
+        }
         this.notifyStatusChanged();
       }
       return this.sendJson(res, 200, { ok: true });
     }
 
-    // Live SSE stream (remains open while temporarily locked so unlock pushes automatically with no PIN)
+    // Session status poll (works even during Timeout so clients never get stuck if SSE drops)
+    if (method === 'GET' && pathname === '/api/session/status') {
+      const statusAuth = this.requireAuth(req, res, parsedUrl, true);
+      if (!statusAuth) return;
+      return this.sendJson(res, 200, {
+        tempLocked: !!statusAuth.session.tempLocked,
+        session: this.getSessionRoleState(statusAuth.session),
+        activeSoundIds: this.state.activeSoundIds || [],
+        pausedSoundIds: this.state.pausedSoundIds || [],
+        progressMap: this.state.progressMap || {},
+        activePlaybacks: this.state.activePlaybacks || [],
+      });
+    }
+
+    // Live SSE stream (remains open during Timeout so ending Timeout pushes automatically with no PIN)
     if (method === 'GET' && pathname === '/api/events') {
       const sseAuth = this.requireAuth(req, res, parsedUrl, true);
       if (!sseAuth) return;
@@ -946,12 +1183,22 @@ class RemoteServer {
         sseAuth.session.ip = sseIp;
       }
 
+      if (res.socket && typeof res.socket.setNoDelay === 'function') {
+        res.socket.setNoDelay(true);
+      }
+
+      // Omit HTTP/1.1 hop-by-hop "Connection" header so HTTP/2 proxies (Cloudflare Tunnel) stream SSE cleanly
       res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, no-transform',
         'X-Accel-Buffering': 'no',
-        Connection: 'keep-alive',
+        'Content-Encoding': 'identity',
       });
+      if (typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+      }
+      // Padding comment flushes proxy read buffers immediately
+      res.write(`: ${' '.repeat(2048)}\n\n`);
 
       if (!this.sseClients.has(sseAuth.token)) {
         this.sseClients.set(sseAuth.token, new Set());
@@ -960,7 +1207,7 @@ class RemoteServer {
       this.notifyStatusChanged();
 
       if (sseAuth.session.tempLocked) {
-        res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: true, reason: 'Temporarily locked from PC' })}\n\n`);
+        res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: true, reason: 'Timed out from PC' })}\n\n`);
       } else {
         res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: false })}\n\n`);
         res.write(`event: state\ndata: ${JSON.stringify(this.getPublicStateSnapshot(sseAuth.session))}\n\n`);
@@ -972,6 +1219,27 @@ class RemoteServer {
           set.delete(res);
           if (set.size === 0) {
             this.sseClients.delete(sseAuth.token);
+            // If they left/closed the page (no SSE reconnect or status poll within 4.5s), lock them out immediately
+            const activeSess = this.sessions.get(sseAuth.token);
+            if (activeSess && !activeSess.disconnectTimer) {
+              activeSess.disconnectTimer = setTimeout(() => {
+                activeSess.disconnectTimer = null;
+                const currentSess = this.sessions.get(sseAuth.token);
+                if (!currentSess) return;
+                const hasSse = (this.sseClients.get(sseAuth.token)?.size || 0) > 0;
+                const recentlyPolled = Date.now() - (currentSess.lastSeen || 0) < 3500;
+                if (!hasSse && !recentlyPolled) {
+                  const actor = this.getActorFromSession(currentSess);
+                  this.sessions.delete(sseAuth.token);
+                  this.recordActivity({
+                    type: 'leave',
+                    actor,
+                    action: 'Left website',
+                  });
+                  this.notifyStatusChanged();
+                }
+              }, 4500);
+            }
           }
         }
         this.notifyStatusChanged();
@@ -991,14 +1259,29 @@ class RemoteServer {
     const triggerMatch = pathname.match(/^\/api\/sounds\/([^/]+)\/trigger$/);
     if (method === 'POST' && triggerMatch) {
       const soundId = decodeURIComponent(triggerMatch[1]);
-      const ok = await this.handlers.triggerSound?.(soundId);
+      const actor = this.getActorFromSession(auth.session);
+      const targetSound = (this.state.sounds || []).find((s) => s.id === soundId);
+      const ok = await this.handlers.triggerSound?.(soundId, actor);
       if (!ok) return this.sendJson(res, 404, { error: 'Sound not found or main window unavailable' });
-      return this.sendJson(res, 200, { ok: true, soundId });
+      this.recordActivity({
+        type: 'play',
+        actor,
+        action: 'Played sound',
+        detail: targetSound?.title || soundId,
+        soundId,
+      });
+      return this.sendJson(res, 200, { ok: true, soundId, actor });
     }
 
     if (method === 'POST' && pathname === '/api/stop-all') {
       if (!this.requirePermission(res, auth, 'canStopAll')) return;
-      await this.handlers.stopAll?.();
+      const actor = this.getActorFromSession(auth.session);
+      await this.handlers.stopAll?.(actor);
+      this.recordActivity({
+        type: 'stop',
+        actor,
+        action: 'Stopped all sounds',
+      });
       return this.sendJson(res, 200, { ok: true });
     }
 
@@ -1006,7 +1289,15 @@ class RemoteServer {
     if (method === 'POST' && pauseMatch) {
       if (!this.requirePermission(res, auth, 'canStopAll')) return;
       const soundId = decodeURIComponent(pauseMatch[1]);
+      const targetSound = (this.state.sounds || []).find((s) => s.id === soundId);
       await this.handlers.togglePauseSound?.(soundId);
+      this.recordActivity({
+        type: 'stop',
+        actor: this.getActorFromSession(auth.session),
+        action: 'Toggled pause',
+        detail: targetSound?.title || soundId,
+        soundId,
+      });
       return this.sendJson(res, 200, { ok: true });
     }
 
@@ -1032,6 +1323,12 @@ class RemoteServer {
       if (!this.requirePermission(res, auth, 'canAudioClip')) return;
       const body = await this.readJsonBody(req).catch(() => ({}));
       await this.handlers.triggerAudioClip?.(body.duration ? Number(body.duration) : undefined);
+      this.recordActivity({
+        type: 'clip',
+        actor: this.getActorFromSession(auth.session),
+        action: 'Captured audio clip',
+        detail: body.duration ? `${body.duration}s` : undefined,
+      });
       return this.sendJson(res, 200, { ok: true });
     }
 
@@ -1039,6 +1336,12 @@ class RemoteServer {
       if (!this.requirePermission(res, auth, 'canVideoClip')) return;
       const body = await this.readJsonBody(req).catch(() => ({}));
       await this.handlers.triggerVideoClip?.(body.duration ? Number(body.duration) : undefined);
+      this.recordActivity({
+        type: 'clip',
+        actor: this.getActorFromSession(auth.session),
+        action: 'Captured video clip',
+        detail: body.duration ? `${body.duration}s` : undefined,
+      });
       return this.sendJson(res, 200, { ok: true });
     }
 
@@ -1051,12 +1354,27 @@ class RemoteServer {
         const patch = await this.readJsonBody(req);
         const updated = await this.handlers.updateSound?.(soundId, patch);
         if (!updated) return this.sendJson(res, 404, { error: 'Sound not found' });
+        this.recordActivity({
+          type: 'edit',
+          actor: this.getActorFromSession(auth.session),
+          action: 'Edited sound',
+          detail: updated.title,
+          soundId,
+        });
         return this.sendJson(res, 200, { sound: this.sanitizeSound(updated) });
       }
       if (method === 'DELETE') {
         if (!this.requirePermission(res, auth, 'canDeleteSounds')) return;
+        const target = (this.state.sounds || []).find((s) => s.id === soundId);
         const deleted = await this.handlers.deleteSound?.(soundId);
         if (!deleted) return this.sendJson(res, 404, { error: 'Sound not found' });
+        this.recordActivity({
+          type: 'delete',
+          actor: this.getActorFromSession(auth.session),
+          action: 'Deleted sound',
+          detail: target?.title || soundId,
+          soundId,
+        });
         return this.sendJson(res, 200, { ok: true });
       }
     }
@@ -1090,6 +1408,13 @@ class RemoteServer {
         return this.sendJson(res, 400, { error: 'Missing fileName or base64 payload' });
       }
       const created = await this.handlers.uploadSound?.(body);
+      this.recordActivity({
+        type: 'add',
+        actor: this.getActorFromSession(auth.session),
+        action: 'Uploaded sound',
+        detail: created?.title || body.fileName,
+        soundId: created?.id || '',
+      });
       return this.sendJson(res, 201, { sound: this.sanitizeSound(created) });
     }
 
@@ -1112,19 +1437,27 @@ class RemoteServer {
       const body = await this.readJsonBody(req);
       if (!body.url) return this.sendJson(res, 400, { error: 'Missing YouTube URL' });
       const created = await this.handlers.downloadYouTubeSound?.(body);
+      this.recordActivity({
+        type: 'add',
+        actor: this.getActorFromSession(auth.session),
+        action: 'Added YouTube sound',
+        detail: created?.title || body.title || 'YouTube audio',
+        soundId: created?.id || '',
+      });
       return this.sendJson(res, 201, { sound: this.sanitizeSound(created) });
     }
 
-    // Remote soundboard volume / clip duration settings (Owner only; host mic/voice volume stripped)
+    // Remote soundboard volume (Owner or permitted Friend) / clip duration settings (Owner only); host mic/voice volume stripped
     if (method === 'PATCH' && pathname === '/api/settings') {
-      if (auth.session.role !== 'owner') {
-        return this.sendJson(res, 403, { error: 'Only the host can change mixer settings' });
-      }
+      const isOwner = auth.session.role === 'owner';
+      if (!isOwner && !this.requirePermission(res, auth, 'canControlVolume')) return;
       const rawPatch = await this.readJsonBody(req);
       const safePatch = {};
       if (typeof rawPatch.masterSpeakerVolume === 'number') safePatch.masterSpeakerVolume = rawPatch.masterSpeakerVolume;
-      if (typeof rawPatch.recordDuration === 'number') safePatch.recordDuration = rawPatch.recordDuration;
-      if (typeof rawPatch.videoClipDuration === 'number') safePatch.videoClipDuration = rawPatch.videoClipDuration;
+      if (isOwner) {
+        if (typeof rawPatch.recordDuration === 'number') safePatch.recordDuration = rawPatch.recordDuration;
+        if (typeof rawPatch.videoClipDuration === 'number') safePatch.videoClipDuration = rawPatch.videoClipDuration;
+      }
       const updated = await this.handlers.updateSettings?.(safePatch);
       return this.sendJson(res, 200, { settings: this.sanitizeSettings(updated) });
     }

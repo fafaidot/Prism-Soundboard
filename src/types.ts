@@ -81,6 +81,7 @@ export interface AudioSettings {
 
 export interface RemoteGuestPermissions {
   canStopAll: boolean;
+  canControlVolume: boolean;
   canEditSounds: boolean;
   canDeleteSounds: boolean;
   canAddSounds: boolean;
@@ -97,10 +98,45 @@ export interface PublicTunnelStatus {
   error?: string;
 }
 
+export interface PlaybackActor {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  role: 'owner' | 'guest';
+}
+
+export interface ActivePlaybackEntry {
+  soundId: string;
+  soundTitle: string;
+  actorId: string;
+  actorName: string;
+  initials: string;
+  color: string;
+  role: 'owner' | 'guest';
+  startedAt: number;
+}
+
+export interface RemoteActivityEvent {
+  id: string;
+  timestamp: number;
+  type: 'play' | 'stop' | 'join' | 'timeout' | 'permission' | 'add' | 'edit' | 'delete' | 'clip' | 'leave';
+  actorId: string;
+  actorName: string;
+  initials: string;
+  color: string;
+  actorRole: 'owner' | 'guest';
+  action: string;
+  detail?: string;
+  soundId?: string;
+}
+
 export interface RemoteConnectedDevice {
   id: string;
   role: 'owner' | 'guest';
   name?: string;
+  initials?: string;
+  color?: string;
   label: string;
   ip: string;
   connectedAt: number;
@@ -124,6 +160,8 @@ export interface RemoteServerStatus {
   qrDataUrl: string;
   connectedClients: number;
   devices?: RemoteConnectedDevice[];
+  activePlaybacks?: ActivePlaybackEntry[];
+  activityLog?: RemoteActivityEvent[];
   tunnel?: PublicTunnelStatus;
   error?: string;
 }
@@ -269,6 +307,7 @@ export interface SoundboardAPI {
   removeRemoteDevices?: (deviceIds: string[] | 'all') => Promise<RemoteServerStatus>;
   startPublicTunnel?: () => Promise<RemoteServerStatus>;
   stopPublicTunnel?: () => Promise<RemoteServerStatus>;
+  clearRemoteActivity?: () => Promise<RemoteServerStatus>;
   onRemoteServerStatusUpdated?: (callback: (status: RemoteServerStatus) => void) => () => void;
 }
 

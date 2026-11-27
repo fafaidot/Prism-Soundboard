@@ -156,6 +156,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   removeRemoteDevices: (deviceIds) => ipcRenderer.invoke('remove-remote-devices', deviceIds),
   startPublicTunnel: () => ipcRenderer.invoke('start-public-tunnel'),
   stopPublicTunnel: () => ipcRenderer.invoke('stop-public-tunnel'),
+  clearRemoteActivity: () => ipcRenderer.invoke('clear-remote-activity'),
   onRemoteServerStatusUpdated: (callback) => {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on('remote-server-status-updated', handler);

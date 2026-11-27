@@ -932,6 +932,14 @@ ipcMain.on('sync-paused-sounds', (_event, pausedIds) => {
   remoteServer.updatePausedSounds(pausedIds);
 });
 
+ipcMain.on('sync-active-playbacks', (_event, playbacks) => {
+  remoteServer.updateActivePlaybacks(playbacks);
+});
+
+ipcMain.on('record-desktop-activity', (_event, evt) => {
+  remoteServer.recordDesktopActivity(evt);
+});
+
 ipcMain.on('sync-sounds-updated', (event, sounds) => {
   // Pure in-memory inter-window bridge: do NOT write to disk on sync events.
   // Disk persistence is strictly handled by the 'save-sounds' IPC handler.
@@ -1889,7 +1897,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.11';
+    let currentVersion = '1.6.0';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -2404,12 +2412,12 @@ async function initRemoteServer() {
       onStatusChanged: (status) => {
         pushRemoteServerStatus(status);
       },
-      triggerSound: async (soundId) => {
+      triggerSound: async (soundId, actor) => {
         const sounds = getEffectiveSounds();
         const exists = sounds.some((s) => s.id === soundId);
         if (!exists) return false;
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('remote-trigger-sound', soundId);
+          mainWindow.webContents.send('remote-trigger-sound', { soundId, actor });
           return true;
         }
         return false;
@@ -2772,6 +2780,11 @@ ipcMain.handle('start-public-tunnel', async () => {
 
 ipcMain.handle('stop-public-tunnel', async () => {
   tunnelManager.stop();
+  return getCombinedRemoteStatus();
+});
+
+ipcMain.handle('clear-remote-activity', async () => {
+  remoteServer.clearActivityLog();
   return getCombinedRemoteStatus();
 });
 

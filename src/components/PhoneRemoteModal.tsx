@@ -14,8 +14,17 @@ import {
   Sliders,
   Trash2,
   AlertTriangle,
+  Activity,
+  Square,
+  Volume2,
 } from 'lucide-react';
-import { AudioSettings, RemoteServerStatus, RemoteGuestPermissions } from '../types';
+import {
+  AudioSettings,
+  RemoteServerStatus,
+  RemoteGuestPermissions,
+  RemoteConnectedDevice,
+  ActivePlaybackEntry,
+} from '../types';
 import { getTheme } from '../themes';
 
 interface PhoneRemoteModalProps {
@@ -27,6 +36,7 @@ interface PhoneRemoteModalProps {
 
 const DEFAULT_GUEST_PERMS: RemoteGuestPermissions = {
   canStopAll: false,
+  canControlVolume: false,
   canEditSounds: false,
   canDeleteSounds: false,
   canAddSounds: false,
@@ -36,6 +46,7 @@ const DEFAULT_GUEST_PERMS: RemoteGuestPermissions = {
 
 const DEFAULT_PERMISSION_ITEMS: Array<{ key: keyof RemoteGuestPermissions; label: string }> = [
   { key: 'canStopAll', label: 'Stop All / Pause Sounds' },
+  { key: 'canControlVolume', label: 'Soundboard Volume Slider' },
   { key: 'canAddSounds', label: 'Add Sounds (YouTube / Upload)' },
   { key: 'canAudioClip', label: 'Capture Audio Clips' },
   { key: 'canVideoClip', label: 'Capture & Watch Video Clips' },
@@ -45,12 +56,23 @@ const DEFAULT_PERMISSION_ITEMS: Array<{ key: keyof RemoteGuestPermissions; label
 
 const DEVICE_PERMISSION_ITEMS: Array<{ key: keyof RemoteGuestPermissions; label: string }> = [
   { key: 'canStopAll', label: 'Stop All / Pause' },
+  { key: 'canControlVolume', label: 'Volume Slider' },
   { key: 'canAddSounds', label: 'Add Sounds' },
   { key: 'canAudioClip', label: 'Audio Clips' },
   { key: 'canVideoClip', label: 'Video Clips' },
   { key: 'canEditSounds', label: 'Edit Sound Props' },
   { key: 'canDeleteSounds', label: 'Delete Sounds & Clips' },
 ];
+
+function formatRelativeTime(ts: number): string {
+  const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (diff < 5) return 'Just now';
+  if (diff < 60) return `${diff}s ago`;
+  const m = Math.floor(diff / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
+}
 
 const ToggleSwitch: React.FC<{
   checked: boolean;
@@ -77,13 +99,202 @@ const ToggleSwitch: React.FC<{
   </button>
 );
 
+const ActorAvatar: React.FC<{
+  initials?: string;
+  color?: string;
+  size?: 'sm' | 'md';
+}> = ({ initials = 'PC', color = '#38bdf8', size = 'md' }) => (
+  <div
+    style={{ backgroundColor: color }}
+    className={`${
+      size === 'sm' ? 'w-7 h-7 text-[10px]' : 'w-8 h-8 text-[11px]'
+    } rounded-full flex items-center justify-center font-black text-slate-950 tracking-tight shrink-0 shadow-sm border border-black/20`}
+  >
+    {initials}
+  </div>
+);
+
+interface DeviceRowProps {
+  dev: RemoteConnectedDevice;
+  selectable?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  currentPlayback?: ActivePlaybackEntry | null;
+  accent: string;
+  onToggleTimeout: () => void;
+  onRemove: () => void;
+  onUpdatePermission: (key: keyof RemoteGuestPermissions, nextVal: boolean) => void;
+}
+
+const DeviceRow: React.FC<DeviceRowProps> = ({
+  dev,
+  selectable = false,
+  isSelected = false,
+  onToggleSelect,
+  isExpanded,
+  onToggleExpand,
+  currentPlayback,
+  accent,
+  onToggleTimeout,
+  onRemove,
+  onUpdatePermission,
+}) => {
+  const devPerms: RemoteGuestPermissions = dev.permissions || DEFAULT_GUEST_PERMS;
+  const displayInitials =
+    dev.initials ||
+    (dev.role === 'owner' ? 'HP' : (dev.name || dev.label || 'FR').slice(0, 2).toUpperCase());
+  const displayColor = dev.color || (dev.role === 'owner' ? '#38bdf8' : '#a78bfa');
+
+  return (
+    <div className="flex flex-col">
+      <div
+        onClick={() => selectable && onToggleSelect?.()}
+        className={`px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2.5 transition-colors ${
+          selectable ? 'cursor-pointer' : ''
+        } ${isSelected ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => {}}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect?.();
+              }}
+              className="w-4 h-4 rounded border-white/20 accent-sky-400 cursor-pointer shrink-0"
+            />
+          )}
+          <ActorAvatar initials={displayInitials} color={displayColor} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[12.5px] font-semibold text-theme-primary truncate">
+                {dev.label}
+              </span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[9.5px] font-bold border ${
+                  dev.role === 'guest'
+                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                    : 'bg-white/[0.08] text-slate-200 border-white/[0.12]'
+                }`}
+              >
+                {dev.role === 'guest' ? 'Friend' : 'Owner'}
+              </span>
+              {dev.hasCustomPermissions && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                  Custom
+                </span>
+              )}
+              {dev.tempLocked ? (
+                <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  Timed Out
+                </span>
+              ) : dev.online ? (
+                <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  Live
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-white/[0.06] text-theme-muted border border-white/[0.1]">
+                  Connecting
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+              <span className="text-[10.5px] font-mono text-theme-muted">{dev.ip}</span>
+              {currentPlayback && (
+                <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-emerald-300 truncate max-w-[220px]">
+                  <Volume2 size={10} className="shrink-0" />
+                  <span className="truncate">Playing: {currentPlayback.soundTitle}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {dev.role === 'guest' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand();
+              }}
+              className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                isExpanded
+                  ? 'bg-white/[0.12] border-white/[0.2] text-white'
+                  : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-theme-secondary hover:text-theme-primary'
+              }`}
+            >
+              <Sliders size={11} />
+              <span>Permissions</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleTimeout();
+            }}
+            className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+              dev.tempLocked
+                ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/35 text-emerald-300'
+                : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
+            }`}
+          >
+            {dev.tempLocked ? <Unlock size={12} /> : <Lock size={12} />}
+            <span>{dev.tempLocked ? 'End Timeout' : 'Timeout'}</span>
+          </button>
+
+          <button
+            type="button"
+            title="Remove device (requires PIN to reconnect)"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="px-2.5 py-1.5 rounded-lg border bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/25 text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Trash2 size={12} />
+            <span>Remove</span>
+          </button>
+        </div>
+      </div>
+
+      {isExpanded && dev.role === 'guest' && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="px-4 pb-3 pt-2 bg-black/25 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-2"
+        >
+          {DEVICE_PERMISSION_ITEMS.map((perm) => (
+            <div
+              key={perm.key}
+              className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] flex items-center justify-between gap-2"
+            >
+              <span className="text-[11.5px] font-medium text-theme-primary">{perm.label}</span>
+              <ToggleSwitch
+                checked={!!devPerms[perm.key]}
+                accent={accent}
+                onChange={(nextVal) => onUpdatePermission(perm.key, nextVal)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
   isOpen,
   settings,
   onClose,
   onSaveSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'connection' | 'friends' | 'devices'>('connection');
+  const [activeTab, setActiveTab] = useState<'connection' | 'friends' | 'devices' | 'activity'>('connection');
   const [localSettings, setLocalSettings] = useState<AudioSettings>(settings);
   const [remoteStatus, setRemoteStatus] = useState<RemoteServerStatus | null>(null);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
@@ -131,7 +342,40 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
   const currentTheme = getTheme(localSettings.theme, localSettings.accentColor);
   const accent = currentTheme.accent || 'var(--accent-color)';
   const isRemoteEnabled = localSettings.remoteControlEnabled !== false;
-  const deviceCount = remoteStatus?.devices?.length || 0;
+  const devices = remoteStatus?.devices || [];
+  const friendDevices = devices.filter((d) => d.role === 'guest');
+  const deviceCount = devices.length;
+  const activePlaybacks = remoteStatus?.activePlaybacks || [];
+  const activityLog = remoteStatus?.activityLog || [];
+
+  const getPlaybackForActor = (actorId: string) =>
+    activePlaybacks.find((p) => p.actorId === actorId) || null;
+
+  const handleToggleSingleTimeout = async (dev: RemoteConnectedDevice) => {
+    if (!window.soundboardAPI?.setRemoteTempLock) return;
+    const st = await window.soundboardAPI.setRemoteTempLock([dev.id], !dev.tempLocked);
+    setRemoteStatus(st);
+  };
+
+  const handleRemoveSingleDevice = async (devId: string) => {
+    if (!window.soundboardAPI?.removeRemoteDevices) return;
+    const st = await window.soundboardAPI.removeRemoteDevices([devId]);
+    setRemoteStatus(st);
+    setSelectedDeviceIds((prev) => prev.filter((id) => id !== devId));
+    if (expandedDevicePermsId === devId) setExpandedDevicePermsId(null);
+  };
+
+  const handleUpdateSinglePermission = async (
+    devId: string,
+    key: keyof RemoteGuestPermissions,
+    nextVal: boolean
+  ) => {
+    if (!window.soundboardAPI?.setRemoteDevicePermissions) return;
+    const st = await window.soundboardAPI.setRemoteDevicePermissions(devId, {
+      [key]: nextVal,
+    });
+    setRemoteStatus(st);
+  };
 
   return (
     <div
@@ -142,7 +386,7 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex overflow-hidden h-[640px] max-h-[92vh]"
+        className="w-full max-w-4xl frosted-modal bg-[#0e1219]/42 backdrop-blur-2xl border border-white/[0.14] rounded-3xl shadow-[0_25px_80px_rgba(0,0,0,0.65),inset_0_1px_0_0_rgba(255,255,255,0.12)] flex overflow-hidden h-[660px] max-h-[92vh]"
       >
         {/* Left Navigation Sidebar */}
         <aside className="w-64 min-w-[256px] frosted-modal-chrome bg-white/[0.03] border-r border-white/[0.08] flex flex-col justify-between p-5 select-none">
@@ -209,9 +453,13 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                   />
                   <span>Internet & Friends</span>
                 </div>
-                {remoteStatus?.tunnel?.status === 'online' && (
+                {remoteStatus?.tunnel?.status === 'online' ? (
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                )}
+                ) : friendDevices.some((f) => f.tempLocked) ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/20 text-amber-300">
+                    {friendDevices.filter((f) => f.tempLocked).length}
+                  </span>
+                ) : null}
               </button>
 
               <button
@@ -234,6 +482,30 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                 {deviceCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/[0.08] text-theme-primary">
                     {deviceCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('activity')}
+                className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                  activeTab === 'activity'
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Activity
+                    size={16}
+                    style={activeTab === 'activity' ? { color: accent } : undefined}
+                    className="flex-shrink-0"
+                  />
+                  <span>Live Activity</span>
+                </div>
+                {activePlaybacks.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-emerald-500/20 text-emerald-300">
+                    {activePlaybacks.length}
                   </span>
                 )}
               </button>
@@ -266,13 +538,15 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
             <div>
               <h3 className="text-[15px] font-bold text-theme-primary tracking-wide">
                 {activeTab === 'connection' && 'Local Wi-Fi & Owner PIN'}
-                {activeTab === 'friends' && 'Internet Share & Friend Permissions'}
+                {activeTab === 'friends' && 'Internet Share & Friends'}
                 {activeTab === 'devices' && `Connected Devices (${deviceCount})`}
+                {activeTab === 'activity' && 'Live Activity Feed'}
               </h3>
               <p className="text-[11px] text-theme-muted">
                 {activeTab === 'connection' && 'Scan QR or open URL on your phone over local Wi-Fi'}
-                {activeTab === 'friends' && 'Public HTTPS link and default permissions for friends'}
-                {activeTab === 'devices' && 'Temp lock, remove devices, or edit each friend separately'}
+                {activeTab === 'friends' && 'Public link, Friend PIN, permissions, and individual Timeouts'}
+                {activeTab === 'devices' && 'Timeout, remove devices, or edit each friend separately'}
+                {activeTab === 'activity' && 'Live monitor of who is playing what, clips, edits, and timeouts'}
               </p>
             </div>
 
@@ -457,20 +731,20 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={!remoteStatus?.devices?.length}
+                          disabled={!devices.length}
                           onClick={async () => {
-                            if (!window.soundboardAPI?.setRemoteTempLock || !remoteStatus?.devices?.length) return;
-                            const anyUnlocked = remoteStatus.devices.some((d) => !d.tempLocked);
-                            const st = await window.soundboardAPI.setRemoteTempLock('all', anyUnlocked);
+                            if (!window.soundboardAPI?.setRemoteTempLock || !devices.length) return;
+                            const anyNotTimedOut = devices.some((d) => !d.tempLocked);
+                            const st = await window.soundboardAPI.setRemoteTempLock('all', anyNotTimedOut);
                             setRemoteStatus(st);
                           }}
                           className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11.5px] font-semibold disabled:opacity-40 cursor-pointer transition-colors"
                         >
-                          {remoteStatus?.devices?.some((d) => !d.tempLocked)
-                            ? 'Temp Lock All'
-                            : remoteStatus?.devices?.length
-                            ? 'Unlock All'
-                            : 'Temp Lock All'}
+                          {devices.some((d) => !d.tempLocked)
+                            ? 'Timeout All'
+                            : devices.length
+                            ? 'End All Timeouts'
+                            : 'Timeout All'}
                         </button>
 
                         <button
@@ -625,7 +899,60 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                   )}
                 </div>
 
-                {/* Friend Guest Mode & Permissions */}
+                {/* Connected & Timed-Out Friends One-by-One Controls */}
+                <div className="py-5 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-[13px] font-bold text-theme-primary">
+                        Friends ({friendDevices.length})
+                      </h4>
+                      <p className="text-[11px] text-theme-muted">
+                        Timeout, end timeout, remove, or edit permissions for each friend one by one.
+                      </p>
+                    </div>
+                    {friendDevices.some((f) => f.tempLocked) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.soundboardAPI?.setRemoteTempLock) return;
+                          const lockedIds = friendDevices.filter((f) => f.tempLocked).map((f) => f.id);
+                          const st = await window.soundboardAPI.setRemoteTempLock(lockedIds, false);
+                          setRemoteStatus(st);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Unlock size={12} />
+                        <span>End All Friend Timeouts</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {friendDevices.length > 0 ? (
+                    <div className="rounded-2xl bg-white/[0.03] border border-white/[0.08] divide-y divide-white/[0.06]">
+                      {friendDevices.map((dev) => (
+                        <DeviceRow
+                          key={dev.id}
+                          dev={dev}
+                          isExpanded={expandedDevicePermsId === dev.id}
+                          onToggleExpand={() =>
+                            setExpandedDevicePermsId(expandedDevicePermsId === dev.id ? null : dev.id)
+                          }
+                          currentPlayback={getPlaybackForActor(dev.id)}
+                          accent={accent}
+                          onToggleTimeout={() => handleToggleSingleTimeout(dev)}
+                          onRemove={() => handleRemoveSingleDevice(dev.id)}
+                          onUpdatePermission={(key, val) => handleUpdateSinglePermission(dev.id, key, val)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.07] text-[11.5px] text-theme-muted text-center">
+                      No friends connected yet. Share the Friend PIN above.
+                    </div>
+                  )}
+                </div>
+
+                {/* Friend Guest Mode & Default Permissions */}
                 <div className="pt-5 space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
@@ -634,7 +961,7 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                       </div>
                       <div>
                         <h4 className="text-[13.5px] font-bold text-theme-primary">
-                          Friend Guest Mode & Permissions
+                          Friend Guest Mode & Default Permissions
                         </h4>
                         <p className="text-[11.5px] text-theme-muted mt-0.5">
                           Separate PIN for friends with default permissions.
@@ -745,7 +1072,7 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
               <div className="space-y-4 animate-in fade-in duration-100">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[12px] text-theme-muted">
-                    Select devices for bulk actions, or expand Permissions for any Friend.
+                    Select devices for bulk actions, or timeout / end timeout one by one.
                   </span>
 
                   {selectedDeviceIds.length > 0 && (
@@ -760,7 +1087,7 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                         className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Lock size={11} />
-                        <span>Temp Lock ({selectedDeviceIds.length})</span>
+                        <span>Timeout ({selectedDeviceIds.length})</span>
                       </button>
                       <button
                         type="button"
@@ -772,7 +1099,7 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                         className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Unlock size={11} />
-                        <span>Unlock ({selectedDeviceIds.length})</span>
+                        <span>End Timeout ({selectedDeviceIds.length})</span>
                       </button>
                       <button
                         type="button"
@@ -791,162 +1118,31 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                   )}
                 </div>
 
-                {remoteStatus?.devices && remoteStatus.devices.length > 0 ? (
+                {devices.length > 0 ? (
                   <div className="rounded-2xl bg-white/[0.03] border border-white/[0.08] divide-y divide-white/[0.06]">
-                    {remoteStatus.devices.map((dev) => {
+                    {devices.map((dev) => {
                       const isSelected = selectedDeviceIds.includes(dev.id);
-                      const isExpanded = expandedDevicePermsId === dev.id;
-                      const devPerms: RemoteGuestPermissions = dev.permissions || DEFAULT_GUEST_PERMS;
                       return (
-                        <div key={dev.id} className="flex flex-col">
-                          <div
-                            onClick={() => {
-                              setSelectedDeviceIds((prev) =>
-                                prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
-                              );
-                            }}
-                            className={`px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
-                              isSelected ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => {}}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedDeviceIds((prev) =>
-                                    prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
-                                  );
-                                }}
-                                className="w-4 h-4 rounded border-white/20 accent-sky-400 cursor-pointer shrink-0"
-                              />
-                              <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-theme-secondary shrink-0">
-                                <Smartphone size={14} />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[12.5px] font-semibold text-theme-primary truncate">
-                                    {dev.label}
-                                  </span>
-                                  <span
-                                    className={`px-1.5 py-0.5 rounded-full text-[9.5px] font-bold border ${
-                                      dev.role === 'guest'
-                                        ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-                                        : 'bg-white/[0.08] text-slate-200 border-white/[0.12]'
-                                    }`}
-                                  >
-                                    {dev.role === 'guest' ? 'Friend' : 'Owner'}
-                                  </span>
-                                  {dev.hasCustomPermissions && (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                                      Custom
-                                    </span>
-                                  )}
-                                  {dev.tempLocked ? (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                      Temp Locked
-                                    </span>
-                                  ) : dev.online ? (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                      Live
-                                    </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-white/[0.06] text-theme-muted border border-white/[0.1]">
-                                      Standby
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-[10.5px] font-mono text-theme-muted">
-                                  {dev.ip}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {dev.role === 'guest' && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedDevicePermsId(isExpanded ? null : dev.id);
-                                  }}
-                                  className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
-                                    isExpanded
-                                      ? 'bg-white/[0.12] border-white/[0.2] text-white'
-                                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-theme-secondary hover:text-theme-primary'
-                                  }`}
-                                >
-                                  <Sliders size={11} />
-                                  <span>Permissions</span>
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!window.soundboardAPI?.setRemoteTempLock) return;
-                                  const st = await window.soundboardAPI.setRemoteTempLock([dev.id], !dev.tempLocked);
-                                  setRemoteStatus(st);
-                                }}
-                                className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                                  dev.tempLocked
-                                    ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/35 text-emerald-300'
-                                    : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
-                                }`}
-                              >
-                                {dev.tempLocked ? <Unlock size={12} /> : <Lock size={12} />}
-                                <span>{dev.tempLocked ? 'Unlock' : 'Temp Lock'}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                title="Remove device (requires PIN to reconnect)"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!window.soundboardAPI?.removeRemoteDevices) return;
-                                  const st = await window.soundboardAPI.removeRemoteDevices([dev.id]);
-                                  setRemoteStatus(st);
-                                  setSelectedDeviceIds((prev) => prev.filter((id) => id !== dev.id));
-                                  if (expandedDevicePermsId === dev.id) setExpandedDevicePermsId(null);
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg border bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/25 text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                              >
-                                <Trash2 size={12} />
-                                <span>Remove</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          {isExpanded && dev.role === 'guest' && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="px-4 pb-3 pt-2 bg-black/25 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-2 gap-2"
-                            >
-                              {DEVICE_PERMISSION_ITEMS.map((perm) => (
-                                <div
-                                  key={perm.key}
-                                  className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] flex items-center justify-between gap-2"
-                                >
-                                  <span className="text-[11.5px] font-medium text-theme-primary">{perm.label}</span>
-                                  <ToggleSwitch
-                                    checked={!!devPerms[perm.key]}
-                                    accent={accent}
-                                    onChange={async (nextVal) => {
-                                      if (!window.soundboardAPI?.setRemoteDevicePermissions) return;
-                                      const st = await window.soundboardAPI.setRemoteDevicePermissions(dev.id, {
-                                        [perm.key]: nextVal,
-                                      });
-                                      setRemoteStatus(st);
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <DeviceRow
+                          key={dev.id}
+                          dev={dev}
+                          selectable
+                          isSelected={isSelected}
+                          onToggleSelect={() =>
+                            setSelectedDeviceIds((prev) =>
+                              prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
+                            )
+                          }
+                          isExpanded={expandedDevicePermsId === dev.id}
+                          onToggleExpand={() =>
+                            setExpandedDevicePermsId(expandedDevicePermsId === dev.id ? null : dev.id)
+                          }
+                          currentPlayback={getPlaybackForActor(dev.id)}
+                          accent={accent}
+                          onToggleTimeout={() => handleToggleSingleTimeout(dev)}
+                          onRemove={() => handleRemoveSingleDevice(dev.id)}
+                          onUpdatePermission={(key, val) => handleUpdateSinglePermission(dev.id, key, val)}
+                        />
                       );
                     })}
                   </div>
@@ -955,6 +1151,111 @@ export const PhoneRemoteModal: React.FC<PhoneRemoteModalProps> = ({
                     No devices connected right now.
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB 4: LIVE ACTIVITY MONITOR */}
+            {activeTab === 'activity' && (
+              <div className="space-y-6 animate-in fade-in duration-100">
+                {/* Currently Playing Section */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[12.5px] font-bold text-theme-primary flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          activePlaybacks.length > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                        }`}
+                      />
+                      <span>Playing Right Now ({activePlaybacks.length})</span>
+                    </h4>
+                  </div>
+
+                  {activePlaybacks.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {activePlaybacks.map((pb) => (
+                        <div
+                          key={`${pb.soundId}-${pb.startedAt}`}
+                          className="p-3 rounded-2xl bg-white/[0.04] border border-white/[0.1] flex items-center gap-3"
+                        >
+                          <ActorAvatar initials={pb.initials} color={pb.color} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[12.5px] font-bold text-theme-primary truncate">
+                              {pb.soundTitle}
+                            </p>
+                            <p className="text-[11px] text-theme-muted truncate">
+                              Played by <span className="text-theme-secondary font-semibold">{pb.actorName}</span>
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+                            Playing
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.07] text-[11.5px] text-theme-muted">
+                      Nothing playing right now.
+                    </div>
+                  )}
+                </div>
+
+                {/* Full Chronological Activity Feed */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[12.5px] font-bold text-theme-primary">
+                      Recent Events ({activityLog.length})
+                    </h4>
+                    {activityLog.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.soundboardAPI?.clearRemoteActivity) {
+                            const st = await window.soundboardAPI.clearRemoteActivity();
+                            setRemoteStatus(st);
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] font-semibold text-theme-secondary hover:text-theme-primary cursor-pointer"
+                      >
+                        Clear Log
+                      </button>
+                    )}
+                  </div>
+
+                  {activityLog.length > 0 ? (
+                    <div className="rounded-2xl bg-white/[0.03] border border-white/[0.08] divide-y divide-white/[0.06]">
+                      {activityLog.map((ev) => (
+                        <div key={ev.id} className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <ActorAvatar initials={ev.initials} color={ev.color} size="sm" />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[12px] font-bold text-theme-primary">
+                                  {ev.actorName}
+                                </span>
+                                <span className="text-[12px] text-theme-secondary">{ev.action}</span>
+                                {ev.detail && (
+                                  <span className="text-[12px] font-semibold text-white truncate max-w-[260px]">
+                                    “{ev.detail}”
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {ev.type === 'stop' && <Square size={11} className="text-rose-400" />}
+                            <span className="text-[10.5px] font-mono text-theme-muted">
+                              {formatRelativeTime(ev.timestamp)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.07] text-[12px] text-theme-muted text-center">
+                      No remote or playback events recorded yet.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

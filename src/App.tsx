@@ -16,7 +16,7 @@ import { VBCableSetupModal } from './components/VBCableSetupModal';
 import { PhoneRemoteModal } from './components/PhoneRemoteModal';
 import { audioEngine } from './services/audioEngine';
 import { videoClipper } from './services/videoClipper';
-import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem, RemoteServerStatus } from './types';
+import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem, RemoteServerStatus, PlaybackActor, ActivePlaybackEntry } from './types';
 import { ClipCard } from './components/ClipCard';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { SortOption } from './components/CommandBar';
@@ -83,6 +83,8 @@ export const App: React.FC = () => {
   const [selectedSoundId, setSelectedSoundId] = useState<string | null>(null);
   const [activeSoundIds, setActiveSoundIds] = useState<string[]>([]);
   const [pausedSoundIds, setPausedSoundIds] = useState<string[]>([]);
+  const [activePlaybacks, setActivePlaybacks] = useState<ActivePlaybackEntry[]>([]);
+  const activeActorsRef = useRef<Record<string, ActivePlaybackEntry>>({});
   const [playbackProgressMap, setPlaybackProgressMap] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'clips' | 'youtube' | 'favorites'>('all');
@@ -139,9 +141,33 @@ export const App: React.FC = () => {
       const pausedIds = audioEngine.getPausedSoundIds();
       setActiveSoundIds(activeIds);
       setPausedSoundIds(pausedIds);
+
+      const nextActors: Record<string, ActivePlaybackEntry> = {};
+      for (const id of activeIds) {
+        if (activeActorsRef.current[id]) {
+          nextActors[id] = activeActorsRef.current[id];
+        } else {
+          const s = soundsRef.current.find((item) => item.id === id);
+          nextActors[id] = {
+            soundId: id,
+            soundTitle: s?.title || id,
+            actorId: 'host-pc',
+            actorName: 'Host (PC)',
+            initials: 'PC',
+            color: settingsRef.current?.accentColor || '#38bdf8',
+            role: 'owner',
+            startedAt: Date.now(),
+          };
+        }
+      }
+      activeActorsRef.current = nextActors;
+      const nextPlaybacks = Object.values(nextActors);
+      setActivePlaybacks(nextPlaybacks);
+
       if (window.soundboardAPI?.sendIpcCommand) {
         window.soundboardAPI.sendIpcCommand('sync-active-sounds', activeIds);
         window.soundboardAPI.sendIpcCommand('sync-paused-sounds', pausedIds);
+        window.soundboardAPI.sendIpcCommand('sync-active-playbacks', nextPlaybacks);
       }
     });
 
@@ -406,8 +432,7 @@ export const App: React.FC = () => {
       const currentList = soundsRef.current;
       const target = currentList.find((s) => s.id === soundId);
       if (target) {
-        setSelectedSoundId(target.id);
-        audioEngine.triggerSound(target, currentList);
+        triggerSoundWithActor(target, undefined, true);
       }
     });
 
@@ -421,8 +446,7 @@ export const App: React.FC = () => {
           if (lastId) {
             const soundToRepeat = soundsRef.current.find((s) => s.id === lastId);
             if (soundToRepeat) {
-              setSelectedSoundId(soundToRepeat.id);
-              audioEngine.triggerSound(soundToRepeat, soundsRef.current);
+              triggerSoundWithActor(soundToRepeat, undefined, true);
             }
           }
         })
@@ -507,14 +531,15 @@ export const App: React.FC = () => {
       : () => {};
 
     const cleanupRemoteTrigger = window.soundboardAPI.onIpcCommand
-      ? window.soundboardAPI.onIpcCommand('remote-trigger-sound', (soundId: string) => {
+      ? window.soundboardAPI.onIpcCommand('remote-trigger-sound', (payload: string | { soundId: string; actor?: PlaybackActor }) => {
           if (!isStandaloneOverlay) {
+            const soundId = typeof payload === 'string' ? payload : payload?.soundId;
+            const actor = typeof payload === 'object' ? payload?.actor : undefined;
+            if (!soundId) return;
             const currentList = soundsRef.current;
             const target = currentList.find((s) => s.id === soundId);
             if (target) {
-              setSelectedSoundId(target.id);
-              lastPlayedSoundIdRef.current = target.id;
-              audioEngine.triggerSound(target, currentList);
+              triggerSoundWithActor(target, actor, false);
             }
           }
         })
@@ -812,10 +837,36 @@ export const App: React.FC = () => {
   // Play a sound
   const lastPlayedSoundIdRef = useRef<string | null>(null);
 
-  const handlePlaySound = (sound: SoundItem) => {
+  const triggerSoundWithActor = (sound: SoundItem, actor?: PlaybackActor, recordDesktop = true) => {
     setSelectedSoundId(sound.id);
     lastPlayedSoundIdRef.current = sound.id;
-    audioEngine.triggerSound(sound, sounds);
+    const effectiveActor: ActivePlaybackEntry = {
+      soundId: sound.id,
+      soundTitle: sound.title,
+      actorId: actor?.id || 'host-pc',
+      actorName: actor?.name || 'Host (PC)',
+      initials: actor?.initials || 'PC',
+      color: actor?.color || settingsRef.current?.accentColor || '#38bdf8',
+      role: actor?.role || 'owner',
+      startedAt: Date.now(),
+    };
+    activeActorsRef.current = {
+      ...activeActorsRef.current,
+      [sound.id]: effectiveActor,
+    };
+    if (recordDesktop && window.soundboardAPI?.sendIpcCommand) {
+      window.soundboardAPI.sendIpcCommand('record-desktop-activity', {
+        type: 'play',
+        action: 'Played sound',
+        detail: sound.title,
+        soundId: sound.id,
+      });
+    }
+    audioEngine.triggerSound(sound, soundsRef.current);
+  };
+
+  const handlePlaySound = (sound: SoundItem) => {
+    triggerSoundWithActor(sound, undefined, true);
   };
 
   const triggerStopAllFeedback = () => {
@@ -831,6 +882,15 @@ export const App: React.FC = () => {
     triggerStopAllFeedback();
     audioEngine.stopAll();
     setActiveSoundIds([]);
+    setActivePlaybacks([]);
+    activeActorsRef.current = {};
+    if (window.soundboardAPI?.sendIpcCommand) {
+      window.soundboardAPI.sendIpcCommand('sync-active-playbacks', []);
+      window.soundboardAPI.sendIpcCommand('record-desktop-activity', {
+        type: 'stop',
+        action: 'Stopped all sounds',
+      });
+    }
   };
 
   // Handle YouTube Download
@@ -1741,6 +1801,7 @@ export const App: React.FC = () => {
                           sound={sound}
                           isSelected={selectedSoundId === sound.id}
                           isPlaying={activeSoundIds.includes(sound.id)}
+                          playingActor={activePlaybacks.find((p) => p.soundId === sound.id) || null}
                           playbackProgress={playbackProgressMap[sound.id] || 0}
                           accentColor={settings.accentColor}
                           isListeningHotkey={listeningSoundId === sound.id}

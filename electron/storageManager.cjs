@@ -506,6 +506,7 @@ class StorageManager {
       remoteGuestPin: '',
       remoteGuestPermissions: {
         canStopAll: false,
+        canControlVolume: false,
         canEditSounds: false,
         canDeleteSounds: false,
         canAddSounds: false,

@@ -1,8 +1,10 @@
-import { SoundItem, VideoClipItem, YouTubeSearchResult, RemoteGuestPermissions } from '../types';
+import { SoundItem, VideoClipItem, YouTubeSearchResult, RemoteGuestPermissions, ActivePlaybackEntry } from '../types';
 
 export interface RemoteSessionInfo {
   role: 'owner' | 'guest';
   name?: string;
+  initials?: string;
+  color?: string;
   requiresName?: boolean;
   permissions: RemoteGuestPermissions;
 }
@@ -23,11 +25,21 @@ export interface RemoteStateSnapshot {
   activeSoundIds: string[];
   pausedSoundIds: string[];
   progressMap: Record<string, number>;
+  activePlaybacks?: ActivePlaybackEntry[];
   settings: RemoteSettingsSnapshot;
   isRecordingClip: boolean;
   hostName: string;
   appVersion: string;
   session?: RemoteSessionInfo;
+}
+
+export interface RemoteSessionStatusResponse {
+  tempLocked: boolean;
+  session: RemoteSessionInfo;
+  activeSoundIds: string[];
+  pausedSoundIds: string[];
+  progressMap: Record<string, number>;
+  activePlaybacks: ActivePlaybackEntry[];
 }
 
 async function apiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
@@ -41,7 +53,7 @@ async function apiFetch<T>(path: string, token: string, init: RequestInit = {}):
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(path, { cache: 'no-store', ...init, headers });
   const text = await res.text();
   let json: any = {};
   try {
@@ -74,6 +86,10 @@ export async function submitFriendName(token: string, name: string): Promise<{ o
     method: 'POST',
     body: JSON.stringify({ name }),
   });
+}
+
+export async function getSessionStatus(token: string): Promise<RemoteSessionStatusResponse> {
+  return apiFetch('/api/session/status', token);
 }
 
 export async function logoutSession(token: string): Promise<void> {
@@ -186,6 +202,7 @@ export interface StreamCallbacks {
   onActive: (activeIds: string[]) => void;
   onPaused: (pausedIds: string[]) => void;
   onProgress: (progressMap: Record<string, number>) => void;
+  onPlaybacks?: (playbacks: ActivePlaybackEntry[]) => void;
   onSettings: (settings: RemoteSettingsSnapshot) => void;
   onRecording: (isRecordingClip: boolean) => void;
   onPermissions?: (session: RemoteSessionInfo) => void;
@@ -218,6 +235,7 @@ export function connectRemoteEvents(token: string, cb: StreamCallbacks): () => v
   bind<string[]>('active', cb.onActive);
   bind<string[]>('paused', cb.onPaused);
   bind<Record<string, number>>('progress', cb.onProgress);
+  bind<ActivePlaybackEntry[]>('playbacks', (d) => cb.onPlaybacks?.(d));
   bind<RemoteSettingsSnapshot>('settings', cb.onSettings);
   bind<{ isRecordingClip: boolean }>('recording', (d) => cb.onRecording(!!d.isRecordingClip));
   bind<RemoteSessionInfo>('permissions', (d) => cb.onPermissions?.(d));

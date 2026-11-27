@@ -65,6 +65,36 @@ input[type='range'].prism-range::-moz-range-thumb {
   cursor: pointer;
 }
 
+input[type='range'].prism-range-compact {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  outline: none;
+}
+
+input[type='range'].prism-range-compact::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+input[type='range'].prism-range-compact::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
 @keyframes pin-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-8px); }
