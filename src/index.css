@@ -165,6 +165,12 @@ a svg, a svg *,
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72), inset 0 1px 0 0 rgba(255, 255, 255, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
 }
 
+.frosted-hud {
+  background: linear-gradient(180deg, rgba(16, 21, 31, 0.84) 0%, rgba(10, 14, 21, 0.80) 28%, rgba(8, 11, 17, 0.86) 100%) !important;
+  backdrop-filter: blur(32px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
+}
+
 .frosted-modal-chrome {
   background-color: rgba(255, 255, 255, 0.035) !important;
 }
@@ -235,7 +241,9 @@ html.no-frosted-glass .frosted-workspace {
 }
 
 html.no-frosted-glass .is-overlay,
+html.no-frosted-glass .frosted-hud,
 html.no-frosted-glass [data-hud-pod="true"] {
+  background: #090b10 !important;
   background-color: #090b10 !important;
 }
 

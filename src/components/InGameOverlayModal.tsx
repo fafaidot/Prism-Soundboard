@@ -332,10 +332,10 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
           onClose();
         }
       }}
-      className={`fixed inset-0 z-[9999] flex flex-col select-none overflow-hidden ${
+      className={`fixed inset-0 z-[9999] flex flex-col select-none overflow-hidden frosted-hud ${
         isStandaloneOverlay
-          ? 'w-full h-full bg-[#090b10]/35 rounded-2xl border border-white/20 shadow-[0_24px_70px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.22)]'
-          : 'w-full h-full bg-[#090b10]/45 backdrop-blur-2xl'
+          ? 'w-full h-full rounded-2xl border border-white/[0.14] shadow-[0_24px_70px_rgba(0,0,0,0.78),inset_0_1px_0_0_rgba(255,255,255,0.16)]'
+          : 'w-full h-full'
       }`}
     >
       {/* Main HUD Full-View Container */}
@@ -345,7 +345,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
         className="w-full h-full flex flex-col overflow-hidden bg-transparent"
       >
         {/* Top Header Bar */}
-        <header className="h-14 px-5 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.03] backdrop-blur-xl shrink-0">
+        <header className="h-14 px-5 border-b border-white/[0.08] flex items-center justify-between bg-[#090c12]/60 backdrop-blur-xl shrink-0">
           {/* Left: Brand Identity & Open Main App */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2.5">
@@ -560,12 +560,12 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
                       {/* Frosted Glass Card Surface */}
                       <div
-                        className={`frosted-card relative flex flex-col p-2 rounded-xl border transition-all duration-200 overflow-hidden ${
+                        className={`frosted-card relative flex flex-col p-2 rounded-xl border transition-colors duration-200 overflow-hidden ${
                           isSelected
-                            ? 'bg-[#122538]/75 border-accent/80 backdrop-blur-2xl shadow-md ring-1 ring-accent/30'
+                            ? 'bg-[#122538]/85 border-accent/80 backdrop-blur-2xl shadow-md ring-1 ring-accent/35'
                             : isPlaying
-                            ? 'bg-[#102030]/70 border-accent/60 backdrop-blur-2xl shadow-md ring-1 ring-accent/20'
-                            : 'bg-white/[0.05] hover:bg-white/[0.09] border-white/[0.1] hover:border-white/[0.22] backdrop-blur-2xl shadow-xs'
+                            ? 'bg-[#102030]/80 border-accent/60 backdrop-blur-2xl shadow-md ring-1 ring-accent/25'
+                            : 'bg-[#0e1219]/78 hover:bg-[#141a25]/88 border-white/[0.09] hover:border-white/[0.2] backdrop-blur-2xl shadow-[0_4px_16px_rgba(0,0,0,0.4)]'
                         }`}
                       >
                         {/* Subtle top specular highlight */}
@@ -641,7 +641,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
             </div>
 
             {/* Bottom Dock: Unified Transport and Volume Strip (Docked frosted glass, no dead space) */}
-            <div className="w-full px-6 py-2.5 border-t border-white/[0.08] bg-white/[0.03] backdrop-blur-2xl flex items-center justify-between gap-4 select-none shrink-0 z-20">
+            <div className="w-full px-6 py-2.5 border-t border-white/[0.08] bg-[#0b0f17]/75 backdrop-blur-2xl flex items-center justify-between gap-4 select-none shrink-0 z-20">
               {/* Volume Faders: Master Output & Mic Gain */}
               <div className="flex items-center gap-4 shrink-0">
                 <div className="flex items-center gap-2">
@@ -800,7 +800,7 @@ export const InGameOverlayModal: React.FC<InGameOverlayModalProps> = ({
 
           {/* Right Inspector Panel */}
           {selectedSound ? (
-            <aside className="w-[320px] min-w-[320px] bg-white/[0.02] backdrop-blur-2xl border-l border-white/[0.08] p-4 flex flex-col justify-between overflow-y-auto shrink-0 select-none">
+            <aside className="w-[320px] min-w-[320px] bg-[#0b0f17]/68 backdrop-blur-2xl border-l border-white/[0.08] p-4 flex flex-col justify-between overflow-y-auto shrink-0 select-none">
               <div className="space-y-4">
                 {/* Actions Toolbar */}
                 <div className="grid grid-cols-4 gap-1.5">
