@@ -3,8 +3,10 @@ const path = require('path');
 const https = require('https');
 const AdmZip = require('adm-zip');
 const { RemoteServer } = require('./remoteServer.cjs');
+const { TunnelManager } = require('./tunnelManager.cjs');
 
 const remoteServer = new RemoteServer();
+const tunnelManager = new TunnelManager();
 let latestSoundsCache = null;
 
 function getEffectiveSounds() {
@@ -831,6 +833,7 @@ public class CoreAudioHelper {
 
   app.on('will-quit', () => {
     storageManager.flushSync();
+    tunnelManager.stop();
     remoteServer.stop();
     if (hookProcess) {
       try {
@@ -1371,6 +1374,9 @@ ipcMain.handle('save-settings', async (_event, settings) => {
     if (overlayWindow && !overlayWindow.isDestroyed() && _event.sender !== overlayWindow.webContents) {
       overlayWindow.webContents.send('settings-sync', settings);
     }
+    if (settings.remoteControlEnabled === false && tunnelManager.getStatus().active) {
+      tunnelManager.stop();
+    }
     remoteServer.applySettings(settings).catch(() => {});
 
     return true;
@@ -1883,7 +1889,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.5.10';
+    let currentVersion = '1.5.11';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -2352,12 +2358,24 @@ ipcMain.handle('change-storage-location', async (event, newRootPath) => {
   }
 });
 
+async function getCombinedRemoteStatus() {
+  const status = await remoteServer.getStatus();
+  return {
+    ...status,
+    tunnel: tunnelManager.getStatus(),
+  };
+}
+
 function pushRemoteServerStatus(status) {
+  const combined = {
+    ...status,
+    tunnel: tunnelManager.getStatus(),
+  };
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('remote-server-status-updated', status);
+    mainWindow.webContents.send('remote-server-status-updated', combined);
   }
   if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.webContents.send('remote-server-status-updated', status);
+    overlayWindow.webContents.send('remote-server-status-updated', combined);
   }
 }
 
@@ -2369,6 +2387,14 @@ async function initRemoteServer() {
   latestSoundsCache = initialSounds;
   remoteServer.updateSounds(initialSounds);
   remoteServer.updateVideoClips(initialClips);
+
+  tunnelManager.configure({
+    userDataBinDir: path.join(app.getPath('appData'), 'Prism Soundboard', 'bin'),
+    resourcesPath: process.resourcesPath || '',
+    onStatusChange: () => {
+      remoteServer.getStatus().then(pushRemoteServerStatus).catch(() => {});
+    },
+  });
 
   remoteServer.configure({
     distDir: path.join(__dirname, '../dist'),
@@ -2655,37 +2681,98 @@ async function initRemoteServer() {
 }
 
 ipcMain.handle('get-remote-server-status', async () => {
-  return remoteServer.getStatus();
+  return getCombinedRemoteStatus();
 });
 
-ipcMain.handle('regenerate-remote-pin', async () => {
-  const newPin = RemoteServer.generatePin();
+ipcMain.handle('regenerate-remote-pin', async (_event, payload) => {
+  const isGuest = payload && payload.type === 'guest';
   const current = storageManager.loadSettings();
-  const next = { ...current, remoteControlPin: newPin };
+  let newPin = RemoteServer.generatePin();
+
+  if (isGuest) {
+    if (newPin === String(current.remoteControlPin || remoteServer.pin)) {
+      newPin = String(((parseInt(newPin, 10) + 1379) % 9000) + 1000);
+    }
+    const next = { ...current, remoteGuestPin: newPin };
+    storageManager.saveSettings(next, true);
+    remoteServer.setGuestPin(newPin);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('settings-sync', next);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('settings-sync', next);
+    }
+  } else {
+    const next = { ...current, remoteControlPin: newPin };
+    storageManager.saveSettings(next, true);
+    remoteServer.setPin(newPin);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('settings-sync', next);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send('settings-sync', next);
+    }
+  }
+  return getCombinedRemoteStatus();
+});
+
+ipcMain.handle('disconnect-remote-clients', async () => {
+  remoteServer.disconnectAllClients('Disconnected from desktop');
+  return getCombinedRemoteStatus();
+});
+
+ipcMain.handle('set-remote-temp-lock', async (_event, { deviceIds, locked }) => {
+  remoteServer.setTempLockForDevices(deviceIds, !!locked);
+  return getCombinedRemoteStatus();
+});
+
+ipcMain.handle('set-remote-guest-permissions', async (_event, permissions) => {
+  const current = storageManager.loadSettings();
+  const nextPerms = {
+    ...(current.remoteGuestPermissions || {}),
+    ...(permissions || {}),
+  };
+  const next = { ...current, remoteGuestPermissions: nextPerms };
   storageManager.saveSettings(next, true);
-  remoteServer.setPin(newPin);
+  remoteServer.setGuestDefaultPermissions(nextPerms);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('settings-sync', next);
   }
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send('settings-sync', next);
   }
-  return remoteServer.getStatus();
+  return getCombinedRemoteStatus();
 });
 
-ipcMain.handle('disconnect-remote-clients', async () => {
-  remoteServer.disconnectAllClients('Disconnected from desktop');
-  return remoteServer.getStatus();
-});
-
-ipcMain.handle('set-remote-temp-lock', async (_event, { deviceIds, locked }) => {
-  remoteServer.setTempLockForDevices(deviceIds, !!locked);
-  return remoteServer.getStatus();
+ipcMain.handle('set-remote-device-permissions', async (_event, { deviceId, permissions }) => {
+  remoteServer.setDevicePermissions(deviceId, permissions);
+  return getCombinedRemoteStatus();
 });
 
 ipcMain.handle('remove-remote-devices', async (_event, deviceIds) => {
   remoteServer.disconnectDevices(deviceIds, 'Removed from desktop');
-  return remoteServer.getStatus();
+  return getCombinedRemoteStatus();
+});
+
+ipcMain.handle('start-public-tunnel', async () => {
+  const current = storageManager.loadSettings();
+  if (current.remoteControlEnabled === false) {
+    const enabledSettings = { ...current, remoteControlEnabled: true };
+    storageManager.saveSettings(enabledSettings, true);
+    await remoteServer.applySettings(enabledSettings);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('settings-sync', enabledSettings);
+    }
+  } else if (!remoteServer.isRunning) {
+    await remoteServer.applySettings(current);
+  }
+  await tunnelManager.start(remoteServer.port || Number(current.remoteControlPort) || 3940);
+  return getCombinedRemoteStatus();
+});
+
+ipcMain.handle('stop-public-tunnel', async () => {
+  tunnelManager.stop();
+  return getCombinedRemoteStatus();
 });
 
 function compareSemver(v1, v2) {

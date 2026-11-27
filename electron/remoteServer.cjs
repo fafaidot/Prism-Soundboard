@@ -32,6 +32,15 @@ const MIME_TYPES = {
 
 const MAX_JSON_BODY_BYTES = 40 * 1024 * 1024; // 40 MB (supports phone audio upload)
 
+const DEFAULT_GUEST_PERMISSIONS = {
+  canStopAll: false,
+  canEditSounds: false,
+  canDeleteSounds: false,
+  canAddSounds: false,
+  canAudioClip: false,
+  canVideoClip: false,
+};
+
 class RemoteServer {
   constructor() {
     this.server = null;
@@ -39,13 +48,16 @@ class RemoteServer {
     this.enabled = true;
     this.port = 3940;
     this.pin = '';
+    this.guestEnabled = true;
+    this.guestPin = '';
+    this.guestPermissions = { ...DEFAULT_GUEST_PERMISSIONS };
     this.lastError = '';
     this.distDir = '';
     this.devServerUrl = '';
     this.qrCache = { url: '', dataUrl: '' };
 
     // Authenticated sessions (in-memory only -> PIN required on every fresh phone connection)
-    /** @type {Map<string, { id: string, createdAt: number, lastSeen: number, userAgent: string, label: string, ip: string, tempLocked: boolean }>} */
+    /** @type {Map<string, { id: string, role: 'owner' | 'guest', createdAt: number, lastSeen: number, userAgent: string, label: string, ip: string, tempLocked: boolean }>} */
     this.sessions = new Map();
     /** @type {Map<string, Set<import('http').ServerResponse>>} */
     this.sseClients = new Map();
@@ -175,7 +187,29 @@ class RemoteServer {
     };
   }
 
-  getPublicStateSnapshot() {
+  getSessionRoleState(sess) {
+    if (!sess || sess.role === 'owner') {
+      return {
+        role: 'owner',
+        permissions: {
+          canStopAll: true,
+          canEditSounds: true,
+          canDeleteSounds: true,
+          canAddSounds: true,
+          canAudioClip: true,
+          canVideoClip: true,
+        },
+      };
+    }
+    return {
+      role: 'guest',
+      name: sess.friendName || '',
+      requiresName: !sess.friendName,
+      permissions: { ...(sess.permissions || this.guestPermissions) },
+    };
+  }
+
+  getPublicStateSnapshot(sess = null) {
     return {
       sounds: this.sanitizeSounds(this.state.sounds),
       videoClips: (this.state.videoClips || []).map((c) => this.sanitizeClip(c)),
@@ -186,6 +220,7 @@ class RemoteServer {
       isRecordingClip: !!this.state.isRecordingClip,
       hostName: os.hostname(),
       appVersion: this.state.appVersion,
+      session: this.getSessionRoleState(sess),
     };
   }
 
@@ -218,21 +253,55 @@ class RemoteServer {
   }
 
   cleanIp(ip = '') {
-    return String(ip).replace(/^::ffff:/, '');
+    let clean = String(ip).trim().replace(/^::ffff:/i, '');
+    // Strip port if IPv4:port format came from X-Forwarded-For
+    if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(clean)) {
+      clean = clean.split(':')[0];
+    }
+    return clean;
+  }
+
+  extractClientIp(req) {
+    const sockIp = this.cleanIp(req.socket?.remoteAddress || '');
+    const isLoopback = !sockIp || sockIp === '127.0.0.1' || sockIp === '::1' || sockIp === 'localhost';
+    if (isLoopback) {
+      const cfIp = req.headers['cf-connecting-ip'];
+      const realIp = req.headers['x-real-ip'];
+      const xff = req.headers['x-forwarded-for'];
+      if (cfIp) {
+        const cleaned = this.cleanIp(Array.isArray(cfIp) ? cfIp[0] : cfIp);
+        if (cleaned) return cleaned;
+      }
+      if (realIp) {
+        const cleaned = this.cleanIp(Array.isArray(realIp) ? realIp[0] : realIp);
+        if (cleaned) return cleaned;
+      }
+      if (xff) {
+        const first = String(Array.isArray(xff) ? xff[0] : xff).split(',')[0];
+        const cleaned = this.cleanIp(first);
+        if (cleaned) return cleaned;
+      }
+    }
+    return sockIp || 'unknown';
   }
 
   getConnectedDevices() {
     const devices = [];
     for (const [token, sess] of this.sessions.entries()) {
       const online = (this.sseClients.get(token)?.size || 0) > 0;
+      const roleState = this.getSessionRoleState(sess);
       devices.push({
         id: sess.id,
+        role: sess.role || 'owner',
+        name: sess.friendName || '',
         label: sess.label || this.formatDeviceLabel(sess.userAgent),
         ip: sess.ip,
         connectedAt: sess.createdAt,
         lastSeen: sess.lastSeen,
         online,
         tempLocked: !!sess.tempLocked,
+        permissions: roleState.permissions,
+        hasCustomPermissions: !!sess.hasCustomPermissions,
       });
     }
     return devices.sort((a, b) => a.connectedAt - b.connectedAt);
@@ -266,6 +335,9 @@ class RemoteServer {
       running: this.isRunning,
       port: this.port,
       pin: this.pin,
+      guestEnabled: this.guestEnabled,
+      guestPin: this.guestPin,
+      guestPermissions: { ...this.guestPermissions },
       urls,
       primaryUrl,
       qrDataUrl,
@@ -443,7 +515,7 @@ class RemoteServer {
         });
       } else {
         this.sendSseToToken(token, 'temp_locked', { locked: false });
-        this.sendSseToToken(token, 'state', this.getPublicStateSnapshot());
+        this.sendSseToToken(token, 'state', this.getPublicStateSnapshot(sess));
       }
     }
 
@@ -451,6 +523,74 @@ class RemoteServer {
       this.notifyStatusChanged();
     }
     return changed;
+  }
+
+  disconnectGuests(reason = 'Friend access updated on desktop') {
+    const guestIds = [];
+    for (const sess of this.sessions.values()) {
+      if (sess.role === 'guest') guestIds.push(sess.id);
+    }
+    if (guestIds.length > 0) {
+      this.disconnectDevices(guestIds, reason);
+    }
+  }
+
+  broadcastPermissions() {
+    for (const [token, sess] of this.sessions.entries()) {
+      if (sess.tempLocked) continue;
+      this.sendSseToToken(token, 'permissions', this.getSessionRoleState(sess));
+    }
+  }
+
+  /**
+   * Update default Guest permissions live and push to all non-customized guest sessions.
+   */
+  setGuestDefaultPermissions(permissionsPatch) {
+    if (!permissionsPatch || typeof permissionsPatch !== 'object') return false;
+    const next = { ...this.guestPermissions };
+    for (const key of Object.keys(DEFAULT_GUEST_PERMISSIONS)) {
+      if (typeof permissionsPatch[key] === 'boolean') {
+        next[key] = permissionsPatch[key];
+      }
+    }
+    this.guestPermissions = next;
+
+    for (const [token, sess] of this.sessions.entries()) {
+      if (sess.role === 'guest' && !sess.hasCustomPermissions) {
+        sess.permissions = { ...next };
+        if (!sess.tempLocked) {
+          this.sendSseToToken(token, 'permissions', this.getSessionRoleState(sess));
+        }
+      }
+    }
+    this.notifyStatusChanged();
+    return true;
+  }
+
+  /**
+   * Update an individual connected device's permissions live without affecting other friends.
+   */
+  setDevicePermissions(deviceId, permissionsPatch) {
+    if (!deviceId || !permissionsPatch || typeof permissionsPatch !== 'object') return false;
+    for (const [token, sess] of this.sessions.entries()) {
+      if (sess.id !== deviceId) continue;
+      if (sess.role !== 'guest') return false;
+      const base = sess.permissions || { ...this.guestPermissions };
+      const next = { ...base };
+      for (const key of Object.keys(DEFAULT_GUEST_PERMISSIONS)) {
+        if (typeof permissionsPatch[key] === 'boolean') {
+          next[key] = permissionsPatch[key];
+        }
+      }
+      sess.permissions = next;
+      sess.hasCustomPermissions = true;
+      if (!sess.tempLocked) {
+        this.sendSseToToken(token, 'permissions', this.getSessionRoleState(sess));
+      }
+      this.notifyStatusChanged();
+      return true;
+    }
+    return false;
   }
 
   setPin(newPin) {
@@ -464,6 +604,17 @@ class RemoteServer {
     return true;
   }
 
+  setGuestPin(newPin) {
+    const clean = String(newPin || '').replace(/\D/g, '').slice(0, 6);
+    if (clean.length < 4 || clean === this.pin) return false;
+    if (clean !== this.guestPin) {
+      this.guestPin = clean;
+      this.disconnectGuests('Friend PIN changed on desktop');
+      this.notifyStatusChanged();
+    }
+    return true;
+  }
+
   /**
    * Start or restart the HTTP server according to settings.
    */
@@ -471,12 +622,28 @@ class RemoteServer {
     const enabled = settings?.remoteControlEnabled !== false;
     const port = Number(settings?.remoteControlPort) || 3940;
     const pin = settings?.remoteControlPin ? String(settings.remoteControlPin) : this.pin || RemoteServer.generatePin();
+    const guestEnabled = settings?.remoteGuestEnabled !== false;
+    let guestPin = settings?.remoteGuestPin ? String(settings.remoteGuestPin) : this.guestPin || RemoteServer.generatePin();
+    if (guestPin === pin) {
+      guestPin = String((parseInt(pin, 10) + 1379) % 9000 + 1000);
+    }
+    const nextGuestPerms = {
+      ...DEFAULT_GUEST_PERMISSIONS,
+      ...(settings?.remoteGuestPermissions || {}),
+    };
 
     this.state.settings = { ...this.state.settings, ...(settings || {}) };
 
     const pinChanged = this.pin && this.pin !== pin;
+    const guestPinChanged = this.guestPin && this.guestPin !== guestPin;
+    const guestDisabled = this.guestEnabled && !guestEnabled;
+    const permsChanged = JSON.stringify(this.guestPermissions) !== JSON.stringify(nextGuestPerms);
     const portChanged = this.port !== port;
+
     this.pin = pin;
+    this.guestEnabled = guestEnabled;
+    this.guestPin = guestPin;
+    this.guestPermissions = nextGuestPerms;
     this.enabled = enabled;
 
     if (!enabled) {
@@ -487,13 +654,19 @@ class RemoteServer {
 
     if (pinChanged && this.isRunning) {
       this.disconnectAllClients('PIN updated on desktop');
+    } else if ((guestPinChanged || guestDisabled) && this.isRunning) {
+      this.disconnectGuests(guestDisabled ? 'Friend access disabled on desktop' : 'Friend PIN updated on desktop');
     }
 
     if (!this.isRunning || portChanged) {
       await this.start(port);
     } else {
       this.broadcastSse('settings', this.sanitizeSettings(this.state.settings));
-      this.notifyStatusChanged();
+      if (permsChanged) {
+        this.setGuestDefaultPermissions(nextGuestPerms);
+      } else {
+        this.notifyStatusChanged();
+      }
     }
   }
 
@@ -612,6 +785,18 @@ class RemoteServer {
     return qToken ? qToken.trim() : '';
   }
 
+  requirePermission(res, auth, permKey) {
+    if (auth.session.role === 'owner') {
+      return true;
+    }
+    const perms = auth.session.permissions || this.guestPermissions;
+    if (perms && perms[permKey]) {
+      return true;
+    }
+    this.sendJson(res, 403, { error: 'Not allowed in Friend mode', permission: permKey });
+    return false;
+  }
+
   requireAuth(req, res, parsedUrl, allowWhenTempLocked = false) {
     const token = this.extractToken(req, parsedUrl);
     if (!token || !this.sessions.has(token)) {
@@ -665,7 +850,7 @@ class RemoteServer {
     }
 
     if (method === 'POST' && pathname === '/api/auth/verify') {
-      const clientIp = req.socket?.remoteAddress || 'unknown';
+      const clientIp = this.extractClientIp(req);
       const now = Date.now();
       const rate = this.failedAttempts.get(clientIp);
       if (rate && rate.resetAt > now && rate.count >= 8) {
@@ -675,7 +860,14 @@ class RemoteServer {
 
       const body = await this.readJsonBody(req).catch(() => ({}));
       const entered = String(body.pin || '').trim();
-      if (!entered || entered !== this.pin) {
+      let role = null;
+      if (entered && entered === this.pin) {
+        role = 'owner';
+      } else if (entered && this.guestEnabled && this.guestPin && entered === this.guestPin) {
+        role = 'guest';
+      }
+
+      if (!role) {
         const next = !rate || rate.resetAt <= now ? { count: 1, resetAt: now + 60000 } : { count: rate.count + 1, resetAt: rate.resetAt };
         this.failedAttempts.set(clientIp, next);
         return this.sendJson(res, 401, { error: 'Incorrect PIN' });
@@ -684,21 +876,46 @@ class RemoteServer {
       this.failedAttempts.delete(clientIp);
       const token = crypto.randomBytes(32).toString('hex');
       const ua = String(req.headers['user-agent'] || 'Phone');
-      this.sessions.set(token, {
+      const baseDevice = this.formatDeviceLabel(ua);
+      const submittedName = role === 'guest' && body.name ? String(body.name).trim().slice(0, 36) : '';
+      const sess = {
         id: crypto.randomBytes(6).toString('hex'),
+        role,
+        friendName: submittedName,
+        baseLabel: baseDevice,
         createdAt: now,
         lastSeen: now,
         userAgent: ua,
-        label: this.formatDeviceLabel(ua),
-        ip: this.cleanIp(clientIp),
+        label: submittedName ? `${submittedName} (${baseDevice})` : baseDevice,
+        ip: clientIp,
         tempLocked: false,
-      });
+        permissions: role === 'guest' ? { ...this.guestPermissions } : undefined,
+        hasCustomPermissions: false,
+      };
+      this.sessions.set(token, sess);
       this.notifyStatusChanged();
 
       return this.sendJson(res, 200, {
         token,
-        state: this.getPublicStateSnapshot(),
+        state: this.getPublicStateSnapshot(sess),
       });
+    }
+
+    if (method === 'POST' && pathname === '/api/auth/name') {
+      const auth = this.requireAuth(req, res, parsedUrl, false);
+      if (!auth) return;
+      const body = await this.readJsonBody(req).catch(() => ({}));
+      const cleanName = String(body.name || '').trim().slice(0, 36);
+      if (!cleanName) {
+        return this.sendJson(res, 400, { error: 'Please enter your name' });
+      }
+      auth.session.friendName = cleanName;
+      const base = auth.session.baseLabel || this.formatDeviceLabel(auth.session.userAgent);
+      auth.session.label = `${cleanName} (${base})`;
+      const roleState = this.getSessionRoleState(auth.session);
+      this.sendSseToToken(auth.token, 'permissions', roleState);
+      this.notifyStatusChanged();
+      return this.sendJson(res, 200, { ok: true, session: roleState });
     }
 
     if (method === 'POST' && pathname === '/api/auth/logout') {
@@ -724,9 +941,15 @@ class RemoteServer {
       const sseAuth = this.requireAuth(req, res, parsedUrl, true);
       if (!sseAuth) return;
 
+      const sseIp = this.extractClientIp(req);
+      if (sseIp && sseIp !== 'unknown') {
+        sseAuth.session.ip = sseIp;
+      }
+
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
         Connection: 'keep-alive',
       });
 
@@ -740,7 +963,7 @@ class RemoteServer {
         res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: true, reason: 'Temporarily locked from PC' })}\n\n`);
       } else {
         res.write(`event: temp_locked\ndata: ${JSON.stringify({ locked: false })}\n\n`);
-        res.write(`event: state\ndata: ${JSON.stringify(this.getPublicStateSnapshot())}\n\n`);
+        res.write(`event: state\ndata: ${JSON.stringify(this.getPublicStateSnapshot(sseAuth.session))}\n\n`);
       }
 
       req.on('close', () => {
@@ -761,7 +984,7 @@ class RemoteServer {
     if (!auth) return;
 
     if (method === 'GET' && pathname === '/api/state') {
-      return this.sendJson(res, 200, this.getPublicStateSnapshot());
+      return this.sendJson(res, 200, this.getPublicStateSnapshot(auth.session));
     }
 
     // Trigger playback / Stop / Replay clips
@@ -774,12 +997,14 @@ class RemoteServer {
     }
 
     if (method === 'POST' && pathname === '/api/stop-all') {
+      if (!this.requirePermission(res, auth, 'canStopAll')) return;
       await this.handlers.stopAll?.();
       return this.sendJson(res, 200, { ok: true });
     }
 
     const pauseMatch = pathname.match(/^\/api\/playback\/([^/]+)\/pause$/);
     if (method === 'POST' && pauseMatch) {
+      if (!this.requirePermission(res, auth, 'canStopAll')) return;
       const soundId = decodeURIComponent(pauseMatch[1]);
       await this.handlers.togglePauseSound?.(soundId);
       return this.sendJson(res, 200, { ok: true });
@@ -787,6 +1012,7 @@ class RemoteServer {
 
     const seekMatch = pathname.match(/^\/api\/playback\/([^/]+)\/seek$/);
     if (method === 'POST' && seekMatch) {
+      if (!this.requirePermission(res, auth, 'canStopAll')) return;
       const soundId = decodeURIComponent(seekMatch[1]);
       const body = await this.readJsonBody(req);
       await this.handlers.seekSound?.(soundId, Number(body.progress) || 0);
@@ -795,6 +1021,7 @@ class RemoteServer {
 
     const skipMatch = pathname.match(/^\/api\/playback\/([^/]+)\/skip$/);
     if (method === 'POST' && skipMatch) {
+      if (!this.requirePermission(res, auth, 'canStopAll')) return;
       const soundId = decodeURIComponent(skipMatch[1]);
       const body = await this.readJsonBody(req);
       await this.handlers.skipSound?.(soundId, Number(body.deltaSeconds) || 0);
@@ -802,12 +1029,14 @@ class RemoteServer {
     }
 
     if (method === 'POST' && pathname === '/api/clip/audio') {
+      if (!this.requirePermission(res, auth, 'canAudioClip')) return;
       const body = await this.readJsonBody(req).catch(() => ({}));
       await this.handlers.triggerAudioClip?.(body.duration ? Number(body.duration) : undefined);
       return this.sendJson(res, 200, { ok: true });
     }
 
     if (method === 'POST' && pathname === '/api/clip/video') {
+      if (!this.requirePermission(res, auth, 'canVideoClip')) return;
       const body = await this.readJsonBody(req).catch(() => ({}));
       await this.handlers.triggerVideoClip?.(body.duration ? Number(body.duration) : undefined);
       return this.sendJson(res, 200, { ok: true });
@@ -818,12 +1047,14 @@ class RemoteServer {
     if (soundMatch) {
       const soundId = decodeURIComponent(soundMatch[1]);
       if (method === 'PATCH') {
+        if (!this.requirePermission(res, auth, 'canEditSounds')) return;
         const patch = await this.readJsonBody(req);
         const updated = await this.handlers.updateSound?.(soundId, patch);
         if (!updated) return this.sendJson(res, 404, { error: 'Sound not found' });
         return this.sendJson(res, 200, { sound: this.sanitizeSound(updated) });
       }
       if (method === 'DELETE') {
+        if (!this.requirePermission(res, auth, 'canDeleteSounds')) return;
         const deleted = await this.handlers.deleteSound?.(soundId);
         if (!deleted) return this.sendJson(res, 404, { error: 'Sound not found' });
         return this.sendJson(res, 200, { ok: true });
@@ -833,6 +1064,7 @@ class RemoteServer {
     // Stream sound audio file (for optional mobile preview)
     const soundAudioMatch = pathname.match(/^\/api\/sounds\/([^/]+)\/audio$/);
     if (method === 'GET' && soundAudioMatch) {
+      if (!this.requirePermission(res, auth, 'canEditSounds')) return;
       const soundId = decodeURIComponent(soundAudioMatch[1]);
       const target = (this.state.sounds || []).find((s) => s.id === soundId);
       if (!target) return this.sendJson(res, 404, { error: 'Sound not found' });
@@ -852,6 +1084,7 @@ class RemoteServer {
 
     // Upload audio file directly from phone
     if (method === 'POST' && pathname === '/api/sounds/upload') {
+      if (!this.requirePermission(res, auth, 'canAddSounds')) return;
       const body = await this.readJsonBody(req);
       if (!body.base64 || !body.fileName) {
         return this.sendJson(res, 400, { error: 'Missing fileName or base64 payload' });
@@ -862,25 +1095,31 @@ class RemoteServer {
 
     // YouTube Search, Trending, Download
     if (method === 'GET' && pathname === '/api/youtube/trending') {
+      if (!this.requirePermission(res, auth, 'canAddSounds')) return;
       const items = (await this.handlers.getTrendingYouTube?.()) || [];
       return this.sendJson(res, 200, { results: items });
     }
 
     if (method === 'GET' && pathname === '/api/youtube/search') {
+      if (!this.requirePermission(res, auth, 'canAddSounds')) return;
       const q = parsedUrl.searchParams.get('q') || '';
       const items = (await this.handlers.searchYouTube?.(q)) || [];
       return this.sendJson(res, 200, { results: items });
     }
 
     if (method === 'POST' && pathname === '/api/youtube/download') {
+      if (!this.requirePermission(res, auth, 'canAddSounds')) return;
       const body = await this.readJsonBody(req);
       if (!body.url) return this.sendJson(res, 400, { error: 'Missing YouTube URL' });
       const created = await this.handlers.downloadYouTubeSound?.(body);
       return this.sendJson(res, 201, { sound: this.sanitizeSound(created) });
     }
 
-    // Remote soundboard volume / clip duration settings (host mic/voice volume stripped)
+    // Remote soundboard volume / clip duration settings (Owner only; host mic/voice volume stripped)
     if (method === 'PATCH' && pathname === '/api/settings') {
+      if (auth.session.role !== 'owner') {
+        return this.sendJson(res, 403, { error: 'Only the host can change mixer settings' });
+      }
       const rawPatch = await this.readJsonBody(req);
       const safePatch = {};
       if (typeof rawPatch.masterSpeakerVolume === 'number') safePatch.masterSpeakerVolume = rawPatch.masterSpeakerVolume;
@@ -893,6 +1132,7 @@ class RemoteServer {
     // Video clips management + streaming
     const clipVideoMatch = pathname.match(/^\/api\/clips\/([^/]+)\/video$/);
     if (method === 'GET' && clipVideoMatch) {
+      if (!this.requirePermission(res, auth, 'canVideoClip')) return;
       const clipId = decodeURIComponent(clipVideoMatch[1]);
       const clip = (this.state.videoClips || []).find((c) => c.id === clipId);
       if (!clip || !clip.filePath || !fs.existsSync(clip.filePath)) {
@@ -905,12 +1145,14 @@ class RemoteServer {
     if (clipMatch) {
       const clipId = decodeURIComponent(clipMatch[1]);
       if (method === 'PATCH') {
+        if (!this.requirePermission(res, auth, 'canEditSounds')) return;
         const patch = await this.readJsonBody(req);
         const updated = await this.handlers.updateVideoClip?.(clipId, patch);
         if (!updated) return this.sendJson(res, 404, { error: 'Video clip not found' });
         return this.sendJson(res, 200, { clip: this.sanitizeClip(updated) });
       }
       if (method === 'DELETE') {
+        if (!this.requirePermission(res, auth, 'canDeleteSounds')) return;
         const ok = await this.handlers.deleteVideoClip?.(clipId);
         if (!ok) return this.sendJson(res, 404, { error: 'Video clip not found' });
         return this.sendJson(res, 200, { ok: true });

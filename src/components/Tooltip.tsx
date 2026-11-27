@@ -98,7 +98,15 @@ export const GlobalTooltipProvider: React.FC = () => {
 
   useEffect(() => {
     const handleMouseOver = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement)?.closest('[data-tooltip], [title]') as HTMLElement | null;
+      const eventTarget = e.target as HTMLElement | null;
+      if (!eventTarget) return;
+
+      // Fast-path: moving within the currently hovered tooltip target shouldn't re-query or toggle state
+      if (currentTargetRef.current && currentTargetRef.current.contains(eventTarget)) {
+        return;
+      }
+
+      const target = eventTarget.closest('[data-tooltip], [title]') as HTMLElement | null;
       if (!target) return;
 
       // Transfer native title to data-tooltip to suppress browser native tooltip
@@ -109,6 +117,8 @@ export const GlobalTooltipProvider: React.FC = () => {
           target.removeAttribute('title');
         }
       }
+
+      if (currentTargetRef.current === target) return;
 
       const text = target.getAttribute('data-tooltip');
       if (!text || !text.trim()) return;
@@ -127,11 +137,13 @@ export const GlobalTooltipProvider: React.FC = () => {
 
     const handleMouseOut = (e: MouseEvent) => {
       const target = (e.target as HTMLElement)?.closest('[data-tooltip], [title]');
-      if (target && target === currentTargetRef.current) {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        currentTargetRef.current = null;
-        setTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-      }
+      if (!target || target !== currentTargetRef.current) return;
+      // Ignore child transitions inside the same button/element so tooltips and cursor never flicker
+      if (e.relatedTarget && target.contains(e.relatedTarget as Node)) return;
+
+      if (timerRef.current) clearTimeout(timerRef.current);
+      currentTargetRef.current = null;
+      setTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
     };
 
     const handleMouseDown = () => {

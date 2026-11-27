@@ -47,11 +47,11 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   };
 
   return (
-    <div className="w-full px-6 pb-3 pt-1 select-none">
-      <div className="w-full bg-[#0e1219]/50 frosted-bottom-pill border border-white/[0.12] rounded-xl px-4 py-2 flex items-center justify-between gap-4 backdrop-blur-2xl shadow-[0_12px_36px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]">
+    <div className="w-full px-4 pb-3 pt-1 select-none">
+      <div className="w-full bg-[#0e1219]/50 frosted-bottom-pill border border-white/[0.12] rounded-xl px-3.5 py-2 flex items-center justify-between gap-3 backdrop-blur-2xl shadow-[0_12px_36px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.08)]">
         {/* Left: Speaker and Microphone Volume Faders */}
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleToggleMute}
@@ -69,15 +69,15 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 audioEngine.setMasterSpeakerVolume(val);
                 onSpeakerVolumeChange(val);
               }}
-              className="w-28"
+              className="w-20"
             />
-            <span className="font-mono text-[11px] font-medium text-slate-300 w-9 text-right shrink-0 tabular-nums">
+            <span className="font-mono text-[10.5px] font-medium text-slate-300 w-8 text-right shrink-0 tabular-nums">
               {speakerVolume}%
             </span>
           </div>
 
           {onMicProjectionVolumeChange && (
-            <div className="flex items-center gap-2 pl-3 border-l border-white/[0.08]">
+            <div className="flex items-center gap-1.5 pl-2.5 border-l border-white/[0.08]">
               <Mic size={14} className="text-accent shrink-0" />
               <Slider
                 min={0}
@@ -88,9 +88,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                   audioEngine.setMicInputVolume(val);
                   onMicProjectionVolumeChange(val);
                 }}
-                className="w-28"
+                className="w-20"
               />
-              <span className="font-mono text-[11px] font-medium text-slate-300 w-9 text-right shrink-0 tabular-nums">
+              <span className="font-mono text-[10.5px] font-medium text-slate-300 w-8 text-right shrink-0 tabular-nums">
                 {micProjectionVolume}%
               </span>
             </div>
@@ -98,9 +98,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </div>
 
         {/* Right / Now Playing Console */}
-        <div className="flex-1 flex items-center justify-between gap-4 min-w-0 pl-3 border-l border-white/[0.08]">
+        <div className="flex-1 flex items-center justify-between gap-3 min-w-0 pl-3 border-l border-white/[0.08]">
           {/* Sound Cover & Name */}
-          <div className="flex items-center gap-2.5 min-w-0 max-w-[220px]">
+          <div className="flex items-center gap-2 min-w-[76px] max-w-[148px] shrink">
             <div className="w-8 h-8 rounded-md bg-[#0e1219] border border-white/[0.08] overflow-hidden flex items-center justify-center text-slate-500 shrink-0">
               {activeSound?.thumbnail ? (
                 <img
@@ -117,13 +117,13 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 {activeSound ? activeSound.title : 'Ready'}
               </span>
               <span className="text-[10px] text-slate-400 truncate">
-                {activeSound?.author || (activeSound ? 'Playing' : 'Select a sound to play')}
+                {activeSound?.author || (activeSound ? 'Playing' : 'Select a sound')}
               </span>
             </div>
           </div>
 
           {/* Timeline Scrubber */}
-          <div className="flex-1 flex items-center min-w-0 px-2">
+          <div className="flex-1 flex items-center min-w-[120px] px-1">
             <Slider
               min={0}
               max={1}
@@ -140,7 +140,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           </div>
 
           {/* Transport Controls */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => onSkipSound && onSkipSound(-5)}

@@ -42,7 +42,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
         onSelect();
         onPlay();
       }}
-      className="group relative flex flex-col cursor-pointer select-none transition-all duration-200"
+      className="group relative flex flex-col cursor-pointer select-none transition-colors duration-200"
     >
       {/* Ambient Thumbnail Color Glow (Frosted & Spreaded past the card borders) */}
       {hasThumbnail ? (
@@ -64,7 +64,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
 
       {/* Frosted Glass Card Surface */}
       <div
-        className={`frosted-card relative flex flex-col p-2.5 rounded-2xl border transition-all duration-200 overflow-hidden ${
+        className={`frosted-card relative flex flex-col p-2.5 rounded-2xl border transition-colors duration-200 overflow-hidden ${
           isSelected
             ? 'bg-[#122538]/75 border-accent/80 backdrop-blur-2xl shadow-[0_8px_28px_rgba(0,0,0,0.55)] ring-1 ring-accent/40'
             : isPlaying
@@ -84,9 +84,9 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
             className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200 pointer-events-none"
           />
         ) : sound.source === 'clip' || sound.title.toLowerCase().startsWith('clipped') ? (
-          <Clapperboard size={26} className="text-accent opacity-80 group-hover:scale-105 transition-transform duration-150" />
+          <Clapperboard size={26} className="text-accent opacity-80 pointer-events-none" />
         ) : (
-          <Music size={26} className="text-accent opacity-80 group-hover:scale-105 transition-transform duration-150" />
+          <Music size={26} className="text-accent opacity-80 pointer-events-none" />
         )}
 
         {/* Center Play / Pause Indicator */}
@@ -102,7 +102,7 @@ const SoundCardComponent: React.FC<SoundCardProps> = ({
               onSelect();
               onPlay();
             }}
-            className={`group/playbtn w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow-md border ${
+            className={`group/playbtn w-9 h-9 rounded-full flex items-center justify-center transition-colors active:scale-95 cursor-pointer shadow-md border ${
               isPlaying
                 ? 'bg-black/80 border-accent text-accent'
                 : 'bg-black/75 border-white/20 text-white hover:border-accent hover:text-accent'

@@ -108,13 +108,21 @@
   user-select: none !important;
 }
 
-/* Ensure stable pointer cursor across all interactive elements and prevent child element hover twitch */
-button, [role="button"], a, input[type="button"], input[type="submit"], .cursor-pointer {
+/* Ensure stable pointer cursor and no-drag hit-testing across all interactive elements */
+button, [role="button"], a, input[type="button"], input[type="submit"], select, .cursor-pointer {
   cursor: pointer !important;
+  -webkit-app-region: no-drag;
 }
 
 button *, [role="button"] *, a *, .cursor-pointer * {
-  cursor: inherit !important;
+  cursor: pointer !important;
+}
+
+button svg, button svg *,
+[role="button"] svg, [role="button"] svg *,
+a svg, a svg *,
+.cursor-pointer svg, .cursor-pointer svg * {
+  pointer-events: none !important;
 }
 
 /* Crystal-Clear Frosted Glass Acrylic utilities */

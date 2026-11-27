@@ -1,4 +1,11 @@
-import { SoundItem, VideoClipItem, YouTubeSearchResult } from '../types';
+import { SoundItem, VideoClipItem, YouTubeSearchResult, RemoteGuestPermissions } from '../types';
+
+export interface RemoteSessionInfo {
+  role: 'owner' | 'guest';
+  name?: string;
+  requiresName?: boolean;
+  permissions: RemoteGuestPermissions;
+}
 
 export interface RemoteSettingsSnapshot {
   accentColor: string;
@@ -20,6 +27,7 @@ export interface RemoteStateSnapshot {
   isRecordingClip: boolean;
   hostName: string;
   appVersion: string;
+  session?: RemoteSessionInfo;
 }
 
 async function apiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
@@ -54,10 +62,17 @@ export async function getHealth(): Promise<{ ok: boolean; hostName: string; appV
   return apiFetch('/api/health', '');
 }
 
-export async function verifyPin(pin: string): Promise<{ token: string; state: RemoteStateSnapshot }> {
+export async function verifyPin(pin: string, name?: string): Promise<{ token: string; state: RemoteStateSnapshot }> {
   return apiFetch('/api/auth/verify', '', {
     method: 'POST',
-    body: JSON.stringify({ pin }),
+    body: JSON.stringify(name ? { pin, name } : { pin }),
+  });
+}
+
+export async function submitFriendName(token: string, name: string): Promise<{ ok: boolean; session: RemoteSessionInfo }> {
+  return apiFetch('/api/auth/name', token, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
   });
 }
 
@@ -173,6 +188,7 @@ export interface StreamCallbacks {
   onProgress: (progressMap: Record<string, number>) => void;
   onSettings: (settings: RemoteSettingsSnapshot) => void;
   onRecording: (isRecordingClip: boolean) => void;
+  onPermissions?: (session: RemoteSessionInfo) => void;
   onToast: (toast: { message: string; kind?: string }) => void;
   onTempLocked: (payload: { locked: boolean; reason?: string }) => void;
   onLocked: (reason: string) => void;
@@ -204,6 +220,7 @@ export function connectRemoteEvents(token: string, cb: StreamCallbacks): () => v
   bind<Record<string, number>>('progress', cb.onProgress);
   bind<RemoteSettingsSnapshot>('settings', cb.onSettings);
   bind<{ isRecordingClip: boolean }>('recording', (d) => cb.onRecording(!!d.isRecordingClip));
+  bind<RemoteSessionInfo>('permissions', (d) => cb.onPermissions?.(d));
   bind<{ message: string; kind?: string }>('toast', cb.onToast);
   bind<{ locked: boolean; reason?: string }>('temp_locked', cb.onTempLocked);
   bind<{ reason?: string }>('locked', (d) => {

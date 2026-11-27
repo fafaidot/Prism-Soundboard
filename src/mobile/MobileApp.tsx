@@ -21,13 +21,16 @@ import {
   Minimize2,
   Menu,
   Wifi,
+  User,
 } from 'lucide-react';
-import { SoundItem, VideoClipItem, YouTubeSearchResult } from '../types';
+import { SoundItem, VideoClipItem, YouTubeSearchResult, RemoteGuestPermissions } from '../types';
 import {
   RemoteStateSnapshot,
   RemoteSettingsSnapshot,
+  RemoteSessionInfo,
   getHealth,
   verifyPin,
+  submitFriendName,
   logoutSession,
   connectRemoteEvents,
   triggerSound,
@@ -84,9 +87,22 @@ export const MobileApp: React.FC = () => {
   });
   const [isRecordingClip, setIsRecordingClip] = useState(false);
   const [isTriggeringVideoClip, setIsTriggeringVideoClip] = useState(false);
+  const [sessionRole, setSessionRole] = useState<'owner' | 'guest'>('owner');
+  const [permissions, setPermissions] = useState<RemoteGuestPermissions>({
+    canStopAll: true,
+    canEditSounds: true,
+    canDeleteSounds: true,
+    canAddSounds: true,
+    canAudioClip: true,
+    canVideoClip: true,
+  });
+  const [requiresName, setRequiresName] = useState(false);
+  const [friendNameInput, setFriendNameInput] = useState('');
+  const [submittingName, setSubmittingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Mobile View State
-  const [tab, setTab] = useState<'all' | 'favorites' | 'clips'>('all');
+  const [tab, setTab] = useState<'all' | 'favorites' | 'youtube' | 'clips'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showMixer, setShowMixer] = useState(false);
@@ -136,6 +152,26 @@ export const MobileApp: React.FC = () => {
     document.documentElement.style.setProperty('--accent', settings.accentColor || '#38bdf8');
   }, [settings.accentColor]);
 
+  const applyPermissions = (session?: RemoteSessionInfo) => {
+    if (!session) return;
+    setSessionRole(session.role);
+    setRequiresName(session.role === 'guest' && !!session.requiresName);
+    setPermissions(session.permissions);
+    if (!session.permissions.canEditSounds && !session.permissions.canDeleteSounds) {
+      setEditingSoundId(null);
+    }
+    if (!session.permissions.canAddSounds) {
+      setIsAddOpen(false);
+    }
+    if (!session.permissions.canVideoClip) {
+      setPlayingClip(null);
+      setTab((prev) => (prev === 'clips' ? 'all' : prev));
+    }
+    if (session.role !== 'owner') {
+      setShowMixer(false);
+    }
+  };
+
   const applySnapshot = (snap: RemoteStateSnapshot) => {
     if (Array.isArray(snap.sounds)) setSounds(snap.sounds);
     if (Array.isArray(snap.videoClips)) setVideoClips(snap.videoClips);
@@ -145,6 +181,7 @@ export const MobileApp: React.FC = () => {
     if (snap.settings) setSettings(snap.settings);
     setIsRecordingClip(!!snap.isRecordingClip);
     if (snap.hostName) setHostName(snap.hostName);
+    if (snap.session) applyPermissions(snap.session);
   };
 
   // Subscribe to SSE stream once authenticated
@@ -162,6 +199,7 @@ export const MobileApp: React.FC = () => {
       onProgress: setProgressMap,
       onSettings: setSettings,
       onRecording: setIsRecordingClip,
+      onPermissions: applyPermissions,
       onToast: (t) => showToast(t.message, t.kind),
       onTempLocked: (d) => {
         setIsTempLocked(!!d.locked);
@@ -196,6 +234,8 @@ export const MobileApp: React.FC = () => {
   const handleLock = async () => {
     if (token) await logoutSession(token);
     setToken(null);
+    setRequiresName(false);
+    setFriendNameInput('');
     setIsTempLocked(false);
     setIsStreamConnected(false);
     setLockMessage(null);
@@ -218,10 +258,18 @@ export const MobileApp: React.FC = () => {
     }
   };
 
+  const isYouTubeSound = (s: SoundItem) => {
+    if (s.source === 'youtube') return true;
+    if (s.author && (s.author.toLowerCase().includes('youtube') || s.author.toLowerCase().includes('yt'))) return true;
+    if (s.thumbnail && (s.thumbnail.includes('ytimg') || s.thumbnail.includes('youtube') || s.thumbnail.includes('ggpht'))) return true;
+    return false;
+  };
+
   const filteredSounds = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return sounds.filter((s) => {
       if (tab === 'favorites' && !s.isFavorite) return false;
+      if (tab === 'youtube' && !isYouTubeSound(s)) return false;
       if (!q) return true;
       return (
         s.title.toLowerCase().includes(q) ||
@@ -252,6 +300,87 @@ export const MobileApp: React.FC = () => {
 
   if (!token) {
     return <PinGate hostName={hostName} lockMessage={lockMessage} onSubmitPin={handlePinSubmit} />;
+  }
+
+  if (sessionRole === 'guest' && requiresName) {
+    return (
+      <div className="min-h-[100dvh] w-full bg-[#07090e] flex flex-col items-center justify-between px-6 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] select-none relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[360px] h-[220px] rounded-full blur-[110px] opacity-25"
+          style={{ background: 'var(--accent)' }}
+        />
+
+        <div className="w-full max-w-sm flex items-center justify-between pt-1 relative z-10">
+          <div className="flex items-center gap-2.5">
+            <img src={prismLogo} alt="Prism" className="w-6 h-6 object-contain" />
+            <span className="text-[15px] font-bold tracking-tight text-white">Prism Deck</span>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-[11px] font-semibold text-sky-300">
+            Friend
+          </span>
+        </div>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const clean = friendNameInput.trim();
+            if (!clean || submittingName) return;
+            setSubmittingName(true);
+            setNameError(null);
+            try {
+              const res = await submitFriendName(token, clean);
+              applyPermissions(res.session);
+              setRequiresName(false);
+            } catch (err: any) {
+              setNameError(err?.message || 'Could not save name');
+            } finally {
+              setSubmittingName(false);
+            }
+          }}
+          className="w-full max-w-xs flex flex-col items-center gap-4 my-auto relative z-10"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/[0.1] flex items-center justify-center text-sky-400">
+            <User size={21} />
+          </div>
+          <div className="text-center space-y-1">
+            <h1 className="text-[20px] font-bold tracking-tight text-white">What's your name?</h1>
+            <p className="text-[12.5px] text-slate-400">Shown on the host soundboard</p>
+          </div>
+
+          <input
+            type="text"
+            autoFocus
+            maxLength={36}
+            value={friendNameInput}
+            onChange={(e) => {
+              setFriendNameInput(e.target.value);
+              setNameError(null);
+            }}
+            placeholder="Your name"
+            className="w-full h-12 px-4 rounded-2xl bg-white/[0.06] border border-white/[0.12] text-[15px] font-medium text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-center"
+          />
+
+          {nameError && <p className="text-[12px] text-rose-400 font-semibold">{nameError}</p>}
+
+          <button
+            type="submit"
+            disabled={!friendNameInput.trim() || submittingName}
+            style={{ backgroundColor: 'var(--accent)' }}
+            className="w-full h-12 rounded-2xl text-slate-950 font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-45 cursor-pointer"
+          >
+            {submittingName ? <Loader2 size={17} className="animate-spin" /> : 'Continue'}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          onClick={handleLock}
+          className="text-[12px] text-slate-400 hover:text-white cursor-pointer relative z-10"
+        >
+          Back
+        </button>
+      </div>
+    );
   }
 
   if (isTempLocked) {
@@ -400,12 +529,23 @@ export const MobileApp: React.FC = () => {
                 isStreamConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
               }`}
             />
+            {sessionRole === 'guest' && (
+              <span className="px-1.5 py-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 text-[10px] font-bold text-sky-300 shrink-0">
+                Friend
+              </span>
+            )}
             {hasActiveFilterOrSearch && (
               <span
                 style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
                 className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md border bg-white/[0.04] text-[10.5px] font-semibold truncate max-w-[140px]"
               >
-                {tab === 'favorites' ? 'Favorites' : tab === 'clips' ? 'Videos' : ''}
+                {tab === 'favorites'
+                  ? 'Favorites'
+                  : tab === 'youtube'
+                  ? 'YouTube'
+                  : tab === 'clips'
+                  ? 'Videos'
+                  : ''}
                 {tab !== 'all' && searchQuery.trim() ? ' · ' : ''}
                 {searchQuery.trim() ? `"${searchQuery.trim()}"` : ''}
               </span>
@@ -442,54 +582,60 @@ export const MobileApp: React.FC = () => {
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setShowMixer((v) => !v);
-                setShowFilterMenu(false);
-              }}
-              style={showMixer ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
-              className={`w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
-                showMixer ? 'bg-white/[0.1]' : 'bg-white/[0.05] border-white/[0.09] text-slate-300'
-              }`}
-              aria-label="Master mixer"
-            >
-              <SlidersHorizontal size={14} />
-            </button>
+            {sessionRole === 'owner' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMixer((v) => !v);
+                  setShowFilterMenu(false);
+                }}
+                style={showMixer ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
+                className={`w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                  showMixer ? 'bg-white/[0.1]' : 'bg-white/[0.05] border-white/[0.09] text-slate-300'
+                }`}
+                aria-label="Master mixer"
+              >
+                <SlidersHorizontal size={14} />
+              </button>
+            )}
 
-            <button
-              type="button"
-              disabled={isRecordingClip}
-              onClick={handleTriggerAudioClip}
-              className="h-8 px-2 rounded-lg bg-white/[0.06] active:bg-white/[0.14] border border-white/[0.09] text-[11px] font-semibold text-slate-100 flex items-center gap-1 cursor-pointer disabled:opacity-60"
-            >
-              {isRecordingClip ? (
-                <Loader2 size={12} className="animate-spin text-sky-400" />
-              ) : (
-                <Scissors size={12} style={{ color: 'var(--accent)' }} />
-              )}
-              <span>
-                <span className="hidden sm:inline">Clip </span>
-                {settings.recordDuration || 5}s
-              </span>
-            </button>
+            {permissions.canAudioClip && (
+              <button
+                type="button"
+                disabled={isRecordingClip}
+                onClick={handleTriggerAudioClip}
+                className="h-8 px-2 rounded-lg bg-white/[0.06] active:bg-white/[0.14] border border-white/[0.09] text-[11px] font-semibold text-slate-100 flex items-center gap-1 cursor-pointer disabled:opacity-60"
+              >
+                {isRecordingClip ? (
+                  <Loader2 size={12} className="animate-spin text-sky-400" />
+                ) : (
+                  <Scissors size={12} style={{ color: 'var(--accent)' }} />
+                )}
+                <span>
+                  <span className="hidden sm:inline">Clip </span>
+                  {settings.recordDuration || 5}s
+                </span>
+              </button>
+            )}
 
-            <button
-              type="button"
-              disabled={isTriggeringVideoClip}
-              onClick={handleTriggerVideoClip}
-              className="h-8 px-2 rounded-lg bg-white/[0.06] active:bg-white/[0.14] border border-white/[0.09] text-[11px] font-semibold text-slate-100 flex items-center gap-1 cursor-pointer disabled:opacity-60"
-            >
-              {isTriggeringVideoClip ? (
-                <Loader2 size={12} className="animate-spin text-sky-400" />
-              ) : (
-                <Video size={12} style={{ color: 'var(--accent)' }} />
-              )}
-              <span>
-                <span className="hidden sm:inline">Vid </span>
-                {settings.videoClipDuration || 30}s
-              </span>
-            </button>
+            {permissions.canVideoClip && (
+              <button
+                type="button"
+                disabled={isTriggeringVideoClip}
+                onClick={handleTriggerVideoClip}
+                className="h-8 px-2 rounded-lg bg-white/[0.06] active:bg-white/[0.14] border border-white/[0.09] text-[11px] font-semibold text-slate-100 flex items-center gap-1 cursor-pointer disabled:opacity-60"
+              >
+                {isTriggeringVideoClip ? (
+                  <Loader2 size={12} className="animate-spin text-sky-400" />
+                ) : (
+                  <Video size={12} style={{ color: 'var(--accent)' }} />
+                )}
+                <span>
+                  <span className="hidden sm:inline">Vid </span>
+                  {settings.videoClipDuration || 30}s
+                </span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -535,11 +681,16 @@ export const MobileApp: React.FC = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-1 p-0.5 rounded-xl bg-white/[0.04] border border-white/[0.08] sm:w-72 shrink-0">
+              <div
+                className={`grid gap-1 p-0.5 rounded-xl bg-white/[0.04] border border-white/[0.08] shrink-0 ${
+                  permissions.canVideoClip ? 'grid-cols-4 sm:w-88' : 'grid-cols-3 sm:w-64'
+                }`}
+              >
                 {[
                   { id: 'all', label: `All (${sounds.length})` },
                   { id: 'favorites', label: 'Favorites' },
-                  { id: 'clips', label: `Videos (${videoClips.length})` },
+                  { id: 'youtube', label: 'YouTube' },
+                  ...(permissions.canVideoClip ? [{ id: 'clips', label: `Videos (${videoClips.length})` }] : []),
                 ].map((item) => {
                   const active = tab === item.id;
                   return (
@@ -652,26 +803,34 @@ export const MobileApp: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateVideoClip(token, clip.id, { isFavorite: !clip.isFavorite }).catch(() => {})
-                      }
-                      className={`w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer ${
-                        clip.isFavorite
-                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                          : 'bg-white/[0.04] border-white/[0.09] text-slate-400'
-                      }`}
-                    >
-                      <Star size={13} fill={clip.isFavorite ? 'currentColor' : 'none'} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteVideoClip(token, clip.id).catch(() => {})}
-                      className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.09] text-slate-400 hover:text-rose-400 flex items-center justify-center cursor-pointer"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {permissions.canEditSounds && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateVideoClip(token, clip.id, { isFavorite: !clip.isFavorite }).catch((e) =>
+                            handleApiError(e, 'Update failed')
+                          )
+                        }
+                        className={`w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer ${
+                          clip.isFavorite
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                            : 'bg-white/[0.04] border-white/[0.09] text-slate-400'
+                        }`}
+                      >
+                        <Star size={13} fill={clip.isFavorite ? 'currentColor' : 'none'} />
+                      </button>
+                    )}
+                    {permissions.canDeleteSounds && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteVideoClip(token, clip.id).catch((e) => handleApiError(e, 'Delete failed'))
+                        }
+                        className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.09] text-slate-400 hover:text-rose-400 flex items-center justify-center cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -685,15 +844,17 @@ export const MobileApp: React.FC = () => {
             <p className="text-[13.5px] font-semibold text-slate-300">
               {searchQuery ? 'No matching sounds' : 'Your soundboard is empty'}
             </p>
-            <button
-              type="button"
-              onClick={() => setIsAddOpen(true)}
-              style={{ backgroundColor: 'var(--accent)' }}
-              className="h-9 px-4 rounded-xl text-slate-950 font-bold text-[12.5px] inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={15} />
-              <span>Add Sound</span>
-            </button>
+            {permissions.canAddSounds && (
+              <button
+                type="button"
+                onClick={() => setIsAddOpen(true)}
+                style={{ backgroundColor: 'var(--accent)' }}
+                className="h-9 px-4 rounded-xl text-slate-950 font-bold text-[12.5px] inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>Add Sound</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-3 min-[480px]:grid-cols-5 gap-3 sm:gap-3.5">
@@ -711,6 +872,7 @@ export const MobileApp: React.FC = () => {
                   onContextMenu={(e) => e.preventDefault()}
                   onPointerDown={(e) => {
                     longPressTriggeredRef.current = false;
+                    if (!permissions.canEditSounds && !permissions.canDeleteSounds) return;
                     longPressOriginRef.current = { x: e.clientX, y: e.clientY };
                     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
                     longPressTimerRef.current = setTimeout(() => {
@@ -861,8 +1023,8 @@ export const MobileApp: React.FC = () => {
 
       {/* Slim Space-Efficient Bottom Bar with Interactive Scrub Progress */}
       <footer className="fixed bottom-0 left-0 right-0 z-30 bg-[#0b0e16]/95 backdrop-blur-2xl border-t border-white/[0.1] pl-[max(1.25rem,calc(env(safe-area-inset-left)+0.75rem))] pr-[max(1.25rem,calc(env(safe-area-inset-right)+0.75rem))] pt-2 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
-        {/* Interactive Full-Width Playback Scrub Bar */}
-        {nowPlayingSound && (
+        {/* Interactive Full-Width Playback Scrub Bar (Owner or Stop/Playback permission) */}
+        {nowPlayingSound && permissions.canStopAll && (
           <div
             ref={scrubTrackRef}
             onPointerDown={(e) => {
@@ -906,17 +1068,19 @@ export const MobileApp: React.FC = () => {
 
         <div className="w-full flex items-center gap-2">
           {/* Panic Stop All */}
-          <button
-            type="button"
-            onClick={() => {
-              navigator.vibrate?.(25);
-              stopAll(token).catch(() => {});
-            }}
-            className="h-9 px-3 rounded-xl bg-rose-600 active:bg-rose-500 text-white font-bold text-[12px] flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform cursor-pointer"
-          >
-            <Square size={12} fill="currentColor" />
-            <span>Stop</span>
-          </button>
+          {permissions.canStopAll && (
+            <button
+              type="button"
+              onClick={() => {
+                navigator.vibrate?.(25);
+                stopAll(token).catch((e) => handleApiError(e, 'Stop failed'));
+              }}
+              className="h-9 px-3 rounded-xl bg-rose-600 active:bg-rose-500 text-white font-bold text-[12px] flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform cursor-pointer"
+            >
+              <Square size={12} fill="currentColor" />
+              <span>Stop</span>
+            </button>
+          )}
 
           {/* Compact Single-Line Now Playing Pill */}
           <div className="relative flex-1 min-w-0 h-9 px-3 rounded-xl bg-white/[0.05] border border-white/[0.09] flex items-center justify-between gap-2 overflow-hidden">
@@ -935,37 +1099,45 @@ export const MobileApp: React.FC = () => {
                   <span className="font-mono-tabular text-[10.5px] text-slate-400 hidden xs:inline sm:inline">
                     {formatDuration((nowPlayingSound.duration || 0) * nowPlayingProgress)} / {formatDuration(nowPlayingSound.duration)}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => togglePauseSound(token, nowPlayingSound.id).catch(() => {})}
-                    className="w-7 h-7 rounded-lg bg-white/[0.1] text-white flex items-center justify-center shrink-0 cursor-pointer"
-                    aria-label="Pause or resume"
-                  >
-                    {pausedSoundIds.includes(nowPlayingSound.id) ? (
-                      <Play size={12} fill="currentColor" />
-                    ) : (
-                      <Pause size={12} fill="currentColor" />
-                    )}
-                  </button>
+                  {permissions.canStopAll && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        togglePauseSound(token, nowPlayingSound.id).catch((e) => handleApiError(e, 'Pause failed'))
+                      }
+                      className="w-7 h-7 rounded-lg bg-white/[0.1] text-white flex items-center justify-center shrink-0 cursor-pointer"
+                      aria-label="Pause or resume"
+                    >
+                      {pausedSoundIds.includes(nowPlayingSound.id) ? (
+                        <Play size={12} fill="currentColor" />
+                      ) : (
+                        <Pause size={12} fill="currentColor" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </>
             ) : (
               <span className="text-[11.5px] text-slate-400 truncate">
-                Ready • {sounds.length} sounds • Hold pad for options
+                {permissions.canEditSounds || permissions.canDeleteSounds
+                  ? `Ready • ${sounds.length} sounds • Hold pad for options`
+                  : `Friend Mode • ${sounds.length} sounds • Tap pad to play`}
               </span>
             )}
           </div>
 
           {/* Compact Add Sound Button */}
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            style={{ backgroundColor: 'var(--accent)' }}
-            className="h-9 px-3 rounded-xl text-slate-950 font-bold text-[12px] flex items-center gap-1 shrink-0 active:scale-95 transition-transform cursor-pointer"
-          >
-            <Plus size={15} strokeWidth={2.5} />
-            <span>Add</span>
-          </button>
+          {permissions.canAddSounds && (
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              style={{ backgroundColor: 'var(--accent)' }}
+              className="h-9 px-3 rounded-xl text-slate-950 font-bold text-[12px] flex items-center gap-1 shrink-0 active:scale-95 transition-transform cursor-pointer"
+            >
+              <Plus size={15} strokeWidth={2.5} />
+              <span>Add</span>
+            </button>
+          )}
         </div>
       </footer>
 
@@ -1005,6 +1177,8 @@ export const MobileApp: React.FC = () => {
         sound={editingSound}
         token={token}
         isPlaying={editingSound ? activeSoundIds.includes(editingSound.id) : false}
+        canEdit={permissions.canEditSounds}
+        canDelete={permissions.canDeleteSounds}
         onClose={() => setEditingSoundId(null)}
         onTrigger={handlePadTrigger}
         onPatchSound={async (soundId, patch) => {
@@ -1019,7 +1193,7 @@ export const MobileApp: React.FC = () => {
 
       {/* Add Sound Sheet (YouTube & Upload) */}
       <AddSoundSheet
-        isOpen={isAddOpen}
+        isOpen={isAddOpen && permissions.canAddSounds}
         onClose={() => setIsAddOpen(false)}
         onSearchYouTube={(q: string) => searchYouTube(token, q)}
         onLoadTrending={() => getTrendingYouTube(token)}

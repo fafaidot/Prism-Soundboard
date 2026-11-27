@@ -99,7 +99,7 @@ export const PinGate: React.FC<PinGateProps> = ({ hostName, lockMessage, onSubmi
         <div className="text-center space-y-1">
           <h1 className="text-[20px] font-bold tracking-tight text-white">Enter PIN to connect</h1>
           <p className="text-[12.5px] text-slate-400">
-            Check Phone Remote settings on your PC for the PIN
+            Enter the Owner or Friend PIN from Prism Desktop
           </p>
         </div>
 
@@ -180,7 +180,7 @@ export const PinGate: React.FC<PinGateProps> = ({ hostName, lockMessage, onSubmi
       </div>
 
       <p className="text-[11px] text-slate-500 relative z-10">
-        Same-Wi-Fi local session • Locked automatically on disconnect
+        PIN required on every connection
       </p>
     </div>
   );

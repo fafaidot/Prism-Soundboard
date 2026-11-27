@@ -145,12 +145,17 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   changeStorageLocation: (newRootPath) => ipcRenderer.invoke('change-storage-location', newRootPath),
   selectStorageFolderDialog: () => ipcRenderer.invoke('select-storage-folder-dialog'),
 
-  // Mobile Remote Server (LAN Wi-Fi Deck)
+  // Mobile Remote Server (LAN Wi-Fi Deck & Public Tunnel)
   getRemoteServerStatus: () => ipcRenderer.invoke('get-remote-server-status'),
   regenerateRemotePin: () => ipcRenderer.invoke('regenerate-remote-pin'),
+  regenerateGuestPin: () => ipcRenderer.invoke('regenerate-remote-pin', { type: 'guest' }),
   disconnectRemoteClients: () => ipcRenderer.invoke('disconnect-remote-clients'),
   setRemoteTempLock: (deviceIds, locked) => ipcRenderer.invoke('set-remote-temp-lock', { deviceIds, locked }),
+  setRemoteGuestPermissions: (permissions) => ipcRenderer.invoke('set-remote-guest-permissions', permissions),
+  setRemoteDevicePermissions: (deviceId, permissions) => ipcRenderer.invoke('set-remote-device-permissions', { deviceId, permissions }),
   removeRemoteDevices: (deviceIds) => ipcRenderer.invoke('remove-remote-devices', deviceIds),
+  startPublicTunnel: () => ipcRenderer.invoke('start-public-tunnel'),
+  stopPublicTunnel: () => ipcRenderer.invoke('stop-public-tunnel'),
   onRemoteServerStatusUpdated: (callback) => {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on('remote-server-status-updated', handler);

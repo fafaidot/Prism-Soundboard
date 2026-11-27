@@ -24,13 +24,8 @@ import {
   Video,
   Trash2,
   Palette,
-  Smartphone,
-  Copy,
-  Wifi,
-  Lock,
-  Unlock,
 } from 'lucide-react';
-import { AudioSettings, RemoteServerStatus } from '../types';
+import { AudioSettings } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { videoClipper } from '../services/videoClipper';
 import { getTheme, THEMES, applyThemeToDom } from '../themes';
@@ -39,7 +34,7 @@ import { Slider } from './Slider';
 
 interface SettingsModalProps {
   isOpen: boolean;
-  initialTab?: 'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates' | 'remote';
+  initialTab?: 'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates';
   settings: AudioSettings;
   onClose: () => void;
   onSaveSettings: (settings: AudioSettings, immediate?: boolean) => void;
@@ -99,10 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [recordingOverlay, setRecordingOverlay] = useState(false);
   const [recordingRecordClip, setRecordingRecordClip] = useState(false);
   const [recordingVideoClip, setRecordingVideoClip] = useState(false);
-  const [activeTab, setActiveTab] = useState<'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates' | 'remote'>('devices');
-  const [remoteStatus, setRemoteStatus] = useState<RemoteServerStatus | null>(null);
-  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
-  const [copiedRemoteUrl, setCopiedRemoteUrl] = useState(false);
+  const [activeTab, setActiveTab] = useState<'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates'>('devices');
   const [micLevel, setMicLevel] = useState<number>(0);
   const [rawDb, setRawDb] = useState<number>(-100);
   const [isGateOpen, setIsGateOpen] = useState<boolean>(true);
@@ -208,24 +200,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const syncRemoteStatus = (st: RemoteServerStatus) => {
-      setRemoteStatus(st);
-      const validIds = new Set((st.devices || []).map((d) => d.id));
-      setSelectedDeviceIds((prev) => prev.filter((id) => validIds.has(id)));
-    };
-    if (window.soundboardAPI?.getRemoteServerStatus) {
-      window.soundboardAPI.getRemoteServerStatus().then(syncRemoteStatus).catch(() => {});
-    }
-    const unsub = window.soundboardAPI?.onRemoteServerStatusUpdated?.((st) => {
-      syncRemoteStatus(st);
-    });
-    return () => {
-      if (unsub) unsub();
-    };
-  }, [isOpen]);
 
   const currentTheme = getTheme(localSettings.theme, localSettings.accentColor);
   const accent = currentTheme.accent || 'var(--accent-color)';
@@ -447,7 +421,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (e: any) {
       setUpdateResult({
         hasUpdate: false,
-        currentVersion: '1.5.10',
+        currentVersion: '1.5.11',
         error: e?.message || 'Failed to check updates.',
       });
     } finally {
@@ -504,7 +478,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h2 className="text-[14px] font-black tracking-wide text-theme-primary flex items-center gap-1.5">
                   PRISM <span style={{ color: accent }}>SETTINGS</span>
                 </h2>
-                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.10</span>
+                <span className="text-[10px] font-mono font-bold text-theme-muted">v1.5.11</span>
               </div>
             </div>
 
@@ -570,32 +544,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="flex-shrink-0"
                   />
                   <span>Global Hotkeys</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('remote')}
-                  className={`w-full px-3 py-2.5 rounded-xl text-[12.5px] font-bold flex items-center justify-between transition-all cursor-pointer ${
-                    activeTab === 'remote'
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-theme-secondary hover:text-theme-primary hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Smartphone
-                      size={16}
-                      style={activeTab === 'remote' ? { color: accent } : undefined}
-                      className="flex-shrink-0"
-                    />
-                    <span>Phone Remote</span>
-                  </div>
-                  {remoteStatus?.running && (
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        remoteStatus.connectedClients > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400/80'
-                      }`}
-                    />
-                  )}
                 </button>
               </div>
 
@@ -685,7 +633,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {activeTab === 'devices' && 'Audio Devices & Routing'}
                 {activeTab === 'voice' && 'Microphone & Noise Gate'}
                 {activeTab === 'hotkeys' && 'Global Shortcuts & Keybindings'}
-                {activeTab === 'remote' && 'Phone Remote Web Deck'}
                 {activeTab === 'theme' && 'Themes & Color Palette'}
                 {activeTab === 'backup' && 'Backup, Storage & Maintenance'}
                 {activeTab === 'updates' && 'Application Updates'}
@@ -694,7 +641,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {activeTab === 'devices' && 'Configure physical microphones, headsets, and virtual cables'}
                 {activeTab === 'voice' && 'Real-time VU meter, sensitivity threshold, and voice projection'}
                 {activeTab === 'hotkeys' && 'Set global hotkeys for instant replay, overlay HUD, and panic stop'}
-                {activeTab === 'remote' && 'Control sounds, clips, and YouTube additions from your phone on Wi-Fi'}
                 {activeTab === 'theme' && 'Personalize UI palettes, choose dark themes, and customize accent colors'}
                 {activeTab === 'backup' && 'Manage your sounds directory, export backups, and recycle bin'}
                 {activeTab === 'updates' && 'Check for updates and automatically install the latest release'}
@@ -1767,404 +1713,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* TAB: PHONE REMOTE WEB DECK */}
-            {activeTab === 'remote' && (
-              <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
-                {/* Enable & Connection Status */}
-                <div className="py-5 first:pt-0 space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.1] flex items-center justify-center">
-                        <Wifi
-                          size={18}
-                          style={remoteStatus?.running ? { color: accent } : undefined}
-                          className={remoteStatus?.running ? '' : 'text-theme-muted'}
-                        />
-                      </div>
-                      <div>
-                        <h4 className="text-[13.5px] font-bold text-theme-primary flex items-center gap-2">
-                          <span>Wi-Fi Remote Server</span>
-                          {remoteStatus?.running ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                              Online • {remoteStatus.connectedClients} active
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/[0.06] text-theme-muted border border-white/[0.1]">
-                              Disabled
-                            </span>
-                          )}
-                        </h4>
-                        <p className="text-[11.5px] text-theme-muted mt-0.5">
-                          Open Prism on your phone browser over local Wi-Fi. A PIN is required every time a phone connects.
-                        </p>
-                      </div>
-                    </div>
-
-                    <ToggleSwitch
-                      checked={localSettings.remoteControlEnabled !== false}
-                      accent={accent}
-                      onChange={(checked) => {
-                        const updated = { ...localSettings, remoteControlEnabled: checked };
-                        setLocalSettings(updated);
-                        onSaveSettings(updated, true);
-                      }}
-                    />
-                  </div>
-
-                  {remoteStatus?.error && (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[12px] flex items-center gap-2">
-                      <AlertTriangle size={15} className="flex-shrink-0" />
-                      <span>{remoteStatus.error}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* QR Pairing & Connection Details */}
-                {localSettings.remoteControlEnabled !== false && (
-                  <div className="py-5 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 items-start">
-                    {/* Left: QR Code */}
-                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.1] flex flex-col items-center gap-2.5">
-                      {remoteStatus?.qrDataUrl ? (
-                        <img
-                          src={remoteStatus.qrDataUrl}
-                          alt="Scan to open Prism Deck"
-                          className="w-40 h-40 rounded-xl bg-black/30 p-1.5"
-                        />
-                      ) : (
-                        <div className="w-40 h-40 rounded-xl bg-white/[0.04] flex items-center justify-center text-[11px] text-theme-muted">
-                          Starting server...
-                        </div>
-                      )}
-                      <span className="text-[10.5px] font-medium text-theme-muted text-center">
-                        Scan with phone camera
-                      </span>
-                    </div>
-
-                    {/* Right: URL + PIN + Port */}
-                    <div className="space-y-4">
-                      {/* URL Card */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">
-                          Phone Website URL
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.1] font-mono text-[12.5px] text-theme-primary select-text truncate">
-                            {remoteStatus?.primaryUrl || `http://localhost:${localSettings.remoteControlPort || 3940}`}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const url = remoteStatus?.primaryUrl;
-                              if (url) {
-                                navigator.clipboard?.writeText(url);
-                                setCopiedRemoteUrl(true);
-                                setTimeout(() => setCopiedRemoteUrl(false), 1800);
-                              }
-                            }}
-                            className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-[12px] font-semibold text-theme-primary flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            {copiedRemoteUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                            <span>{copiedRemoteUrl ? 'Copied' : 'Copy'}</span>
-                          </button>
-                        </div>
-
-                        {remoteStatus && remoteStatus.urls.length > 1 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {remoteStatus.urls.slice(1).map((u) => (
-                              <button
-                                key={u}
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard?.writeText(u);
-                                  setCopiedRemoteUrl(true);
-                                  setTimeout(() => setCopiedRemoteUrl(false), 1800);
-                                }}
-                                className="px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] font-mono text-[10.5px] text-theme-muted hover:text-theme-primary cursor-pointer"
-                                title="Click to copy alternate LAN address"
-                              >
-                                {u}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* PIN & Port Row */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-theme-muted flex items-center gap-1.5">
-                            <Lock size={11} />
-                            <span>Required Access PIN</span>
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={6}
-                              value={localSettings.remoteControlPin ?? remoteStatus?.pin ?? ''}
-                              onChange={(e) => {
-                                const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
-                                setLocalSettings({ ...localSettings, remoteControlPin: digits });
-                              }}
-                              onBlur={() => {
-                                const clean = String(localSettings.remoteControlPin || '').replace(/\D/g, '');
-                                if (clean.length >= 4) {
-                                  onSaveSettings({ ...localSettings, remoteControlPin: clean }, true);
-                                }
-                              }}
-                              placeholder="4-6 digits"
-                              className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.1] font-mono text-[15px] font-bold tracking-[0.25em] text-theme-primary focus:outline-none focus:border-accent"
-                            />
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (window.soundboardAPI?.regenerateRemotePin) {
-                                  const st = await window.soundboardAPI.regenerateRemotePin();
-                                  setRemoteStatus(st);
-                                  setLocalSettings((prev) => ({ ...prev, remoteControlPin: st.pin }));
-                                }
-                              }}
-                              title="Generate new PIN & disconnect active phones"
-                              className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-theme-secondary hover:text-theme-primary flex items-center gap-1 text-[11.5px] font-semibold cursor-pointer flex-shrink-0"
-                            >
-                              <RefreshCw size={13} />
-                              <span>New</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-theme-muted">
-                            Server Port
-                          </label>
-                          <input
-                            type="number"
-                            min={1024}
-                            max={65535}
-                            value={localSettings.remoteControlPort || 3940}
-                            onChange={(e) => {
-                              const p = Math.max(1024, Math.min(65535, Number(e.target.value) || 3940));
-                              setLocalSettings({ ...localSettings, remoteControlPort: p });
-                            }}
-                            onBlur={() => onSaveSettings(localSettings, true)}
-                            className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.1] font-mono text-[13px] font-semibold text-theme-primary focus:outline-none focus:border-accent"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Session & Temporary Lock Controls */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                        <span className="text-[11.5px] text-theme-muted">
-                          {remoteStatus?.connectedClients
-                            ? `${remoteStatus.connectedClients} active session${remoteStatus.connectedClients > 1 ? 's' : ''}`
-                            : 'No phones connected right now'}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={!remoteStatus?.devices?.length}
-                            onClick={async () => {
-                              if (!window.soundboardAPI?.setRemoteTempLock || !remoteStatus?.devices?.length) return;
-                              const anyUnlocked = remoteStatus.devices.some((d) => !d.tempLocked);
-                              const st = await window.soundboardAPI.setRemoteTempLock('all', anyUnlocked);
-                              setRemoteStatus(st);
-                            }}
-                            className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11.5px] font-semibold disabled:opacity-40 cursor-pointer transition-colors"
-                          >
-                            {remoteStatus?.devices?.some((d) => !d.tempLocked)
-                              ? 'Temp Lock All'
-                              : remoteStatus?.devices?.length
-                              ? 'Unlock All'
-                              : 'Temp Lock All'}
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={!remoteStatus?.connectedClients}
-                            onClick={async () => {
-                              if (window.soundboardAPI?.disconnectRemoteClients) {
-                                const st = await window.soundboardAPI.disconnectRemoteClients();
-                                setRemoteStatus(st);
-                              }
-                            }}
-                            title="Disconnects all phones and requires PIN again"
-                            className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 text-[11.5px] font-semibold disabled:opacity-40 cursor-pointer transition-colors"
-                          >
-                            Revoke All (PIN)
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Connected Devices Selection & Per-Device Temporary Lock */}
-                {localSettings.remoteControlEnabled !== false && (
-                  <div className="py-5 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h4 className="text-[12.5px] font-bold text-theme-primary">
-                          Connected Devices ({remoteStatus?.devices?.length || 0})
-                        </h4>
-                        <p className="text-[11px] text-theme-muted">
-                          Temp Lock pauses selected devices until unlocked — reconnecting takes no PIN.
-                        </p>
-                      </div>
-
-                      {selectedDeviceIds.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!window.soundboardAPI?.setRemoteTempLock) return;
-                              const st = await window.soundboardAPI.setRemoteTempLock(selectedDeviceIds, true);
-                              setRemoteStatus(st);
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Lock size={11} />
-                            <span>Temp Lock ({selectedDeviceIds.length})</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!window.soundboardAPI?.setRemoteTempLock) return;
-                              const st = await window.soundboardAPI.setRemoteTempLock(selectedDeviceIds, false);
-                              setRemoteStatus(st);
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Unlock size={11} />
-                            <span>Unlock ({selectedDeviceIds.length})</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!window.soundboardAPI?.removeRemoteDevices) return;
-                              const st = await window.soundboardAPI.removeRemoteDevices(selectedDeviceIds);
-                              setRemoteStatus(st);
-                              setSelectedDeviceIds([]);
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Trash2 size={11} />
-                            <span>Remove ({selectedDeviceIds.length})</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {remoteStatus?.devices && remoteStatus.devices.length > 0 ? (
-                      <div className="rounded-2xl bg-white/[0.03] border border-white/[0.08] divide-y divide-white/[0.06]">
-                        {remoteStatus.devices.map((dev) => {
-                          const isSelected = selectedDeviceIds.includes(dev.id);
-                          return (
-                            <div
-                              key={dev.id}
-                              onClick={() => {
-                                setSelectedDeviceIds((prev) =>
-                                  prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
-                                );
-                              }}
-                              className={`px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
-                                isSelected ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedDeviceIds((prev) =>
-                                      prev.includes(dev.id) ? prev.filter((id) => id !== dev.id) : [...prev, dev.id]
-                                    );
-                                  }}
-                                  className="w-4 h-4 rounded border-white/20 accent-sky-400 cursor-pointer shrink-0"
-                                />
-                                <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-theme-secondary shrink-0">
-                                  <Smartphone size={14} />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[12.5px] font-semibold text-theme-primary truncate">
-                                      {dev.label}
-                                    </span>
-                                    {dev.tempLocked ? (
-                                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                        Temp Locked
-                                      </span>
-                                    ) : dev.online ? (
-                                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                        Live
-                                      </span>
-                                    ) : (
-                                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-white/[0.06] text-theme-muted border border-white/[0.1]">
-                                        Standby
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10.5px] font-mono text-theme-muted">
-                                    {dev.ip}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (!window.soundboardAPI?.setRemoteTempLock) return;
-                                    const st = await window.soundboardAPI.setRemoteTempLock([dev.id], !dev.tempLocked);
-                                    setRemoteStatus(st);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                                    dev.tempLocked
-                                      ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/35 text-emerald-300'
-                                      : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300'
-                                  }`}
-                                >
-                                  {dev.tempLocked ? <Unlock size={12} /> : <Lock size={12} />}
-                                  <span>{dev.tempLocked ? 'Unlock' : 'Temp Lock'}</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  title="Remove device (requires PIN to reconnect)"
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (!window.soundboardAPI?.removeRemoteDevices) return;
-                                    const st = await window.soundboardAPI.removeRemoteDevices([dev.id]);
-                                    setRemoteStatus(st);
-                                    setSelectedDeviceIds((prev) => prev.filter((id) => id !== dev.id));
-                                  }}
-                                  className="px-2.5 py-1.5 rounded-lg border bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/25 text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                                >
-                                  <Trash2 size={12} />
-                                  <span>Remove</span>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.07] text-[11.5px] text-theme-muted text-center">
-                        Connected phones will appear here so you can select and temporarily lock individual devices.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Tip */}
-                <div className="pt-5 text-[11.5px] text-theme-muted leading-relaxed">
-                  Your phone and PC must be on the same Wi-Fi network. If Windows Firewall prompts when enabling this, allow access on <span className="text-theme-primary font-semibold">Private networks</span> so your phone can reach port <span className="font-mono text-theme-primary">{localSettings.remoteControlPort || 3940}</span>.
-                </div>
-              </div>
-            )}
-
             {/* TAB 5: UPDATES */}
             {activeTab === 'updates' && (
               <div className="divide-y divide-white/[0.07] animate-in fade-in duration-100">
@@ -2178,7 +1726,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <h4 className="text-[14px] font-bold text-theme-primary flex items-center gap-2">
                           <span>Prism Soundboard</span>
-                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.10</span>
+                          <span className="text-[12px] text-accent font-mono font-medium">v1.5.11</span>
                         </h4>
                         <p className="text-[11.5px] text-theme-muted">
                           Direct GitHub releases update channel (fafaidot/Prism-Soundboard)
@@ -2360,7 +1908,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Clean Footer Bar */}
           <footer className="h-16 px-8 border-t border-white/[0.08] flex items-center justify-between frosted-modal-chrome bg-white/[0.025] shrink-0">
             <div className="flex items-center gap-2 text-[11.5px] text-theme-muted">
-              <span>Prism Soundboard v1.5.10</span>
+              <span>Prism Soundboard v1.5.11</span>
               <span>•</span>
               <button
                 type="button"

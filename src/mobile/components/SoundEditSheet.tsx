@@ -15,6 +15,8 @@ interface SoundEditSheetProps {
   sound: SoundItem | null;
   token: string;
   isPlaying: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   onClose: () => void;
   onTrigger: (soundId: string) => void;
   onPatchSound: (soundId: string, patch: Partial<SoundItem>) => Promise<void>;
@@ -33,6 +35,8 @@ export const SoundEditSheet: React.FC<SoundEditSheetProps> = ({
   sound,
   token,
   isPlaying,
+  canEdit = true,
+  canDelete = true,
   onClose,
   onTrigger,
   onPatchSound,
@@ -125,18 +129,20 @@ export const SoundEditSheet: React.FC<SoundEditSheetProps> = ({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => onPatchSound(sound.id, { isFavorite: !sound.isFavorite })}
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center cursor-pointer transition-colors ${
-                  sound.isFavorite
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                    : 'bg-white/[0.05] border-white/[0.1] text-slate-400'
-                }`}
-                aria-label="Toggle favorite"
-              >
-                <Star size={17} fill={sound.isFavorite ? 'currentColor' : 'none'} />
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => onPatchSound(sound.id, { isFavorite: !sound.isFavorite })}
+                  className={`w-10 h-10 rounded-xl border flex items-center justify-center cursor-pointer transition-colors ${
+                    sound.isFavorite
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                      : 'bg-white/[0.05] border-white/[0.1] text-slate-400'
+                  }`}
+                  aria-label="Toggle favorite"
+                >
+                  <Star size={17} fill={sound.isFavorite ? 'currentColor' : 'none'} />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -160,7 +166,9 @@ export const SoundEditSheet: React.FC<SoundEditSheetProps> = ({
           </div>
         </div>
 
-        {/* Rename Title */}
+        {canEdit && (
+          <>
+            {/* Rename Title */}
         <div className="space-y-1.5">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
             Sound Title
@@ -333,49 +341,53 @@ export const SoundEditSheet: React.FC<SoundEditSheetProps> = ({
           </div>
         </div>
 
-        {/* Preview on Phone */}
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Phone Preview
-          </label>
-          <audio
-            controls
-            preload="none"
-            src={`/api/sounds/${encodeURIComponent(sound.id)}/audio?token=${encodeURIComponent(token)}`}
-            className="w-full h-10 rounded-xl"
-          />
-        </div>
+            {/* Preview on Phone */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Phone Preview
+              </label>
+              <audio
+                controls
+                preload="none"
+                src={`/api/sounds/${encodeURIComponent(sound.id)}/audio?token=${encodeURIComponent(token)}`}
+                className="w-full h-10 rounded-xl"
+              />
+            </div>
+          </>
+        )}
 
         {/* Delete Sound */}
-        <div className="pt-1">
-          {confirmDelete ? (
-            <div className="flex items-center gap-2">
+        {canDelete && (
+          <div className="pt-1">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onDeleteSound(sound.id)}
+                  className="flex-1 h-11 rounded-xl bg-rose-600 text-white font-bold text-[13px] cursor-pointer"
+                >
+                  Confirm Move to Trash
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="h-11 px-4 rounded-xl bg-white/[0.06] text-slate-300 font-semibold text-[13px] cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={() => onDeleteSound(sound.id)}
-                className="flex-1 h-11 rounded-xl bg-rose-600 text-white font-bold text-[13px] cursor-pointer"
+                onClick={() => setConfirmDelete(true)}
+                className="w-full h-11 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 font-semibold text-[13px] flex items-center justify-center gap-2 cursor-pointer"
               >
-                Confirm Move to Trash
+                <Trash2 size={15} />
+                <span>Move Sound to Trash</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="h-11 px-4 rounded-xl bg-white/[0.06] text-slate-300 font-semibold text-[13px] cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="w-full h-11 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 font-semibold text-[13px] flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Trash2 size={15} />
-              <span>Move Sound to Trash</span>
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

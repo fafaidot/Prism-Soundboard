@@ -13,6 +13,7 @@ import { RestoreDeletedModal } from './components/RestoreDeletedModal';
 import { EditSoundModal } from './components/EditSoundModal';
 import { InGameOverlayModal } from './components/InGameOverlayModal';
 import { VBCableSetupModal } from './components/VBCableSetupModal';
+import { PhoneRemoteModal } from './components/PhoneRemoteModal';
 import { audioEngine } from './services/audioEngine';
 import { videoClipper } from './services/videoClipper';
 import { SoundItem, AudioSettings, YouTubeSearchResult, VideoClipItem, RemoteServerStatus } from './types';
@@ -20,7 +21,7 @@ import { ClipCard } from './components/ClipCard';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { SortOption } from './components/CommandBar';
 import { getTheme, applyThemeToDom } from './themes';
-import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Music, Video, Settings, ChevronDown, Check, Trash2, Smartphone } from 'lucide-react';
+import { Plus, Sparkles, Download, X, ExternalLink, RefreshCw, Music, Video, Settings, ChevronDown, Check, Trash2, Smartphone, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import prismLogo from './assets/Prism.png';
 
 const DEFAULT_SETTINGS: AudioSettings = {
@@ -87,13 +88,13 @@ export const App: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'clips' | 'youtube' | 'favorites'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
-  const [micLevel, setMicLevel] = useState<number>(0);
   const [listeningSoundId, setListeningSoundId] = useState<string | null>(null);
   const [stopAllFlash, setStopAllFlash] = useState(false);
   const flashTimerRef = useRef<any>(null);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
   const [recordSecondsLeft, setRecordSecondsLeft] = useState(0);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [isControlPanelCollapsed, setIsControlPanelCollapsed] = useState(false);
 
   const sortLabels: Record<SortOption, string> = {
     newest: 'Recently added',
@@ -106,7 +107,7 @@ export const App: React.FC = () => {
   // Modals state
   const [isYouTubeModalOpen, setIsYouTubeModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'devices' | 'voice' | 'hotkeys' | 'theme' | 'backup' | 'updates' | 'remote'>('devices');
+  const [isRemoteModalOpen, setIsRemoteModalOpen] = useState(false);
   const [remoteStatus, setRemoteStatus] = useState<RemoteServerStatus | null>(null);
   const [isTrimmerModalOpen, setIsTrimmerModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -144,10 +145,6 @@ export const App: React.FC = () => {
       }
     });
 
-    const unsubscribeMic = audioEngine.onMicLevel((level) => {
-      setMicLevel(level);
-    });
-
     const handleUnload = () => {
       audioEngine.cleanup();
     };
@@ -155,7 +152,6 @@ export const App: React.FC = () => {
 
     return () => {
       unsubscribeState();
-      unsubscribeMic();
       window.removeEventListener('beforeunload', handleUnload);
     };
   }, []);
@@ -1393,7 +1389,7 @@ export const App: React.FC = () => {
             <button
               onClick={() => setActiveView('sounds')}
               title="Sound Library"
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
                 activeView === 'sounds'
                   ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs backdrop-blur-md'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
@@ -1406,7 +1402,7 @@ export const App: React.FC = () => {
             <button
               onClick={() => setActiveView('clips')}
               title="Video Library"
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
                 activeView === 'clips'
                   ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs backdrop-blur-md'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
@@ -1420,16 +1416,13 @@ export const App: React.FC = () => {
           <div className="flex flex-col items-center gap-2">
             {/* Phone Remote Deck */}
             <button
-              onClick={() => {
-                setSettingsInitialTab('remote');
-                setIsSettingsModalOpen(true);
-              }}
+              onClick={() => setIsRemoteModalOpen(true)}
               title={
                 remoteStatus?.running
                   ? `Phone Remote (${remoteStatus.connectedClients} connected) — ${remoteStatus.primaryUrl}`
                   : 'Phone Remote Deck'
               }
-              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer relative"
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer relative"
             >
               <Smartphone size={16} />
               {remoteStatus?.running && (
@@ -1445,7 +1438,7 @@ export const App: React.FC = () => {
             <button
               onClick={() => setIsRestoreModalOpen(true)}
               title={deletedSounds.length > 0 ? `Deleted sounds archive (${deletedSounds.length})` : 'Deleted sounds archive'}
-              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer relative"
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer relative"
             >
               <Trash2 size={16} />
               {deletedSounds.length > 0 && (
@@ -1457,12 +1450,9 @@ export const App: React.FC = () => {
 
             {/* Settings */}
             <button
-              onClick={() => {
-                setSettingsInitialTab('devices');
-                setIsSettingsModalOpen(true);
-              }}
+              onClick={() => setIsSettingsModalOpen(true)}
               title="Settings"
-              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all cursor-pointer"
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
             >
               <Settings size={17} />
             </button>
@@ -1501,7 +1491,7 @@ export const App: React.FC = () => {
             panicHotkey={settings.panicHotkey}
             onOpenSettings={() => setIsSettingsModalOpen(true)}
             isVirtualActive={!!(settings.secondaryDeviceId && settings.isSecondaryEnabled)}
-            micLevel={micLevel}
+            micLevel={0}
             micVolume={settings.micInputVolume}
             onMicVolumeChange={(vol) => {
               audioEngine.setMicInputVolume(vol);
@@ -1727,6 +1717,19 @@ export const App: React.FC = () => {
                             </div>
                           )}
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsControlPanelCollapsed((prev) => !prev)}
+                          title={isControlPanelCollapsed ? 'Show side panel' : 'Collapse side panel'}
+                          className={`h-7 px-2 rounded-md border flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
+                            isControlPanelCollapsed
+                              ? 'bg-accent/15 border-accent/40 text-accent'
+                              : 'bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          {isControlPanelCollapsed ? <PanelRightOpen size={13} /> : <PanelRightClose size={13} />}
+                        </button>
                       </div>
                     </div>
 
@@ -1846,22 +1849,28 @@ export const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Sound Control Panel (Only in sounds view) */}
+            {/* Right: Collapsible Sound Control Panel (Only in sounds view) */}
             {activeView === 'sounds' && (
-              <ControlPanel
-                sound={selectedSound}
-                isPlaying={selectedSound ? activeSoundIds.includes(selectedSound.id) : false}
-                accentColor={settings.accentColor}
-                isListeningHotkey={selectedSound ? listeningSoundId === selectedSound.id : false}
-                onUpdateSound={handleUpdateSound}
-                onPlaySound={() => selectedSound && handlePlaySound(selectedSound)}
-                onStartListeningHotkey={() => selectedSound && setListeningSoundId(selectedSound.id)}
-                onClearHotkey={() => selectedSound && handleUpdateSound({ ...selectedSound, hotkey: '' })}
-                onOpenTrimmer={() => setIsTrimmerModalOpen(true)}
-                onDeleteSound={() => setIsDeleteModalOpen(true)}
-                onEditDetails={() => setIsEditModalOpen(true)}
-                onDuplicateSound={() => selectedSound && handleDuplicateSound(selectedSound)}
-              />
+              <div
+                className={`h-full overflow-hidden transition-[width,opacity] duration-200 shrink-0 ${
+                  isControlPanelCollapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-[300px] opacity-100'
+                }`}
+              >
+                <ControlPanel
+                  sound={selectedSound}
+                  isPlaying={selectedSound ? activeSoundIds.includes(selectedSound.id) : false}
+                  accentColor={settings.accentColor}
+                  isListeningHotkey={selectedSound ? listeningSoundId === selectedSound.id : false}
+                  onUpdateSound={handleUpdateSound}
+                  onPlaySound={() => selectedSound && handlePlaySound(selectedSound)}
+                  onStartListeningHotkey={() => selectedSound && setListeningSoundId(selectedSound.id)}
+                  onClearHotkey={() => selectedSound && handleUpdateSound({ ...selectedSound, hotkey: '' })}
+                  onOpenTrimmer={() => setIsTrimmerModalOpen(true)}
+                  onDeleteSound={() => setIsDeleteModalOpen(true)}
+                  onEditDetails={() => setIsEditModalOpen(true)}
+                  onDuplicateSound={() => selectedSound && handleDuplicateSound(selectedSound)}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -1884,9 +1893,15 @@ export const App: React.FC = () => {
         onSaveAsNewTrim={handleSaveAsNewTrim}
       />
 
+      <PhoneRemoteModal
+        isOpen={isRemoteModalOpen}
+        settings={settings}
+        onClose={() => setIsRemoteModalOpen(false)}
+        onSaveSettings={handleSaveSettings}
+      />
+
       <SettingsModal
         isOpen={isSettingsModalOpen}
-        initialTab={settingsInitialTab}
         settings={settings}
         onClose={() => setIsSettingsModalOpen(false)}
         onSaveSettings={handleSaveSettings}

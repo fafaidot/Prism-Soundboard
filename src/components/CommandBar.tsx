@@ -124,6 +124,17 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           >
             Favorites
           </button>
+          <button
+            type="button"
+            onClick={() => onFilterChange('youtube')}
+            className={`px-3 py-1 rounded-md text-[11.5px] font-medium transition-colors cursor-pointer ${
+              activeFilter === 'youtube'
+                ? 'bg-white/[0.12] text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            YouTube
+          </button>
         </div>
       </div>
 

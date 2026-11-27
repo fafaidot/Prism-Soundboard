@@ -73,17 +73,42 @@ export interface AudioSettings {
   enableFrostedGlass?: boolean; // Translucent frosted glass and Windows 11 acrylic effects (default: true)
   remoteControlEnabled?: boolean; // Enable local Wi-Fi mobile remote server
   remoteControlPort?: number; // Default 3940
-  remoteControlPin?: string; // 4-6 digit PIN required on every phone connection
+  remoteControlPin?: string; // 4-6 digit Owner PIN required on every phone connection
+  remoteGuestEnabled?: boolean; // Allow a separate Friend PIN with restricted permissions
+  remoteGuestPin?: string; // 4-6 digit Friend PIN
+  remoteGuestPermissions?: RemoteGuestPermissions;
+}
+
+export interface RemoteGuestPermissions {
+  canStopAll: boolean;
+  canEditSounds: boolean;
+  canDeleteSounds: boolean;
+  canAddSounds: boolean;
+  canAudioClip: boolean;
+  canVideoClip: boolean;
+}
+
+export interface PublicTunnelStatus {
+  active: boolean;
+  status: 'stopped' | 'downloading' | 'starting' | 'online' | 'error';
+  url: string;
+  qrDataUrl: string;
+  downloadProgress?: number;
+  error?: string;
 }
 
 export interface RemoteConnectedDevice {
   id: string;
+  role: 'owner' | 'guest';
+  name?: string;
   label: string;
   ip: string;
   connectedAt: number;
   lastSeen: number;
   online: boolean;
   tempLocked: boolean;
+  permissions?: RemoteGuestPermissions;
+  hasCustomPermissions?: boolean;
 }
 
 export interface RemoteServerStatus {
@@ -91,11 +116,15 @@ export interface RemoteServerStatus {
   running: boolean;
   port: number;
   pin: string;
+  guestEnabled?: boolean;
+  guestPin?: string;
+  guestPermissions?: RemoteGuestPermissions;
   urls: string[];
   primaryUrl: string;
   qrDataUrl: string;
   connectedClients: number;
   devices?: RemoteConnectedDevice[];
+  tunnel?: PublicTunnelStatus;
   error?: string;
 }
 
@@ -229,12 +258,17 @@ export interface SoundboardAPI {
   changeStorageLocation?: (newRootPath: string) => Promise<{ success: boolean; root: string; sounds: string; videos: string; error?: string }>;
   selectStorageFolderDialog?: () => Promise<string | null>;
 
-  // Mobile Remote Server (LAN Wi-Fi Deck)
+  // Mobile Remote Server (LAN Wi-Fi Deck & Public Tunnel)
   getRemoteServerStatus?: () => Promise<RemoteServerStatus>;
   regenerateRemotePin?: () => Promise<RemoteServerStatus>;
+  regenerateGuestPin?: () => Promise<RemoteServerStatus>;
   disconnectRemoteClients?: () => Promise<RemoteServerStatus>;
   setRemoteTempLock?: (deviceIds: string[] | 'all', locked: boolean) => Promise<RemoteServerStatus>;
+  setRemoteGuestPermissions?: (permissions: Partial<RemoteGuestPermissions>) => Promise<RemoteServerStatus>;
+  setRemoteDevicePermissions?: (deviceId: string, permissions: Partial<RemoteGuestPermissions>) => Promise<RemoteServerStatus>;
   removeRemoteDevices?: (deviceIds: string[] | 'all') => Promise<RemoteServerStatus>;
+  startPublicTunnel?: () => Promise<RemoteServerStatus>;
+  stopPublicTunnel?: () => Promise<RemoteServerStatus>;
   onRemoteServerStatusUpdated?: (callback: (status: RemoteServerStatus) => void) => () => void;
 }
 

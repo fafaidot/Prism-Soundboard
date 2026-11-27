@@ -502,12 +502,46 @@ class StorageManager {
       remoteControlEnabled: true,
       remoteControlPort: 3940,
       remoteControlPin: '',
+      remoteGuestEnabled: true,
+      remoteGuestPin: '',
+      remoteGuestPermissions: {
+        canStopAll: false,
+        canEditSounds: false,
+        canDeleteSounds: false,
+        canAddSounds: false,
+        canAudioClip: false,
+        canVideoClip: false,
+      },
     };
 
     const loaded = this.loadWithAutoRecovery(this.settingsFile, 'settings', defaults);
-    const merged = { ...defaults, ...loaded };
+    const merged = {
+      ...defaults,
+      ...loaded,
+      remoteGuestPermissions: {
+        ...defaults.remoteGuestPermissions,
+        ...(loaded?.remoteGuestPermissions || {}),
+      },
+    };
+
+    let changed = false;
     if (!merged.remoteControlPin || !/^\d{4,6}$/.test(String(merged.remoteControlPin))) {
       merged.remoteControlPin = String(Math.floor(1000 + Math.random() * 9000));
+      changed = true;
+    }
+    if (
+      !merged.remoteGuestPin ||
+      !/^\d{4,6}$/.test(String(merged.remoteGuestPin)) ||
+      String(merged.remoteGuestPin) === String(merged.remoteControlPin)
+    ) {
+      let gp = String(Math.floor(1000 + Math.random() * 9000));
+      if (gp === String(merged.remoteControlPin)) {
+        gp = String(((parseInt(gp, 10) + 1379) % 9000) + 1000);
+      }
+      merged.remoteGuestPin = gp;
+      changed = true;
+    }
+    if (changed) {
       this.atomicWriteJson(this.settingsFile, merged);
     }
     return merged;
