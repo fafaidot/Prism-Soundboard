@@ -1897,7 +1897,7 @@ ipcMain.handle('rename-virtual-mic', async () => {
 // GitHub Release Update Checker helper
 function fetchLatestGitHubRelease() {
   return new Promise((resolve) => {
-    let currentVersion = '1.6.1';
+    let currentVersion = '1.6.2';
     try {
       const pkgPath = path.join(__dirname, '../package.json');
       if (fs.existsSync(pkgPath)) {
@@ -2424,7 +2424,7 @@ async function initRemoteServer() {
       },
       stopAll: async () => {
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('panic-hotkey-triggered');
+          mainWindow.webContents.send('panic-hotkey-triggered', { skipRemoteLog: true });
         }
       },
       togglePauseSound: async (soundId) => {
@@ -2729,8 +2729,8 @@ ipcMain.handle('disconnect-remote-clients', async () => {
   return getCombinedRemoteStatus();
 });
 
-ipcMain.handle('set-remote-temp-lock', async (_event, { deviceIds, locked }) => {
-  remoteServer.setTempLockForDevices(deviceIds, !!locked);
+ipcMain.handle('set-remote-temp-lock', async (_event, { deviceIds, locked, durationSeconds = 0 }) => {
+  remoteServer.setTempLockForDevices(deviceIds, !!locked, Number(durationSeconds) || 0);
   return getCombinedRemoteStatus();
 });
 

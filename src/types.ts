@@ -77,6 +77,7 @@ export interface AudioSettings {
   remoteGuestEnabled?: boolean; // Allow a separate Friend PIN with restricted permissions
   remoteGuestPin?: string; // 4-6 digit Friend PIN
   remoteGuestPermissions?: RemoteGuestPermissions;
+  remoteGuestCooldownSeconds?: number; // Spam cooldown in seconds between Friend sound triggers (default 1)
 }
 
 export interface RemoteGuestPermissions {
@@ -143,6 +144,7 @@ export interface RemoteConnectedDevice {
   lastSeen: number;
   online: boolean;
   tempLocked: boolean;
+  tempLockedUntil?: number | null;
   permissions?: RemoteGuestPermissions;
   hasCustomPermissions?: boolean;
 }
@@ -155,6 +157,7 @@ export interface RemoteServerStatus {
   guestEnabled?: boolean;
   guestPin?: string;
   guestPermissions?: RemoteGuestPermissions;
+  guestCooldownSeconds?: number;
   urls: string[];
   primaryUrl: string;
   qrDataUrl: string;
@@ -222,7 +225,7 @@ export interface SoundboardAPI {
   unregisterGlobalHotkey: (hotkey: string) => Promise<boolean>;
   unregisterAllHotkeys: () => Promise<boolean>;
   onGlobalHotkeyTriggered: (callback: (soundId: string) => void) => () => void;
-  onPanicHotkeyTriggered: (callback: () => void) => () => void;
+  onPanicHotkeyTriggered: (callback: (payload?: { skipRemoteLog?: boolean }) => void) => () => void;
   onRepeatLastHotkeyTriggered?: (callback: () => void) => () => void;
   onOverlayHotkeyTriggered?: (callback: () => void) => () => void;
   onRecordHotkeyTriggered?: (callback: () => void) => () => void;
@@ -301,7 +304,7 @@ export interface SoundboardAPI {
   regenerateRemotePin?: () => Promise<RemoteServerStatus>;
   regenerateGuestPin?: () => Promise<RemoteServerStatus>;
   disconnectRemoteClients?: () => Promise<RemoteServerStatus>;
-  setRemoteTempLock?: (deviceIds: string[] | 'all', locked: boolean) => Promise<RemoteServerStatus>;
+  setRemoteTempLock?: (deviceIds: string[] | 'all', locked: boolean, durationSeconds?: number) => Promise<RemoteServerStatus>;
   setRemoteGuestPermissions?: (permissions: Partial<RemoteGuestPermissions>) => Promise<RemoteServerStatus>;
   setRemoteDevicePermissions?: (deviceId: string, permissions: Partial<RemoteGuestPermissions>) => Promise<RemoteServerStatus>;
   removeRemoteDevices?: (deviceIds: string[] | 'all') => Promise<RemoteServerStatus>;

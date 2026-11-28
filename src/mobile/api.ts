@@ -1,4 +1,4 @@
-import { SoundItem, VideoClipItem, YouTubeSearchResult, RemoteGuestPermissions, ActivePlaybackEntry } from '../types';
+import { SoundItem, VideoClipItem, YouTubeSearchResult, RemoteGuestPermissions, ActivePlaybackEntry, RemoteActivityEvent } from '../types';
 
 export interface RemoteSessionInfo {
   role: 'owner' | 'guest';
@@ -7,6 +7,7 @@ export interface RemoteSessionInfo {
   color?: string;
   requiresName?: boolean;
   permissions: RemoteGuestPermissions;
+  cooldownSeconds?: number;
 }
 
 export interface RemoteSettingsSnapshot {
@@ -26,6 +27,7 @@ export interface RemoteStateSnapshot {
   pausedSoundIds: string[];
   progressMap: Record<string, number>;
   activePlaybacks?: ActivePlaybackEntry[];
+  recentActivity?: RemoteActivityEvent[];
   settings: RemoteSettingsSnapshot;
   isRecordingClip: boolean;
   hostName: string;
@@ -35,11 +37,13 @@ export interface RemoteStateSnapshot {
 
 export interface RemoteSessionStatusResponse {
   tempLocked: boolean;
+  tempLockedUntil?: number | null;
   session: RemoteSessionInfo;
   activeSoundIds: string[];
   pausedSoundIds: string[];
   progressMap: Record<string, number>;
   activePlaybacks: ActivePlaybackEntry[];
+  recentActivity?: RemoteActivityEvent[];
 }
 
 async function apiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
@@ -65,12 +69,13 @@ async function apiFetch<T>(path: string, token: string, init: RequestInit = {}):
   if (!res.ok) {
     const err: any = new Error(json.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.data = json;
     throw err;
   }
   return json as T;
 }
 
-export async function getHealth(): Promise<{ ok: boolean; hostName: string; appVersion: string }> {
+export async function getHealth(): Promise<{ ok: boolean; hostName: string; appVersion: string; pinLengths?: number[] }> {
   return apiFetch('/api/health', '');
 }
 
@@ -203,11 +208,12 @@ export interface StreamCallbacks {
   onPaused: (pausedIds: string[]) => void;
   onProgress: (progressMap: Record<string, number>) => void;
   onPlaybacks?: (playbacks: ActivePlaybackEntry[]) => void;
+  onActivity?: (entry: RemoteActivityEvent) => void;
   onSettings: (settings: RemoteSettingsSnapshot) => void;
   onRecording: (isRecordingClip: boolean) => void;
   onPermissions?: (session: RemoteSessionInfo) => void;
   onToast: (toast: { message: string; kind?: string }) => void;
-  onTempLocked: (payload: { locked: boolean; reason?: string }) => void;
+  onTempLocked: (payload: { locked: boolean; reason?: string; until?: number | null }) => void;
   onLocked: (reason: string) => void;
   onConnectionChange: (connected: boolean) => void;
 }
@@ -236,11 +242,12 @@ export function connectRemoteEvents(token: string, cb: StreamCallbacks): () => v
   bind<string[]>('paused', cb.onPaused);
   bind<Record<string, number>>('progress', cb.onProgress);
   bind<ActivePlaybackEntry[]>('playbacks', (d) => cb.onPlaybacks?.(d));
+  bind<RemoteActivityEvent>('activity', (d) => cb.onActivity?.(d));
   bind<RemoteSettingsSnapshot>('settings', cb.onSettings);
   bind<{ isRecordingClip: boolean }>('recording', (d) => cb.onRecording(!!d.isRecordingClip));
   bind<RemoteSessionInfo>('permissions', (d) => cb.onPermissions?.(d));
   bind<{ message: string; kind?: string }>('toast', cb.onToast);
-  bind<{ locked: boolean; reason?: string }>('temp_locked', cb.onTempLocked);
+  bind<{ locked: boolean; reason?: string; until?: number | null }>('temp_locked', cb.onTempLocked);
   bind<{ reason?: string }>('locked', (d) => {
     es.close();
     cb.onLocked(d.reason || 'Disconnected');

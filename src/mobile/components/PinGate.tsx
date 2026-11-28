@@ -5,14 +5,27 @@ import prismLogo from '../../assets/Prism.png';
 interface PinGateProps {
   hostName: string;
   lockMessage?: string | null;
+  savedName?: string;
+  pinLengths?: number[];
+  onClearSavedName?: () => void;
   onSubmitPin: (pin: string) => Promise<void>;
 }
 
-export const PinGate: React.FC<PinGateProps> = ({ hostName, lockMessage, onSubmitPin }) => {
+export const PinGate: React.FC<PinGateProps> = ({
+  hostName,
+  lockMessage,
+  savedName,
+  pinLengths = [4],
+  onClearSavedName,
+  onSubmitPin,
+}) => {
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(lockMessage || null);
   const [shaking, setShaking] = useState(false);
+
+  const normalizedLengths = pinLengths.length > 0 ? pinLengths : [4];
+  const maxPinLen = Math.min(6, Math.max(4, ...normalizedLengths));
 
   useEffect(() => {
     if (lockMessage) setError(lockMessage);
@@ -40,19 +53,29 @@ export const PinGate: React.FC<PinGateProps> = ({ hostName, lockMessage, onSubmi
     [onSubmitPin, submitting]
   );
 
-  const pressDigit = (d: string) => {
-    if (submitting || pin.length >= 6) return;
-    navigator.vibrate?.(10);
-    setError(null);
-    const next = pin + d;
-    setPin(next);
-  };
+  const pressDigit = useCallback(
+    (d: string) => {
+      if (submitting || pin.length >= maxPinLen) return;
+      navigator.vibrate?.(10);
+      setError(null);
+      const next = pin + d;
+      setPin(next);
+      // Automatically submit once the expected PIN length is reached
+      if (
+        (normalizedLengths.length === 1 && next.length === normalizedLengths[0]) ||
+        (normalizedLengths.length > 1 && next.length === maxPinLen)
+      ) {
+        tryUnlock(next);
+      }
+    },
+    [maxPinLen, normalizedLengths, pin, submitting, tryUnlock]
+  );
 
-  const handleBackspace = () => {
+  const handleBackspace = useCallback(() => {
     if (submitting || pin.length === 0) return;
     navigator.vibrate?.(8);
     setPin((p) => p.slice(0, -1));
-  };
+  }, [pin.length, submitting]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -66,7 +89,7 @@ export const PinGate: React.FC<PinGateProps> = ({ hostName, lockMessage, onSubmi
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pin, submitting, tryUnlock]);
+  }, [handleBackspace, pin, pressDigit, submitting, tryUnlock]);
 
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -101,11 +124,30 @@ export const PinGate: React.FC<PinGateProps> = ({ hostName, lockMessage, onSubmi
           <p className="text-[12.5px] text-slate-400">
             Enter the Owner or Friend PIN from Prism Desktop
           </p>
+          {savedName && (
+            <div className="pt-1 flex items-center justify-center">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/[0.1] text-[11px] text-slate-300">
+                <span>
+                  Name: <strong className="text-white">{savedName}</strong>
+                </span>
+                {onClearSavedName && (
+                  <button
+                    type="button"
+                    onClick={onClearSavedName}
+                    style={{ color: 'var(--accent)' }}
+                    className="font-semibold hover:underline cursor-pointer"
+                  >
+                    Change
+                  </button>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* PIN Slots */}
         <div className={`flex items-center justify-center gap-3 py-2 ${shaking ? 'animate-pin-shake' : ''}`}>
-          {[0, 1, 2, 3, ...(pin.length > 4 ? [4] : []), ...(pin.length > 5 ? [5] : [])].map((idx) => {
+          {Array.from({ length: Math.max(4, maxPinLen) }, (_, idx) => {
             const filled = idx < pin.length;
             return (
               <div

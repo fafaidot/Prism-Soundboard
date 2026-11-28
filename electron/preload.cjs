@@ -41,7 +41,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
 
   onPanicHotkeyTriggered: (callback) => {
     ipcRenderer.removeAllListeners('panic-hotkey-triggered');
-    const handler = () => callback();
+    const handler = (_event, payload) => callback(payload);
     ipcRenderer.on('panic-hotkey-triggered', handler);
     return () => ipcRenderer.removeListener('panic-hotkey-triggered', handler);
   },
@@ -150,7 +150,7 @@ contextBridge.exposeInMainWorld('soundboardAPI', {
   regenerateRemotePin: () => ipcRenderer.invoke('regenerate-remote-pin'),
   regenerateGuestPin: () => ipcRenderer.invoke('regenerate-remote-pin', { type: 'guest' }),
   disconnectRemoteClients: () => ipcRenderer.invoke('disconnect-remote-clients'),
-  setRemoteTempLock: (deviceIds, locked) => ipcRenderer.invoke('set-remote-temp-lock', { deviceIds, locked }),
+  setRemoteTempLock: (deviceIds, locked, durationSeconds = 0) => ipcRenderer.invoke('set-remote-temp-lock', { deviceIds, locked, durationSeconds }),
   setRemoteGuestPermissions: (permissions) => ipcRenderer.invoke('set-remote-guest-permissions', permissions),
   setRemoteDevicePermissions: (deviceId, permissions) => ipcRenderer.invoke('set-remote-device-permissions', { deviceId, permissions }),
   removeRemoteDevices: (deviceIds) => ipcRenderer.invoke('remove-remote-devices', deviceIds),

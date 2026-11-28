@@ -48,6 +48,7 @@ const DEFAULT_SETTINGS: AudioSettings = {
   sortBy: 'newest',
   activeFilter: 'all',
   enableFrostedGlass: true,
+  remoteGuestCooldownSeconds: 1,
 };
 
 export const App: React.FC = () => {
@@ -85,6 +86,7 @@ export const App: React.FC = () => {
   const [pausedSoundIds, setPausedSoundIds] = useState<string[]>([]);
   const [activePlaybacks, setActivePlaybacks] = useState<ActivePlaybackEntry[]>([]);
   const activeActorsRef = useRef<Record<string, ActivePlaybackEntry>>({});
+  const pendingActorsRef = useRef<Record<string, ActivePlaybackEntry>>({});
   const [playbackProgressMap, setPlaybackProgressMap] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'clips' | 'youtube' | 'favorites'>('all');
@@ -144,7 +146,10 @@ export const App: React.FC = () => {
 
       const nextActors: Record<string, ActivePlaybackEntry> = {};
       for (const id of activeIds) {
-        if (activeActorsRef.current[id]) {
+        if (pendingActorsRef.current[id]) {
+          nextActors[id] = pendingActorsRef.current[id];
+          delete pendingActorsRef.current[id];
+        } else if (activeActorsRef.current[id]) {
           nextActors[id] = activeActorsRef.current[id];
         } else {
           const s = soundsRef.current.find((item) => item.id === id);
@@ -436,8 +441,8 @@ export const App: React.FC = () => {
       }
     });
 
-    const cleanupPanic = window.soundboardAPI.onPanicHotkeyTriggered(() => {
-      handleStopAll();
+    const cleanupPanic = window.soundboardAPI.onPanicHotkeyTriggered((payload) => {
+      handleStopAll(!!payload?.skipRemoteLog);
     });
 
     const cleanupRepeatLast = window.soundboardAPI.onRepeatLastHotkeyTriggered
@@ -850,6 +855,10 @@ export const App: React.FC = () => {
       role: actor?.role || 'owner',
       startedAt: Date.now(),
     };
+    pendingActorsRef.current = {
+      ...pendingActorsRef.current,
+      [sound.id]: effectiveActor,
+    };
     activeActorsRef.current = {
       ...activeActorsRef.current,
       [sound.id]: effectiveActor,
@@ -878,18 +887,21 @@ export const App: React.FC = () => {
   };
 
   // Stop all sounds
-  const handleStopAll = () => {
+  const handleStopAll = (skipRemoteLog: unknown = false) => {
     triggerStopAllFeedback();
     audioEngine.stopAll();
     setActiveSoundIds([]);
     setActivePlaybacks([]);
     activeActorsRef.current = {};
+    pendingActorsRef.current = {};
     if (window.soundboardAPI?.sendIpcCommand) {
       window.soundboardAPI.sendIpcCommand('sync-active-playbacks', []);
-      window.soundboardAPI.sendIpcCommand('record-desktop-activity', {
-        type: 'stop',
-        action: 'Stopped all sounds',
-      });
+      if (skipRemoteLog !== true) {
+        window.soundboardAPI.sendIpcCommand('record-desktop-activity', {
+          type: 'stop',
+          action: 'Stopped all sounds',
+        });
+      }
     }
   };
 
@@ -971,7 +983,7 @@ export const App: React.FC = () => {
           volume: 125,
           reproductionMode: 'stop',
           reproductionOptions: {
-            stopOtherSounds: true,
+            stopOtherSounds: false,
             muteOtherSounds: false,
             muteVoice: false,
             loop: false,

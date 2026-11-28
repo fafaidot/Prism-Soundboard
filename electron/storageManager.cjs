@@ -504,6 +504,7 @@ class StorageManager {
       remoteControlPin: '',
       remoteGuestEnabled: true,
       remoteGuestPin: '',
+      remoteGuestCooldownSeconds: 1,
       remoteGuestPermissions: {
         canStopAll: false,
         canControlVolume: false,

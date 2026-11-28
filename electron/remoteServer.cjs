@@ -63,6 +63,8 @@ class RemoteServer {
     this.guestEnabled = true;
     this.guestPin = '';
     this.guestPermissions = { ...DEFAULT_GUEST_PERMISSIONS };
+    this.guestCooldownSeconds = 1;
+    this.timeoutExpiryTimer = null;
     this.lastError = '';
     this.distDir = '';
     this.devServerUrl = '';
@@ -176,6 +178,7 @@ class RemoteServer {
     if (this.activityLog.length > 150) {
       this.activityLog.length = 150;
     }
+    this.broadcastSse('activity', entry);
     this.notifyStatusChanged();
     return entry;
   }
@@ -312,6 +315,7 @@ class RemoteServer {
     if (!sess || sess.role === 'owner') {
       return {
         role: 'owner',
+        cooldownSeconds: 0,
         permissions: {
           canStopAll: true,
           canControlVolume: true,
@@ -329,6 +333,7 @@ class RemoteServer {
       initials: sess.initials || this.computeInitials(sess.friendName || sess.label, 'FR'),
       color: sess.color || '#a78bfa',
       requiresName: !sess.friendName,
+      cooldownSeconds: this.guestCooldownSeconds,
       permissions: { ...DEFAULT_GUEST_PERMISSIONS, ...(sess.permissions || this.guestPermissions) },
     };
   }
@@ -341,6 +346,7 @@ class RemoteServer {
       pausedSoundIds: this.state.pausedSoundIds || [],
       progressMap: this.state.progressMap || {},
       activePlaybacks: this.state.activePlaybacks || [],
+      recentActivity: this.activityLog.slice(0, 30),
       settings: this.sanitizeSettings(this.state.settings),
       isRecordingClip: !!this.state.isRecordingClip,
       hostName: os.hostname(),
@@ -411,6 +417,7 @@ class RemoteServer {
   }
 
   getConnectedDevices() {
+    this.checkExpiredTimeouts();
     const devices = [];
     for (const [token, sess] of this.sessions.entries()) {
       const online = (this.sseClients.get(token)?.size || 0) > 0;
@@ -427,6 +434,7 @@ class RemoteServer {
         lastSeen: sess.lastSeen,
         online,
         tempLocked: !!sess.tempLocked,
+        tempLockedUntil: sess.tempLockedUntil || null,
         permissions: roleState.permissions,
         hasCustomPermissions: !!sess.hasCustomPermissions,
       });
@@ -465,6 +473,7 @@ class RemoteServer {
       guestEnabled: this.guestEnabled,
       guestPin: this.guestPin,
       guestPermissions: { ...this.guestPermissions },
+      guestCooldownSeconds: this.guestCooldownSeconds,
       urls,
       primaryUrl,
       qrDataUrl,
@@ -632,33 +641,104 @@ class RemoteServer {
     return changed;
   }
 
+  formatTimeoutLabel(seconds) {
+    const sec = Math.max(0, Math.round(Number(seconds) || 0));
+    if (sec >= 60 && sec % 60 === 0) return `${sec / 60}m`;
+    return `${sec}s`;
+  }
+
   /**
-   * Put selected device sessions in Timeout or end Timeout without requiring a PIN to resume.
+   * Auto-unlock any timed timeouts whose expiry timestamp has passed.
+   */
+  checkExpiredTimeouts() {
+    const now = Date.now();
+    let changed = false;
+
+    for (const [token, sess] of this.sessions.entries()) {
+      if (sess.tempLocked && sess.tempLockedUntil && now >= sess.tempLockedUntil) {
+        sess.tempLocked = false;
+        sess.tempLockedUntil = null;
+        changed = true;
+
+        this.sendSseToToken(token, 'temp_locked', { locked: false, until: null });
+        this.sendSseToToken(token, 'state', this.getPublicStateSnapshot(sess));
+
+        const actor = this.getActorFromSession(sess);
+        this.recordActivity({
+          type: 'timeout',
+          actor,
+          action: 'Timed timeout ended',
+          detail: sess.label,
+        });
+      }
+    }
+
+    this.scheduleTimeoutExpiry();
+
+    if (changed) {
+      this.notifyStatusChanged();
+    }
+    return changed;
+  }
+
+  scheduleTimeoutExpiry() {
+    if (this.timeoutExpiryTimer) {
+      clearTimeout(this.timeoutExpiryTimer);
+      this.timeoutExpiryTimer = null;
+    }
+
+    let earliest = Infinity;
+    for (const sess of this.sessions.values()) {
+      if (sess.tempLocked && sess.tempLockedUntil && sess.tempLockedUntil < earliest) {
+        earliest = sess.tempLockedUntil;
+      }
+    }
+
+    if (Number.isFinite(earliest)) {
+      const delay = Math.max(50, Math.min(earliest - Date.now() + 25, 2147483647));
+      this.timeoutExpiryTimer = setTimeout(() => {
+        this.timeoutExpiryTimer = null;
+        this.checkExpiredTimeouts();
+      }, delay);
+      this.timeoutExpiryTimer.unref?.();
+    }
+  }
+
+  /**
+   * Put selected device sessions in Timeout (optionally for durationSeconds) or end Timeout without requiring a PIN to resume.
    * @param {string[] | 'all'} deviceIds
    * @param {boolean} locked
+   * @param {number} [durationSeconds=0]
    */
-  setTempLockForDevices(deviceIds, locked) {
+  setTempLockForDevices(deviceIds, locked, durationSeconds = 0) {
     const isAll = deviceIds === 'all';
     const targetIds = Array.isArray(deviceIds) ? new Set(deviceIds) : null;
     if (!isAll && (!targetIds || targetIds.size === 0)) return false;
 
     const nextLocked = !!locked;
+    const durSec =
+      nextLocked && Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) > 0
+        ? Math.round(Number(durationSeconds))
+        : 0;
+    const nextUntil = nextLocked && durSec > 0 ? Date.now() + durSec * 1000 : null;
     let changed = false;
 
     for (const [token, sess] of this.sessions.entries()) {
       if (!isAll && !targetIds.has(sess.id)) continue;
-      if (!!sess.tempLocked === nextLocked) continue;
+      if (!!sess.tempLocked === nextLocked && (sess.tempLockedUntil || null) === nextUntil) continue;
 
       sess.tempLocked = nextLocked;
+      sess.tempLockedUntil = nextUntil;
       changed = true;
 
       if (nextLocked) {
         this.sendSseToToken(token, 'temp_locked', {
           locked: true,
           reason: 'Timed out from PC',
+          until: nextUntil,
         });
       } else {
-        this.sendSseToToken(token, 'temp_locked', { locked: false });
+        this.sendSseToToken(token, 'temp_locked', { locked: false, until: null });
         this.sendSseToToken(token, 'state', this.getPublicStateSnapshot(sess));
       }
 
@@ -666,10 +746,16 @@ class RemoteServer {
       this.recordActivity({
         type: 'timeout',
         actor,
-        action: nextLocked ? 'Put in timeout' : 'Timeout ended',
+        action: nextLocked
+          ? durSec > 0
+            ? `Put in ${this.formatTimeoutLabel(durSec)} timeout`
+            : 'Put in timeout'
+          : 'Timeout ended',
         detail: sess.label,
       });
     }
+
+    this.scheduleTimeoutExpiry();
 
     if (changed) {
       this.notifyStatusChanged();
@@ -789,6 +875,10 @@ class RemoteServer {
       ...DEFAULT_GUEST_PERMISSIONS,
       ...(settings?.remoteGuestPermissions || {}),
     };
+    const rawCooldown = Number(settings?.remoteGuestCooldownSeconds);
+    const nextGuestCooldown = Number.isFinite(rawCooldown) && rawCooldown >= 0
+      ? Math.min(60, Math.round(rawCooldown * 10) / 10)
+      : 1;
 
     this.state.settings = { ...this.state.settings, ...(settings || {}) };
 
@@ -796,12 +886,14 @@ class RemoteServer {
     const guestPinChanged = this.guestPin && this.guestPin !== guestPin;
     const guestDisabled = this.guestEnabled && !guestEnabled;
     const permsChanged = JSON.stringify(this.guestPermissions) !== JSON.stringify(nextGuestPerms);
+    const cooldownChanged = this.guestCooldownSeconds !== nextGuestCooldown;
     const portChanged = this.port !== port;
 
     this.pin = pin;
     this.guestEnabled = guestEnabled;
     this.guestPin = guestPin;
     this.guestPermissions = nextGuestPerms;
+    this.guestCooldownSeconds = nextGuestCooldown;
     this.enabled = enabled;
 
     if (!enabled) {
@@ -820,7 +912,7 @@ class RemoteServer {
       await this.start(port);
     } else {
       this.broadcastSse('settings', this.sanitizeSettings(this.state.settings));
-      if (permsChanged) {
+      if (permsChanged || cooldownChanged) {
         this.setGuestDefaultPermissions(nextGuestPerms);
       } else {
         this.notifyStatusChanged();
@@ -870,15 +962,16 @@ class RemoteServer {
   startHeartbeat() {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = setInterval(() => {
+      this.checkExpiredTimeouts();
       const now = Date.now();
       let pruned = false;
 
-      // Lock out abandoned sessions (left website: no open SSE and no status poll for >12s)
+      // Lock out abandoned sessions (left website: no open SSE and no status poll for >30s)
       for (const [token, sess] of [...this.sessions.entries()]) {
         const hasSse = (this.sseClients.get(token)?.size || 0) > 0;
         if (hasSse) continue;
         const staleMs = now - (sess.lastSeen || sess.createdAt || now);
-        if (staleMs > 12000) {
+        if (staleMs > 30000) {
           if (sess.disconnectTimer) {
             clearTimeout(sess.disconnectTimer);
             sess.disconnectTimer = null;
@@ -913,6 +1006,10 @@ class RemoteServer {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (this.timeoutExpiryTimer) {
+      clearTimeout(this.timeoutExpiryTimer);
+      this.timeoutExpiryTimer = null;
     }
     this.disconnectAllClients('Server stopped');
     if (this.server) {
@@ -985,6 +1082,7 @@ class RemoteServer {
   }
 
   requireAuth(req, res, parsedUrl, allowWhenTempLocked = false) {
+    this.checkExpiredTimeouts();
     const token = this.extractToken(req, parsedUrl);
     if (!token || !this.sessions.has(token)) {
       this.sendJson(res, 401, { error: 'PIN authentication required' });
@@ -997,7 +1095,11 @@ class RemoteServer {
       sess.disconnectTimer = null;
     }
     if (!allowWhenTempLocked && sess.tempLocked) {
-      this.sendJson(res, 423, { error: 'Timed out from PC', tempLocked: true });
+      this.sendJson(res, 423, {
+        error: 'Timed out from PC',
+        tempLocked: true,
+        tempLockedUntil: sess.tempLockedUntil || null,
+      });
       return null;
     }
     return { token, session: sess };
@@ -1032,11 +1134,18 @@ class RemoteServer {
 
     // Public endpoints: health & PIN verification
     if (method === 'GET' && pathname === '/api/health') {
+      const pinLengths = Array.from(
+        new Set([
+          String(this.pin || '').length || 4,
+          ...(this.guestEnabled && this.guestPin ? [String(this.guestPin).length] : []),
+        ])
+      ).sort((a, b) => a - b);
       return this.sendJson(res, 200, {
         ok: true,
         hostName: os.hostname(),
         appVersion: this.state.appVersion,
         pinRequired: true,
+        pinLengths,
       });
     }
 
@@ -1165,11 +1274,13 @@ class RemoteServer {
       if (!statusAuth) return;
       return this.sendJson(res, 200, {
         tempLocked: !!statusAuth.session.tempLocked,
+        tempLockedUntil: statusAuth.session.tempLockedUntil || null,
         session: this.getSessionRoleState(statusAuth.session),
         activeSoundIds: this.state.activeSoundIds || [],
         pausedSoundIds: this.state.pausedSoundIds || [],
         progressMap: this.state.progressMap || {},
         activePlaybacks: this.state.activePlaybacks || [],
+        recentActivity: this.activityLog.slice(0, 20),
       });
     }
 
@@ -1219,7 +1330,7 @@ class RemoteServer {
           set.delete(res);
           if (set.size === 0) {
             this.sseClients.delete(sseAuth.token);
-            // If they left/closed the page (no SSE reconnect or status poll within 4.5s), lock them out immediately
+            // Grace window allows brief network/tunnel hiccups & app switches without falsely kicking active users
             const activeSess = this.sessions.get(sseAuth.token);
             if (activeSess && !activeSess.disconnectTimer) {
               activeSess.disconnectTimer = setTimeout(() => {
@@ -1227,7 +1338,7 @@ class RemoteServer {
                 const currentSess = this.sessions.get(sseAuth.token);
                 if (!currentSess) return;
                 const hasSse = (this.sseClients.get(sseAuth.token)?.size || 0) > 0;
-                const recentlyPolled = Date.now() - (currentSess.lastSeen || 0) < 3500;
+                const recentlyPolled = Date.now() - (currentSess.lastSeen || 0) < 20000;
                 if (!hasSse && !recentlyPolled) {
                   const actor = this.getActorFromSession(currentSess);
                   this.sessions.delete(sseAuth.token);
@@ -1238,7 +1349,7 @@ class RemoteServer {
                   });
                   this.notifyStatusChanged();
                 }
-              }, 4500);
+              }, 25000);
             }
           }
         }
@@ -1259,10 +1370,25 @@ class RemoteServer {
     const triggerMatch = pathname.match(/^\/api\/sounds\/([^/]+)\/trigger$/);
     if (method === 'POST' && triggerMatch) {
       const soundId = decodeURIComponent(triggerMatch[1]);
+      if (auth.session.role === 'guest' && this.guestCooldownSeconds > 0) {
+        const cooldownMs = Math.round(this.guestCooldownSeconds * 1000);
+        const now = Date.now();
+        const elapsed = now - (auth.session.lastTriggerAt || 0);
+        if (elapsed < cooldownMs) {
+          const remainingMs = cooldownMs - elapsed;
+          const waitSec = remainingMs >= 1000 ? (remainingMs / 1000).toFixed(1) : (remainingMs / 1000).toFixed(2);
+          return this.sendJson(res, 429, {
+            error: `Cooldown: wait ${waitSec}s`,
+            cooldownRemainingMs: remainingMs,
+            cooldownSeconds: this.guestCooldownSeconds,
+          });
+        }
+      }
       const actor = this.getActorFromSession(auth.session);
       const targetSound = (this.state.sounds || []).find((s) => s.id === soundId);
       const ok = await this.handlers.triggerSound?.(soundId, actor);
       if (!ok) return this.sendJson(res, 404, { error: 'Sound not found or main window unavailable' });
+      auth.session.lastTriggerAt = Date.now();
       this.recordActivity({
         type: 'play',
         actor,
@@ -1530,6 +1656,36 @@ class RemoteServer {
   async handleStaticOrDev(req, res, pathname) {
     // Serve built dist/ if devServerUrl isn't running, or proxy to Vite dev server
     if (this.devServerUrl) {
+      // Never serve Vite's auto-reloading HMR client script to phones; WS drops over LAN/tunnel trigger infinite reloads
+      if (pathname === '/@vite/client') {
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(`
+export function createHotContext() {
+  const noop = () => {};
+  return { data: {}, accept: noop, acceptExports: noop, dispose: noop, prune: noop, decline: noop, invalidate: noop, on: noop, off: noop, send: noop };
+}
+export function updateStyle(id, css) {
+  let el = document.querySelector('style[data-vite-dev-id="' + id + '"]');
+  if (!el) {
+    el = document.createElement('style');
+    el.setAttribute('data-vite-dev-id', id);
+    document.head.appendChild(el);
+  }
+  el.textContent = css;
+}
+export function removeStyle(id) {
+  const el = document.querySelector('style[data-vite-dev-id="' + id + '"]');
+  if (el) el.remove();
+}
+export const injectQuery = (url) => url;
+export default {};
+`);
+        return;
+      }
+
       const targetPath = pathname === '/' || pathname === '/mobile' ? '/mobile.html' : req.url || '/mobile.html';
       const devUrl = new URL(targetPath, this.devServerUrl);
       const proxyReq = http.request(
